@@ -1,4 +1,6 @@
 
+HOST = 'localhost:3088'
+
 COLLECTION_DIRS = {
     'KUFishvoucher': 'Ichthyology',
     'KUFishtissue': 'Ichthyology',

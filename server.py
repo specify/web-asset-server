@@ -2,7 +2,7 @@ from os import path, mkdir
 from mimetypes import guess_type
 from sh import convert
 
-from bottle import route, request, static_file
+from bottle import route, request, response, static_file, template, abort
 
 import settings
 
@@ -56,7 +56,7 @@ def fileupload():
 
     upload = request.files.values()[0]
     upload.save(pathname, overwrite=True)
-    response = 'Ok.'
+    resp = 'Ok.'
 
     if mimetype in settings.CAN_THUMBNAIL:
         thumb_basepath = get_path(request.forms.coll, thumb_p=True)
@@ -72,9 +72,15 @@ def fileupload():
             input_file += '[0]'
 
         convert(input_file, '-resize' , '%s>' % settings.THUMB_SIZE, '-background', 'white', '-flatten', output_file)
-        response += ' Thumbnail generated.'
+        resp += ' Thumbnail generated.'
 
-    return response
+    response.content_type = 'text/plain; charset=utf-8'
+    return resp
+
+@route('/web_asset_store.xml')
+def web_asset_store():
+    response.content_type = 'text/xml; charset=utf-8'
+    return template('web_asset_store.xml', host=settings.HOST)
 
 if __name__ == '__main__':
     from bottle import run
