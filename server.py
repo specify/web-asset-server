@@ -22,17 +22,25 @@ def fileget():
     mimetype, encoding = guess_type(storename)
 
     if thumb_p and scale is not None and mimetype in settings.CAN_THUMBNAIL:
-
-        if not path.exists(pathname):
-            abort(404)
-
         root, ext = path.splitext(storename)
         scaled_name = "%s_%d%s" % (root, scale, ext)
         scaled_pathname = path.join(basepath, scaled_name)
 
         if not path.exists(scaled_pathname):
+            if not path.exists(basepath):
+                mkdir(basepath)
+
+            orig_path = path.join(get_path(request.query.coll, False), storename)
+
+            if not path.exists(orig_path):
+                if settings.DEBUG: print "Missing original: ", orig_path
+                abort(404)
+
             output_file = 'png:' + scaled_pathname if mimetype == 'application/pdf' else scaled_pathname
-            convert(pathname, '-resize', "%dx%d>" % (scale, scale), output_file)
+            convert(orig_path, '-resize', "%dx%d>" % (scale, scale), output_file)
+            if settings.DEBUG: print "Scaling thumbnail to %d" % scale
+        else:
+            if settings.DEBUG: print "Serving previously scaled thumbnail"
 
         pathname = scaled_pathname
 
@@ -84,4 +92,4 @@ def web_asset_store():
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=8080, debug=True, reloader=True)
+    run(host='0.0.0.0', port=3088, debug=True, reloader=True)

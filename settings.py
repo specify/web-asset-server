@@ -1,3 +1,4 @@
+DEBUG = True
 
 HOST = 'localhost:3088'
 
@@ -6,7 +7,7 @@ COLLECTION_DIRS = {
     'KUFishtissue': 'Ichthyology',
 }
 
-BASE_DIR = '/media/sf_specifyassets/'
+BASE_DIR = '/home/ben/attachments/'
 THUMB_DIR = 'thumbnails'
 ORIG_DIR = 'originals'
 
