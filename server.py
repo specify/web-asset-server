@@ -17,36 +17,46 @@ def fileget():
     storename = request.query.filename
     basepath = get_path(request.query.coll, thumb_p)
     pathname = path.join(basepath, storename)
-    scale = request.query.get('scale', None)
-    scale = int(scale) if scale is not None else None
+
+    if not thumb_p:
+        return static_file(pathname, root='/')
+
+    scale = int(request.query.scale)
     mimetype, encoding = guess_type(storename)
 
-    if thumb_p and scale is not None and mimetype in settings.CAN_THUMBNAIL:
-        root, ext = path.splitext(storename)
-        scaled_name = "%s_%d%s" % (root, scale, ext)
-        scaled_pathname = path.join(basepath, scaled_name)
+    assert mimetype in settings.CAN_THUMBNAIL
 
-        if not path.exists(scaled_pathname):
-            if not path.exists(basepath):
-                mkdir(basepath)
+    root, ext = path.splitext(storename)
 
-            orig_path = path.join(get_path(request.query.coll, False), storename)
+    if mimetype == 'application/pdf':
+        # use PNG for PDF thumbnails
+        ext = '.png'
 
-            if not path.exists(orig_path):
-                if settings.DEBUG: print "Missing original: ", orig_path
-                abort(404)
+    scaled_name = "%s_%d%s" % (root, scale, ext)
+    scaled_pathname = path.join(basepath, scaled_name)
 
-            output_file = 'png:' + scaled_pathname if mimetype == 'application/pdf' else scaled_pathname
-            convert(orig_path, '-resize', "%dx%d>" % (scale, scale), output_file)
-            if settings.DEBUG: print "Scaling thumbnail to %d" % scale
-        else:
-            if settings.DEBUG: print "Serving previously scaled thumbnail"
+    if path.exists(scaled_pathname):
+        print "Serving previously scaled thumbnail"
+        return static_file(scaled_pathname, root='/')
 
-        pathname = scaled_pathname
+    if not path.exists(basepath):
+        mkdir(basepath)
 
-    send_mimetype = 'image/png' if mimetype == 'application/pdf' and thumb_p else 'auto'
+    orig_path = path.join(get_path(request.query.coll, False), storename)
 
-    return static_file(pathname, root='/', mimetype=send_mimetype)
+    if not path.exists(orig_path):
+        abort(404, "Missing original: %s" % orig_path)
+
+    input_spec = orig_path
+    convert_args = ('-resize', "%dx%d>" % (scale, scale))
+    if mimetype == 'application/pdf':
+        input_spec += '[0]'     # only thumbnail first page of PDF
+        convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
+
+    print "Scaling thumbnail to %d" % scale
+    convert(input_spec, *(convert_args + (scaled_pathname,)))
+
+    return static_file(scaled_pathname, root='/')
 
 @route('/fileupload', method='POST')
 def fileupload():
@@ -54,7 +64,6 @@ def fileupload():
     storename = request.forms.store
     basepath = get_path(request.forms.coll, thumb_p)
     pathname = path.join(basepath, storename)
-    mimetype, encoding = guess_type(storename)
 
     if thumb_p:
         return 'Ignoring thumbnail upload!'
@@ -64,26 +73,9 @@ def fileupload():
 
     upload = request.files.values()[0]
     upload.save(pathname, overwrite=True)
-    resp = 'Ok.'
-
-    if mimetype in settings.CAN_THUMBNAIL:
-        thumb_basepath = get_path(request.forms.coll, thumb_p=True)
-        thumbpath = path.join(thumb_basepath, storename)
-
-        if not path.exists(thumb_basepath):
-            mkdir(thumb_basepath)
-
-        output_file = thumbpath
-        input_file = pathname
-        if mimetype == 'application/pdf':
-            output_file = 'png:' + output_file
-            input_file += '[0]'
-
-        convert(input_file, '-resize' , '%s>' % settings.THUMB_SIZE, '-background', 'white', '-flatten', output_file)
-        resp += ' Thumbnail generated.'
 
     response.content_type = 'text/plain; charset=utf-8'
-    return resp
+    return 'Ok.'
 
 @route('/web_asset_store.xml')
 def web_asset_store():
