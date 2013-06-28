@@ -142,8 +142,8 @@ def getmetadata():
 @route('/web_asset_store.xml')
 def web_asset_store():
     response.content_type = 'text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host=settings.HOST)
+    return template('web_asset_store.xml', host="%s:%d" % (settings.HOST, settings.PORT))
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=3088, debug=True, reloader=True) # server='cherrypy')
+    run(host='0.0.0.0', port=settings.PORT, debug=settings.DEBUG, server=settings.SERVER)
