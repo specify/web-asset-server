@@ -1,6 +1,9 @@
 from os import path, mkdir
 from mimetypes import guess_type
 from sh import convert
+from collections import defaultdict, OrderedDict
+import EXIF
+import json
 
 from bottle import route, request, response, static_file, template, abort
 
@@ -76,6 +79,42 @@ def fileupload():
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
+
+@route('/getmetadata')
+def getmetadata():
+    storename = request.query.filename
+    basepath = get_path(request.query.coll, thumb_p=False)
+    pathname = path.join(basepath, storename)
+    datatype = request.query.dt
+
+    if not path.exists(pathname):
+        abort(404)
+
+    with open(pathname, 'rb') as f:
+        tags = EXIF.process_file(f)
+
+    if datatype == 'date':
+        try:
+            return str(tags['EXIF DateTimeOriginal'])
+        except KeyError:
+            abort(404, 'DateTime not found in EXIF')
+
+    data = defaultdict(dict)
+    for key, value in tags.items():
+        parts = key.split()
+        if len(parts) < 2: continue
+        try:
+            v = str(value)
+        except TypeError:
+            v = repr(value)
+
+        data[parts[0]][parts[1]] = str(v)
+
+    response.content_type = 'application/json'
+    return json.dumps([
+        OrderedDict( (('Name', key), ('Fields', value)) )
+        for key,value in data.items()
+        ], indent=4)
 
 @route('/web_asset_store.xml')
 def web_asset_store():

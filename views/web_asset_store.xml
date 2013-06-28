@@ -3,4 +3,5 @@
     <url type="read"><![CDATA[http://{{host}}/fileget?type=<type>&filename=<fname>&coll=<coll>&disp=<disp>&div=<div>&inst=<inst>]]></url>
     <url type="write"><![CDATA[http://{{host}}/fileupload]]></url>
     <url type="delete"><![CDATA[http://{{host}}/filedelete?type=<type>&filename=<fname>&coll=<coll>&disp=<disp>&div=<div>&inst=<inst>]]></url>
+    <url type="getmetadata"><![CDATA[http://{{host}}/getmetadata?dt=<dt>&type=<type>&filename=<fname>&coll=<coll>&disp=<disp>&div=<div>&inst=<inst>]]></url>
 </urls>
