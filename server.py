@@ -1,6 +1,7 @@
-from os import path, mkdir
+from os import path, mkdir, remove
 from mimetypes import guess_type
 from sh import convert
+from glob import glob
 from collections import defaultdict, OrderedDict
 import EXIF
 import json
@@ -80,6 +81,28 @@ def fileupload():
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
+@route('/filedelete', method='POST')
+def filedelete():
+    storename = request.forms.filename
+    basepath = get_path(request.forms.coll, False)
+    thumbpath = get_path(request.forms.coll, True)
+
+    pathname = path.join(basepath, storename)
+    if not path.exists(pathname):
+        abort(404)
+
+    print "Deleting %s" % pathname
+    remove(pathname)
+
+    prefix = storename.split('.att')[0]
+    pattern = path.join(thumbpath, prefix + '*')
+    print "Deleting thumbnails matching %s" % pattern
+    for name in glob(pattern):
+        remove(name)
+
+    response.content_type = 'text/plain; charset=utf-8'
+    return 'Ok.'
+
 @route('/getmetadata')
 def getmetadata():
     storename = request.query.filename
@@ -123,4 +146,4 @@ def web_asset_store():
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=3088, debug=True, reloader=True)
+    run(host='0.0.0.0', port=3088, debug=True, reloader=True) # server='cherrypy')
