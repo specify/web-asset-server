@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urls>
-    <url type="read"><![CDATA[http://{{host}}/fileget?type=<type>&filename=<fname>&coll=<coll>&disp=<disp>&div=<div>&inst=<inst>]]></url>
+    <url type="read"><![CDATA[http://{{host}}/fileget]]></url>
     <url type="write"><![CDATA[http://{{host}}/fileupload]]></url>
     <url type="delete"><![CDATA[http://{{host}}/filedelete]]></url>
-    <url type="getmetadata"><![CDATA[http://{{host}}/getmetadata?dt=<dt>&type=<type>&filename=<fname>&coll=<coll>&disp=<disp>&div=<div>&inst=<inst>]]></url>
+    <url type="getmetadata"><![CDATA[http://{{host}}/getmetadata]]></url>
 </urls>
