@@ -114,7 +114,11 @@ def getmetadata():
         abort(404)
 
     with open(pathname, 'rb') as f:
-        tags = EXIF.process_file(f)
+        try:
+            tags = EXIF.process_file(f)
+        except:
+            print "Error reading exif data."
+            tags = {}
 
     if datatype == 'date':
         try:
@@ -127,17 +131,19 @@ def getmetadata():
         parts = key.split()
         if len(parts) < 2: continue
         try:
-            v = str(value)
+            v = str(value).decode('ascii', 'replace').encode('utf-8')
         except TypeError:
             v = repr(value)
 
         data[parts[0]][parts[1]] = str(v)
 
     response.content_type = 'application/json'
-    return json.dumps([
-        OrderedDict( (('Name', key), ('Fields', value)) )
-        for key,value in data.items()
-        ], indent=4)
+    data = [OrderedDict( (('Name', key), ('Fields', value)) )
+            for key,value in data.items()]
+
+    return json.dumps(data, indent=4)
+
+
 
 @route('/web_asset_store.xml')
 def web_asset_store():
