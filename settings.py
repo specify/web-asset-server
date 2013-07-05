@@ -1,12 +1,18 @@
 DEBUG = True
 
+KEY = 'mCXJbpL102qTOrKU3FzeZbsrjT1J4vlrkIUZRQ5J9hmx3hMMZp4twyn5Ps5hThM'
+
+TIMEOUT = 300
+
+REQUIRE_KEY_FOR_GET = True
+
 # These values are interpolated into the web_asset_store.xml resource so the client
 # knows how to talk to the server.
 HOST = 'dhwd99p1.nhm.ku.edu'
-PORT = 3088
+PORT = 3080
 
 # Port the development test server should listen on.
-DEVELOPMENT_PORT = 3088
+DEVELOPMENT_PORT = PORT
 
 # Map collection names to directories.
 COLLECTION_DIRS = {

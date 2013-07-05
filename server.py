@@ -6,6 +6,8 @@ from urllib import pathname2url
 from collections import defaultdict, OrderedDict
 import EXIF
 import json
+import hmac
+import time
 
 from bottle import route, request, response, static_file, template, abort
 
@@ -16,10 +18,53 @@ def get_rel_path(coll, thumb_p):
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
     return path.join(coll_dir, type_dir)
 
+def generate_token(timestamp, filename):
+    timestamp = str(timestamp)
+    mac = hmac.new(settings.KEY, timestamp + filename)
+    return ':'.join((mac.hexdigest(), timestamp))
+
+class TokenException(Exception):
+    pass
+
+def get_timestamp():
+    return int(time.time())
+
+def validate_token(token_in, filename):
+    if ':' not in token_in:
+        raise TokenException("Auth token is malformed.")
+    mac_in, timestr = token_in.split(':')
+    try:
+        timestamp = int(timestr)
+    except ValueError:
+        raise TokenException("Auth token is malformed.")
+
+    if settings.TIMEOUT is not None:
+        current_time = get_timestamp()
+        if not  0 <= (current_time - timestamp) < settings.TIMEOUT:
+            raise TokenException("Auth token is expired: %s vs %s" % (timestamp, current_time))
+
+    if token_in != generate_token(timestamp, filename):
+        raise TokenException("Auth token is invalid.")
+
+def validate_token_in_request(request, filename):
+    if request.method in ("GET", "HEAD") and settings.REQUIRE_KEY_FOR_GET:
+        token = request.query.token
+        try:
+            validate_token(token, filename)
+        except TokenException as e:
+            abort(403, e)
+
+@route('/timestamp')
+def timestamp():
+    response.content_type = "text/plain; charset=utf-8"
+    return str(get_timestamp())
+
 def resolve_file():
     thumb_p = (request.query['type'] == "T")
     storename = request.query.filename
     relpath = get_rel_path(request.query.coll, thumb_p)
+
+    validate_token_in_request(request, storename)
 
     if not thumb_p:
         return path.join(relpath, storename)
@@ -167,4 +212,4 @@ def web_asset_store():
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=settings.PORT, debug=settings.DEBUG, server=settings.SERVER)
+    run(host='0.0.0.0', port=settings.PORT, debug=settings.DEBUG, server=settings.SERVER, reloader=True)
