@@ -2,6 +2,7 @@ from os import path, mkdir, remove
 from mimetypes import guess_type
 from sh import convert
 from glob import glob
+from urllib import pathname2url
 from collections import defaultdict, OrderedDict
 import EXIF
 import json
@@ -10,20 +11,20 @@ from bottle import route, request, response, static_file, template, abort
 
 import settings
 
-def get_path(coll, thumb_p):
+def get_rel_path(coll, thumb_p):
     coll_dir = settings.COLLECTION_DIRS[coll]
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
-    return path.join(settings.BASE_DIR, coll_dir, type_dir)
+    return path.join(coll_dir, type_dir)
 
-@route('/fileget')
-def fileget():
+def resolve_file():
     thumb_p = (request.query['type'] == "T")
     storename = request.query.filename
-    basepath = get_path(request.query.coll, thumb_p)
-    pathname = path.join(basepath, storename)
+    relpath = get_rel_path(request.query.coll, thumb_p)
 
     if not thumb_p:
-        return static_file(pathname, root='/')
+        return path.join(relpath, storename)
+
+    basepath = path.join(settings.BASE_DIR, relpath)
 
     scale = int(request.query.scale)
     mimetype, encoding = guess_type(storename)
@@ -41,12 +42,13 @@ def fileget():
 
     if path.exists(scaled_pathname):
         print "Serving previously scaled thumbnail"
-        return static_file(scaled_pathname, root='/')
+        return path.join(relpath, scaled_name)
 
     if not path.exists(basepath):
         mkdir(basepath)
 
-    orig_path = path.join(get_path(request.query.coll, False), storename)
+    orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
+    orig_path = path.join(orig_dir, storename)
 
     if not path.exists(orig_path):
         abort(404, "Missing original: %s" % orig_path)
@@ -60,13 +62,28 @@ def fileget():
     print "Scaling thumbnail to %d" % scale
     convert(input_spec, *(convert_args + (scaled_pathname,)))
 
-    return static_file(scaled_pathname, root='/')
+    return path.join(relpath, scaled_name)
+
+@route('/static/<path:path>')
+def static(path):
+    return static_file(path, root=settings.BASE_DIR)
+
+@route('/getfileref')
+def getfileref():
+    response.set_header('Access-Control-Allow-Origin', '*')
+    response.content_type = 'text/plain; charset=utf-8'
+    return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
+                                       pathname2url(resolve_file()))
+
+@route('/fileget')
+def fileget():
+    return static_file(resolve_file(), root=settings.BASE_DIR)
 
 @route('/fileupload', method='POST')
 def fileupload():
     thumb_p = (request.forms['type'] == "T")
     storename = request.forms.store
-    basepath = get_path(request.forms.coll, thumb_p)
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p))
     pathname = path.join(basepath, storename)
 
     if thumb_p:
@@ -84,8 +101,8 @@ def fileupload():
 @route('/filedelete', method='POST')
 def filedelete():
     storename = request.forms.filename
-    basepath = get_path(request.forms.coll, False)
-    thumbpath = get_path(request.forms.coll, True)
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False))
+    thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
 
     pathname = path.join(basepath, storename)
     if not path.exists(pathname):
@@ -106,7 +123,7 @@ def filedelete():
 @route('/getmetadata')
 def getmetadata():
     storename = request.query.filename
-    basepath = get_path(request.query.coll, thumb_p=False)
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     pathname = path.join(basepath, storename)
     datatype = request.query.dt
 
@@ -142,8 +159,6 @@ def getmetadata():
             for key,value in data.items()]
 
     return json.dumps(data, indent=4)
-
-
 
 @route('/web_asset_store.xml')
 def web_asset_store():
