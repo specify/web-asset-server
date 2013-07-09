@@ -4,67 +4,116 @@ from sh import convert
 from glob import glob
 from urllib import pathname2url
 from collections import defaultdict, OrderedDict
-import EXIF
-import json
-import hmac
-import time
+from functools import wraps
+import EXIF, json, hmac, time
 
-from bottle import route, request, response, static_file, template, abort
+from bottle import Response, route, request, response, static_file, template, abort
 
 import settings
 
 def get_rel_path(coll, thumb_p):
+    """Return originals or thumbnails subdirectory of the main
+    attachments directory for the given collection.
+    """
     coll_dir = settings.COLLECTION_DIRS[coll]
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
     return path.join(coll_dir, type_dir)
 
 def generate_token(timestamp, filename):
+    """Generate the auth token for the given filename and timestamp.
+    This is for comparing to the client submited token.
+    """
     timestamp = str(timestamp)
     mac = hmac.new(settings.KEY, timestamp + filename)
     return ':'.join((mac.hexdigest(), timestamp))
 
 class TokenException(Exception):
+    """Raised when an auth token is invalid for some reason."""
     pass
 
 def get_timestamp():
+    """Return an integer timestamp with one second resolution for
+    the current moment.
+    """
     return int(time.time())
 
 def validate_token(token_in, filename):
+    """Validate the input token for given filename using the secret key
+    in settings. Checks that the token is within the time tolerance and
+    is valid.
+    """
+    if settings.KEY is None:
+        return
+    if token_in == '':
+        raise TokenException("Auth token is missing.")
     if ':' not in token_in:
         raise TokenException("Auth token is malformed.")
+
     mac_in, timestr = token_in.split(':')
     try:
         timestamp = int(timestr)
     except ValueError:
         raise TokenException("Auth token is malformed.")
 
-    if settings.TIMEOUT is not None:
+    if settings.TIME_TOLERANCE is not None:
         current_time = get_timestamp()
-        if not  0 <= (current_time - timestamp) < settings.TIMEOUT:
-            raise TokenException("Auth token is expired: %s vs %s" % (timestamp, current_time))
+        if not abs(current_time - timestamp) < settings.TIME_TOLERANCE:
+            raise TokenException("Auth token timestamp out of range: %s vs %s" % (timestamp, current_time))
 
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
 
-def validate_token_in_request(request, filename):
-    if request.method in ("GET", "HEAD") and settings.REQUIRE_KEY_FOR_GET:
-        token = request.query.token
-        try:
-            validate_token(token, filename)
-        except TokenException as e:
-            abort(403, e)
+def require_token(filename_param, always=False):
+    """Decorate a view function to require an auth token to be present for access.
 
-@route('/timestamp')
-def timestamp():
-    response.content_type = "text/plain; charset=utf-8"
-    return str(get_timestamp())
+    filename_param defines the field in the request that contains the filename
+    against which the token should validate.
+
+    If REQUIRE_KEY_FOR_GET is False, validation will be skipped.
+
+    Automatically adds the X-Timestamp header to responses to help clients stay
+    syncronized.
+    """
+    def decorator(func):
+        @include_timestamp
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            print always
+            if always or request.method not in ('GET', 'HEAD') or settings.REQUIRE_KEY_FOR_GET:
+                params = request.forms if request.method == 'POST' else request.query
+                try:
+                    validate_token(params.token, params.get(filename_param))
+                except TokenException as e:
+                    response.content_type = 'text/plain; charset=utf-8'
+                    response.status = 403
+                    return e
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def include_timestamp(func):
+    """Decorate a view function to include the X-Timestamp header to help clients
+    maintain time syncronization.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        (result if isinstance(result, Response) else response) \
+                .set_header('X-Timestamp', str(get_timestamp()))
+        return result
+    return wrapper
 
 def resolve_file():
+    """Inspect the request object to determine the file being requested.
+    If the request is for a thumbnail and it has not been generated, do
+    so before returning.
+
+    Returns the relative path to the requested file in the base
+    attachments directory.
+    """
     thumb_p = (request.query['type'] == "T")
     storename = request.query.filename
     relpath = get_rel_path(request.query.coll, thumb_p)
-
-    validate_token_in_request(request, storename)
 
     if not thumb_p:
         return path.join(relpath, storename)
@@ -111,21 +160,32 @@ def resolve_file():
 
 @route('/static/<path:path>')
 def static(path):
+    """Serve static files to the client. Primarily for Web Portal."""
+    if not settings.ALLOW_STATIC_FILE_ACCESS:
+        abort(404)
     return static_file(path, root=settings.BASE_DIR)
 
 @route('/getfileref')
+@require_token('filename')
 def getfileref():
+    """Returns a URL to the static file indicated by the query parameters."""
     response.set_header('Access-Control-Allow-Origin', '*')
     response.content_type = 'text/plain; charset=utf-8'
     return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
                                        pathname2url(resolve_file()))
 
 @route('/fileget')
+@require_token('filename')
 def fileget():
+    """Returns the file data of the file indicated by the query parameters."""
     return static_file(resolve_file(), root=settings.BASE_DIR)
 
 @route('/fileupload', method='POST')
+@require_token('store')
 def fileupload():
+    """Accept original file uploads and store them in the proper
+    attchment subdirectory.
+    """
     thumb_p = (request.forms['type'] == "T")
     storename = request.forms.store
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p))
@@ -144,7 +204,12 @@ def fileupload():
     return 'Ok.'
 
 @route('/filedelete', method='POST')
+@require_token('filename')
 def filedelete():
+    """Delete the file indicated by the query parameters. Returns 404
+    if the original file does not exist. Any associated thumbnails will
+    also be deleted.
+    """
     storename = request.forms.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False))
     thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
@@ -166,7 +231,9 @@ def filedelete():
     return 'Ok.'
 
 @route('/getmetadata')
+@require_token('filename')
 def getmetadata():
+    """Provides access to EXIF metadata."""
     storename = request.query.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     pathname = path.join(basepath, storename)
@@ -205,8 +272,19 @@ def getmetadata():
 
     return json.dumps(data, indent=4)
 
+@route('/testkey')
+@require_token('random', always=True)
+def testkey():
+    """If access to this resource succeeds, clients can conclude
+    that they have a valid access key.
+    """
+    response.content_type ='text/plain; charset=utf-8'
+    return 'Ok.'
+
 @route('/web_asset_store.xml')
+@include_timestamp
 def web_asset_store():
+    """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
     return template('web_asset_store.xml', host="%s:%d" % (settings.HOST, settings.PORT))
 

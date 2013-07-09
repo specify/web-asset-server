@@ -1241,7 +1241,7 @@ class BaseRequest(object):
 
     @property
     def script_name(self):
-        ''' The initial portion of the URL's `path` that was removed by a higher
+        ''' The initial portion of the URLs `path` that was removed by a higher
             level (server or routing middleware) before the application was
             called. This script path is returned with leading and tailing
             slashes. '''

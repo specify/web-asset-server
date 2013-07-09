@@ -1,10 +1,24 @@
 DEBUG = True
 
-KEY = 'mCXJbpL102qTOrKU3FzeZbsrjT1J4vlrkIUZRQ5J9hmx3hMMZp4twyn5Ps5hThM'
+# This secret key is used to generate authentication tokens for requests.
+# The same key must be set in the Web Store Attachment Preferences in Specify.
+# A good source for key value is: https://www.grc.com/passwords.htm
+# Set KEY to None to disable security. This is NOT recommended since doing so
+# will allow anyone on the internet to use the attachment server to store
+# arbitrary files.
+KEY = 'test_attachment_key'
 
-TIMEOUT = 300
+# Auth token timestamp must be within this many seconds of server time
+# in order to be considered valid. This prevents replay attacks.
+# Set to None to disable time validation.
+TIME_TOLERANCE = 150
 
+# Set this to False to only require authentication for uploads and deletes.
+# Static file access, if enabled, is not affected by this setting.
 REQUIRE_KEY_FOR_GET = True
+
+# This is required for use with the Web Portal.
+ALLOW_STATIC_FILE_ACCESS = False
 
 # These values are interpolated into the web_asset_store.xml resource so the client
 # knows how to talk to the server.
