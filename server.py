@@ -7,15 +7,35 @@ from collections import defaultdict, OrderedDict
 from functools import wraps
 import EXIF, json, hmac, time
 
-from bottle import Response, route, request, response, static_file, template, abort
+from bottle import Response, request, response, static_file, template, abort
+from bottle import route as bottle_route
 
 import settings
+
+def route(*args, **kwargs):
+    def decorator(func):
+        @bottle_route(*args, **kwargs)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+            except UnknownCollectionException as e:
+                abort(404, e)
+            return result
+        return wrapper
+    return decorator
+
+class UnknownCollectionException(Exception):
+    pass
 
 def get_rel_path(coll, thumb_p):
     """Return originals or thumbnails subdirectory of the main
     attachments directory for the given collection.
     """
-    coll_dir = settings.COLLECTION_DIRS[coll]
+    try:
+        coll_dir = settings.COLLECTION_DIRS[coll]
+    except KeyError:
+        raise UnknownCollectionException(coll)
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
     return path.join(coll_dir, type_dir)
 
