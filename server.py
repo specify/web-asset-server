@@ -185,10 +185,12 @@ def static(path):
         abort(404)
     return static_file(path, root=settings.BASE_DIR)
 
+@route('/getfileref.php')
 @route('/getfileref')
-@require_token('filename')
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
+    if not settings.ALLOW_STATIC_FILE_ACCESS:
+        abort(404)
     response.set_header('Access-Control-Allow-Origin', '*')
     response.content_type = 'text/plain; charset=utf-8'
     return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,

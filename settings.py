@@ -18,7 +18,7 @@ TIME_TOLERANCE = 150
 REQUIRE_KEY_FOR_GET = True
 
 # This is required for use with the Web Portal.
-ALLOW_STATIC_FILE_ACCESS = False
+ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource so the client
 # knows how to talk to the server.
