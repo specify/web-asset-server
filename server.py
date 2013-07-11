@@ -8,7 +8,7 @@ from functools import wraps
 import EXIF, json, hmac, time
 
 from bottle import Response, request, response, static_file, template, abort
-from bottle import route as bottle_route
+from bottle import HTTPError, route as bottle_route
 
 import settings
 
@@ -185,16 +185,19 @@ def static(path):
         abort(404)
     return static_file(path, root=settings.BASE_DIR)
 
-@route('/getfileref.php')
 @route('/getfileref')
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
-    if not settings.ALLOW_STATIC_FILE_ACCESS:
-        abort(404)
-    response.set_header('Access-Control-Allow-Origin', '*')
-    response.content_type = 'text/plain; charset=utf-8'
-    return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
-                                       pathname2url(resolve_file()))
+    try:
+        if not settings.ALLOW_STATIC_FILE_ACCESS:
+            abort(404)
+        response.set_header('Access-Control-Allow-Origin', '*')
+        response.content_type = 'text/plain; charset=utf-8'
+        return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
+                                           pathname2url(resolve_file()))
+    except HTTPError as e:
+        e.set_header('Access-Control-Allow-Origin', '*')
+        raise e
 
 @route('/fileget')
 @require_token('filename')
