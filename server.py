@@ -12,6 +12,17 @@ from bottle import HTTPError, route as bottle_route
 
 import settings
 
+def log(msg):
+    if settings.DEBUG:
+        print msg
+
+class UnknownCollectionException(Exception):
+    """Raised when the collection parameter contains an unknown value
+    when using collections to map to directories.
+    """
+    pass
+
+# Catch UnknownCollectionException to return 404 instead of server error.
 def route(*args, **kwargs):
     def decorator(func):
         @bottle_route(*args, **kwargs)
@@ -25,18 +36,20 @@ def route(*args, **kwargs):
         return wrapper
     return decorator
 
-class UnknownCollectionException(Exception):
-    pass
-
 def get_rel_path(coll, thumb_p):
     """Return originals or thumbnails subdirectory of the main
     attachments directory for the given collection.
     """
+    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+
+    if settings.COLLECTION_DIRS is None:
+        return type_dir
+
     try:
         coll_dir = settings.COLLECTION_DIRS[coll]
     except KeyError:
         raise UnknownCollectionException(coll)
-    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+
     return path.join(coll_dir, type_dir)
 
 def generate_token(timestamp, filename):
@@ -89,7 +102,8 @@ def require_token(filename_param, always=False):
     filename_param defines the field in the request that contains the filename
     against which the token should validate.
 
-    If REQUIRE_KEY_FOR_GET is False, validation will be skipped.
+    If REQUIRE_KEY_FOR_GET is False, validation will be skipped for GET and HEAD
+    requests.
 
     Automatically adds the X-Timestamp header to responses to help clients stay
     syncronized.
@@ -98,7 +112,6 @@ def require_token(filename_param, always=False):
         @include_timestamp
         @wraps(func)
         def wrapper(*args, **kwargs):
-            print always
             if always or request.method not in ('GET', 'HEAD') or settings.REQUIRE_KEY_FOR_GET:
                 params = request.forms if request.method == 'POST' else request.query
                 try:
@@ -155,7 +168,7 @@ def resolve_file():
     scaled_pathname = path.join(basepath, scaled_name)
 
     if path.exists(scaled_pathname):
-        print "Serving previously scaled thumbnail"
+        log("Serving previously scaled thumbnail")
         return path.join(relpath, scaled_name)
 
     if not path.exists(basepath):
@@ -173,7 +186,7 @@ def resolve_file():
         input_spec += '[0]'     # only thumbnail first page of PDF
         convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
 
-    print "Scaling thumbnail to %d" % scale
+    log("Scaling thumbnail to %d" % scale)
     convert(input_spec, *(convert_args + (scaled_pathname,)))
 
     return path.join(relpath, scaled_name)
@@ -243,12 +256,12 @@ def filedelete():
     if not path.exists(pathname):
         abort(404)
 
-    print "Deleting %s" % pathname
+    log("Deleting %s" % pathname)
     remove(pathname)
 
     prefix = storename.split('.att')[0]
     pattern = path.join(thumbpath, prefix + '*')
-    print "Deleting thumbnails matching %s" % pattern
+    log("Deleting thumbnails matching %s" % pattern)
     for name in glob(pattern):
         remove(name)
 
@@ -271,7 +284,7 @@ def getmetadata():
         try:
             tags = EXIF.process_file(f)
         except:
-            print "Error reading exif data."
+            log("Error reading exif data.")
             tags = {}
 
     if datatype == 'date':
@@ -315,4 +328,5 @@ def web_asset_store():
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=settings.PORT, debug=settings.DEBUG, server=settings.SERVER, reloader=True)
+    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
+        debug=settings.DEBUG, reloader=settings.DEBUG)
