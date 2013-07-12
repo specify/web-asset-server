@@ -10,7 +10,8 @@ DEBUG = True
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = 'test_attachment_key'
+# KEY = 'test_attachment_key'
+from secret_key import KEY
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
@@ -28,8 +29,8 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = 'localhost'
-PORT = 8080
+HOST = 'dhwd99p1.nhm.ku.edu'
+PORT = 3088
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
@@ -39,16 +40,16 @@ DEVELOPMENT_PORT = PORT
 # recommended unless some provision is made to allow attachments for
 # items scoped above collections to be found.
 
-# COLLECTION_DIRS = {
-#     # 'COLLECTION_NAME': 'DIRECTORY_NAME',
-#     'KUFishvoucher': 'Ichthyology',
-#     'KUFishtissue': 'Ichthyology',
-# }
+# COLLECTION_DIRS = None
 
-COLLECTION_DIRS = None
+COLLECTION_DIRS = {
+    # 'COLLECTION_NAME': 'DIRECTORY_NAME',
+    'KUFishvoucher': 'Ichthyology',
+    'KUFishtissue': 'Ichthyology',
+}
 
 # Base directory for all attachments.
-BASE_DIR = '/home/specify/attachments/'
+BASE_DIR = '/home/ben/attachments/'
 
 # Originals and thumbnails are stored in separate directories.
 THUMB_DIR = 'thumbnails'
@@ -58,6 +59,7 @@ ORIG_DIR = 'originals'
 CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'application/pdf'}
 
 # What HTTP server to use for stand-alone operation.
-# SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
-SERVER = 'wsgiref'  # For testing. Requires no extra packages.
+# SERVER = 'wsgiref'  # For testing. Requires no extra packages.
+SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
+
 
