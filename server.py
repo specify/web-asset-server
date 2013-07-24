@@ -218,6 +218,12 @@ def fileget():
     """Returns the file data of the file indicated by the query parameters."""
     return static_file(resolve_file(), root=settings.BASE_DIR)
 
+@route('/fileupload', method='OPTIONS')
+def fileupload_options():
+    response.set_header('Access-Control-Allow-Origin', '*')
+    response.content_type = "text/plain; charset=utf-8"
+    return ''
+
 @route('/fileupload', method='POST')
 @require_token('store')
 def fileupload():
@@ -238,6 +244,7 @@ def fileupload():
     upload = request.files.values()[0]
     upload.save(pathname, overwrite=True)
 
+    response.set_header('Access-Control-Allow-Origin', '*')
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
