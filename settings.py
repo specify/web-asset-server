@@ -46,6 +46,14 @@ COLLECTION_DIRS = {
     # 'COLLECTION_NAME': 'DIRECTORY_NAME',
     'KUFishvoucher': 'Ichthyology',
     'KUFishtissue': 'Ichthyology',
+
+    'CReAC': 'Creac',
+    'Pinned': 'Entomology',
+    'Plant': 'Entomology',
+    'Fossils': 'Entomology',
+    'KUEntoPinned': 'Entomology',
+    'KUEntoPlant': 'Entomology',
+    'KUEntoFossil': 'Entomology',
 }
 
 # Base directory for all attachments.
