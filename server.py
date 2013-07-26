@@ -2,7 +2,7 @@ from os import path, mkdir, remove
 from mimetypes import guess_type
 from sh import convert
 from glob import glob
-from urllib import pathname2url
+from urllib import pathname2url, quote
 from collections import defaultdict, OrderedDict
 from functools import wraps
 import EXIF, json, hmac, time
@@ -216,7 +216,12 @@ def getfileref():
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
-    return static_file(resolve_file(), root=settings.BASE_DIR)
+    r = static_file(resolve_file(), root=settings.BASE_DIR)
+    download_name = request.query.downloadname
+    if download_name:
+        download_name = quote(path.basename(download_name))
+        r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
+    return r
 
 @route('/fileupload', method='OPTIONS')
 def fileupload_options():
