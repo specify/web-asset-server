@@ -340,5 +340,5 @@ def web_asset_store():
 
 if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
+    run(host=settings.IPADDR, port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)

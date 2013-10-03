@@ -35,6 +35,9 @@ PORT = 80
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
 
+# IP address to bind.
+IPADDR = '129.237.201.244'
+
 # Map collection names to directories.  Set to None to store
 # everything in the same originals and thumbnail directories.  This is
 # recommended unless some provision is made to allow attachments for
