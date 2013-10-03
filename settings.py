@@ -57,6 +57,8 @@ COLLECTION_DIRS = {
     'KUEntoPinned': 'Entomology',
     'KUEntoPlant': 'Entomology',
     'KUEntoFossil': 'Entomology',
+
+    'KUInvertPaleo': 'InvertebratePaleontology',
 }
 
 # Base directory for all attachments.
