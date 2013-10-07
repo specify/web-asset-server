@@ -29,7 +29,7 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = 'biwebdb.nhm.ku.edu'
+HOST = 'biimages.biodiversity.ku.edu'
 PORT = 80
 
 # Port the development test server should listen on.
