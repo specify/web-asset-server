@@ -89,3 +89,11 @@ sudo start web-asset-server
 
 By default, the server's logs go to standard output which *upstart* will redirect
 to `/var/log/upstart/web-asset-server.log`
+
+
+Specify settings
+----------------
+
+To set up a Specify client to use the server, set the Server URL and Key in the
+Attachment Preferences. The URL will be `http://[YOUR_SERVER]/web_asset_store.xml`.
+For the key, use the same value as in the server `setting.py` file.

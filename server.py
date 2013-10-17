@@ -7,34 +7,15 @@ from collections import defaultdict, OrderedDict
 from functools import wraps
 import EXIF, json, hmac, time
 
-from bottle import Response, request, response, static_file, template, abort
-from bottle import HTTPError, route as bottle_route
+from bottle import (
+    Response, request, response, static_file, template, abort,
+    HTTPError, HTTPResponse, route, hook)
 
 import settings
 
 def log(msg):
     if settings.DEBUG:
         print msg
-
-class UnknownCollectionException(Exception):
-    """Raised when the collection parameter contains an unknown value
-    when using collections to map to directories.
-    """
-    pass
-
-# Catch UnknownCollectionException to return 404 instead of server error.
-def route(*args, **kwargs):
-    def decorator(func):
-        @bottle_route(*args, **kwargs)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                result = func(*args, **kwargs)
-            except UnknownCollectionException as e:
-                abort(404, e)
-            return result
-        return wrapper
-    return decorator
 
 def get_rel_path(coll, thumb_p):
     """Return originals or thumbnails subdirectory of the main
@@ -48,7 +29,7 @@ def get_rel_path(coll, thumb_p):
     try:
         coll_dir = settings.COLLECTION_DIRS[coll]
     except KeyError:
-        raise UnknownCollectionException(coll)
+        abort(404, "Unknown collection: %r" % coll)
 
     return path.join(coll_dir, type_dir)
 
@@ -136,6 +117,21 @@ def include_timestamp(func):
         return result
     return wrapper
 
+def allow_cross_origin(func):
+    """Decorate a view function to allow cross domain access."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            result = func(*args, **kwargs)
+        except HTTPResponse as r:
+            r.set_header('Access-Control-Allow-Origin', '*')
+            raise
+
+        (result if isinstance(result, Response) else response) \
+                .set_header('Access-Control-Allow-Origin', '*')
+        return result
+    return wrapper
+
 def resolve_file():
     """Inspect the request object to determine the file being requested.
     If the request is for a thumbnail and it has not been generated, do
@@ -199,19 +195,14 @@ def static(path):
     return static_file(path, root=settings.BASE_DIR)
 
 @route('/getfileref')
+@allow_cross_origin
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
-    try:
-        if not settings.ALLOW_STATIC_FILE_ACCESS:
-            abort(404)
-        response.set_header('Access-Control-Allow-Origin', '*')
-        response.content_type = 'text/plain; charset=utf-8'
-        return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
-                                           pathname2url(resolve_file()))
-    except HTTPError as e:
-        e.set_header('Access-Control-Allow-Origin', '*')
-        raise e
-
+    if not settings.ALLOW_STATIC_FILE_ACCESS:
+        abort(404)
+    response.content_type = 'text/plain; charset=utf-8'
+    return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
+                                       pathname2url(resolve_file()))
 @route('/fileget')
 @require_token('filename')
 def fileget():
@@ -224,12 +215,13 @@ def fileget():
     return r
 
 @route('/fileupload', method='OPTIONS')
+@allow_cross_origin
 def fileupload_options():
-    response.set_header('Access-Control-Allow-Origin', '*')
     response.content_type = "text/plain; charset=utf-8"
     return ''
 
 @route('/fileupload', method='POST')
+@allow_cross_origin
 @require_token('store')
 def fileupload():
     """Accept original file uploads and store them in the proper
@@ -249,7 +241,6 @@ def fileupload():
     upload = request.files.values()[0]
     upload.save(pathname, overwrite=True)
 
-    response.set_header('Access-Control-Allow-Origin', '*')
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
