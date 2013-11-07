@@ -2,7 +2,7 @@
 
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
-DEBUG = False
+DEBUG = True
 
 # This secret key is used to generate authentication tokens for requests.
 # The same key must be set in the Web Store Attachment Preferences in Specify.
@@ -29,14 +29,14 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = 'biimages.biodiversity.ku.edu'
-PORT = 80
+HOST = 'biwebdbtest.nhm.ku.edu'
+PORT = 8080
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
 
 # IP address to bind.
-IPADDR = '129.237.201.244'
+IPADDR = '0.0.0.0'
 
 # Map collection names to directories.  Set to None to store
 # everything in the same originals and thumbnail directories.  This is
