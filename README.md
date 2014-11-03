@@ -80,6 +80,9 @@ exec /usr/bin/authbind /usr/bin/python /home/anhalt/web-asset-server/server.py
 respawn
 ```
 
+Note: Some users have reported that `authbind` must be provided with the `--deep` option.
+If the asset server is failing to start due to permission problems, this may be a solution.
+
 Then reload the init config files and start the server:
 
 ```
