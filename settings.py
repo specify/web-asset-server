@@ -47,8 +47,13 @@ IPADDR = '129.237.201.244'
 
 COLLECTION_DIRS = {
     # 'COLLECTION_NAME': 'DIRECTORY_NAME',
-    'KUFishvoucher': 'Ichthyology',
-    'KUFishtissue': 'Ichthyology',
+    'KU Fish Voucher Collection': 'Ichthyology',
+    'KU Fish Tissue Collection': 'Ichthyology',
+
+    # Work around for double encoding of spaces in urls
+    # Can be removed after release of SP 6.5.06
+    'KU%20Fish%20Voucher%20Collection': 'Ichthyology',
+    'KU%20Fish%20Tissue%20Collection': 'Ichthyology',
 
     'CReAC': 'Creac',
     'Pinned': 'Entomology',
@@ -59,6 +64,10 @@ COLLECTION_DIRS = {
     'KUEntoFossil': 'Entomology',
 
     'KUInvertPaleo': 'InvertebratePaleontology',
+
+    'KUHerpetology': 'Herpetology',
+
+    'Ornithology': 'Ornithology',
 }
 
 # Base directory for all attachments.
