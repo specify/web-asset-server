@@ -68,6 +68,8 @@ COLLECTION_DIRS = {
     'KUHerpetology': 'Herpetology',
 
     'Ornithology': 'Ornithology',
+
+    'Mammalogy': 'Mammalogy',
 }
 
 # Base directory for all attachments.
