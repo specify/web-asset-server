@@ -156,7 +156,7 @@ def resolve_file():
 
     root, ext = path.splitext(storename)
 
-    if mimetype == 'application/pdf':
+    if mimetype in ('application/pdf', 'image/tiff'):
         # use PNG for PDF thumbnails
         ext = '.png'
 
