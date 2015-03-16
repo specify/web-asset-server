@@ -80,6 +80,9 @@ exec /usr/bin/authbind /usr/bin/python /home/anhalt/web-asset-server/server.py
 respawn
 ```
 
+Note: Some users have reported that `authbind` must be provided with the `--deep` option.
+If the asset server is failing to start due to permission problems, this may be a solution.
+
 Then reload the init config files and start the server:
 
 ```
@@ -94,6 +97,19 @@ to `/var/log/upstart/web-asset-server.log`
 Specify settings
 ----------------
 
-To set up a Specify client to use the server, set the Server URL and Key in the
-Attachment Preferences. The URL will be `http://[YOUR_SERVER]/web_asset_store.xml`.
-For the key, use the same value as in the server `setting.py` file.
+You will generally want to add the asset server settings to the global Specify 
+preferences so that all of the Specify clients obtain the same configuration.
+
+The easiest way to do this is to open the database in Specify and navigate to
+the *About* option in the help menu. In the resulting dialog double-click on the
+division name under *System Information* on the right hand side. This will open
+a properties editor for the global preferences. You will need to set four properties
+to configure access to the asset server:
+
+* `USE_GLOBAL_PREFS` `true`
+* `attachment.key`  obtain from asset server `settings.py` file
+* `attachment.url`  `http://[YOUR_SERVER]/web_asset_store.xml` 
+* `attachment.use_path` `false`
+
+If these properties do not already exist, they can be added using the *Add Property*
+button. 
