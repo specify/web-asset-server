@@ -9,7 +9,7 @@ Dependencies
 
 The dependencies are:
 
-1. *Python* 2.7 is known to work.
+1. *Python* 2.7 is known to work. (see below for Python 2.6)
 1. *exif-py* for EXIF metadata.
 1. *sh* the Python shell command utility.
 1. *bottlepy* the Python web micro-framework.
@@ -113,3 +113,32 @@ to configure access to the asset server:
 
 If these properties do not already exist, they can be added using the *Add Property*
 button. 
+
+Python 2.6 compatibility
+------------------------
+
+The following information is courtesy of David Konrad of The Natural
+History Museum of Denmark:
+
+It is possible to install the Attachment Server on a SuSe Enterprise 11 SP3 with python 2.6.8.
+
+* *python-pip* should be installed manually from RPM, v1.2.1 only version that works without conflict / break
+* *python-exif* should be installed manually from PRM
+* *OrderedDict* needs a "backport" -> https://pypi.python.org/pypi/ordereddict
+
+changes in `server.py`  :
+
+```
+try:
+    from collections import OrderedDict
+except ImportError:
+    # python 2.6 or earlier, use backport
+    from ordereddict import OrderedDict
+```
+
+changes in `settings.py` :
+
+```
+#CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'application/pdf'}
+CAN_THUMBNAIL = ['image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'application/pdf']
+```
