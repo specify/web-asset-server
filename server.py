@@ -5,7 +5,7 @@ from glob import glob
 from urllib import pathname2url, quote
 from collections import defaultdict, OrderedDict
 from functools import wraps
-import EXIF, json, hmac, time
+import exifread, json, hmac, time
 
 from bottle import (
     Response, request, response, static_file, template, abort,
@@ -285,7 +285,7 @@ def getmetadata():
 
     with open(pathname, 'rb') as f:
         try:
-            tags = EXIF.process_file(f)
+            tags = exifread.process_file(f)
         except:
             log("Error reading exif data.")
             tags = {}
