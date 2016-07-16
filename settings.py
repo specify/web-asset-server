@@ -1,5 +1,8 @@
 # Sample Specify web asset server settings.
 
+# Modifie par TV
+import os
+
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
 DEBUG = True
@@ -10,7 +13,7 @@ DEBUG = True
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = 'test_attachment_key'
+KEY = os.environ["SPECIFY_KEY"]
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
@@ -28,8 +31,8 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = 'localhost'
-PORT = 8080
+HOST = os.environ["SPECIFY_HOST"]
+PORT = os.environ["SPECIFY_PORT"]
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
@@ -48,7 +51,7 @@ DEVELOPMENT_PORT = PORT
 COLLECTION_DIRS = None
 
 # Base directory for all attachments.
-BASE_DIR = '/home/specify/attachments/'
+BASE_DIR = os.environ["BASE_DIR"]
 
 # Originals and thumbnails are stored in separate directories.
 THUMB_DIR = 'thumbnails'
