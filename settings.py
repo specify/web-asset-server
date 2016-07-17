@@ -32,7 +32,7 @@ ALLOW_STATIC_FILE_ACCESS = True
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
 HOST = os.environ["SPECIFY_HOST"]
-PORT = os.environ["SPECIFY_PORT"]
+PORT = int(os.environ["SPECIFY_PORT"])
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
