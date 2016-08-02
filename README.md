@@ -16,28 +16,21 @@ The requirements are:
 Installing
 ----------
 
-Télécharger le conténaire depuis https://hub.docker.com/r/tvalero/web-asset-server/ 
+1. Avec Docker (version ligne de commande, Kitematic ou Docker pour Synology), télécharger le conténaire depuis https://hub.docker.com/r/tvalero/web-asset-server/ 
+
 
 Configuration des variables d'environnements 
 --------------------------------------------
 
-SPECIFY_KEY  None
+`SPECIFY_KEY`  : clef d'authentification ou "None".
 
-SPECIFY_HOST : nom (DNS) ou adrese (IP) du serveur (hôte)
+`SPECIFY_HOST` : nom (DNS) ou adrese (IP) du serveur (hôte)
 
-SPECIFY_PORT : numéro du port sur le serveur (hôte).
-
-
-Deploying
----------
-
-In my experience, it has been easiest to deploy using the Python *Paste* server.
-
-In `settings.py` set the value `SERVER = 'paste'`.
+`SPECIFY_PORT` : numéro du port sur le serveur (hôte).
 
 
-By default, the server's logs go to standard output which *upstart* will redirect
-to `/var/log/upstart/web-asset-server.log`
+Note sur le numéro de port
+--------------------------
 
 
 Specify settings
@@ -53,11 +46,9 @@ a properties editor for the global preferences. You will need to set four proper
 to configure access to the asset server:
 
 * `USE_GLOBAL_PREFS` `true`
-* `attachment.key`  obtain from asset server `settings.py` file
-* `attachment.url`  `http://[YOUR_SERVER]/web_asset_store.xml` 
+* `attachment.key`  obtain from Docker environment variable `SPECIFY_KEY` 
+* `attachment.url`  `http://[SPECIFY_HOST]:[SPECIFY_PORT]/web_asset_store.xml` 
 * `attachment.use_path` `false`
 
 If these properties do not already exist, they can be added using the *Add Property*
 button. 
-
-
