@@ -1,4 +1,4 @@
-Specify Web Asset Server (dans un conténaire)
+DEV Specify Web Asset Server (dans un conténaire)
 =====================================
 
 Création d'un conténaire "clef en main" pour le Web Asset Server de Specify.
