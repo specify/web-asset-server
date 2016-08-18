@@ -1,19 +1,17 @@
-Web Asset Server (dans un conténaire)
+Specify Web Asset Server (dans un conténaire)
 =====================================
 
 Création d'un conténaire "clef en main" pour le Web Asset Server de Specify.
 
 
-Requirements 
-------------
+Pré-requis 
+----------
 
-The requirements are:
-
-1. *Docker* pour la pris en charge du conténaire.
+1. *Docker* (testé avec v1.11) pour la pris en charge du conténaire.
 2. Suffisament de *mémoire* (512 Mo) et d'espace disques pour stocker les pièces jointes. 
 
 
-Installing
+Installation
 ----------
 
 1. Avec Docker (version ligne de commande, Kitematic ou Docker pour Synology), télécharger le conténaire depuis https://hub.docker.com/r/tvalero/web-asset-server/ 
@@ -24,7 +22,7 @@ Configuration des variables d'environnements
 
 `SPECIFY_KEY`  : clef d'authentification ou "None".
 
-`SPECIFY_HOST` : nom (DNS) ou adrese (IP) du serveur (hôte)
+`SPECIFY_HOST` : nom (DNS) ou adrese (IP) du serveur publique.
 
 `SPECIFY_PORT` : numéro du port sur le serveur (hôte).
 
