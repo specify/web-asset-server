@@ -13,7 +13,7 @@ DEBUG = True
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = os.environ["SPECIFY_KEY"]
+KEY = os.environ.get('SPECIFY_KEY', None)
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
@@ -31,8 +31,8 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = os.environ["SPECIFY_HOST"]
-PORT = int(os.environ["SPECIFY_PORT"])
+HOST = os.environ.get('SPECIFY_HOST', 'localhost') 
+PORT = int(os.environ.get('SPECIFY_PORT', 8080)
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
@@ -51,7 +51,8 @@ DEVELOPMENT_PORT = PORT
 COLLECTION_DIRS = None
 
 # Base directory for all attachments.
-BASE_DIR = os.environ["BASE_DIR"]
+BASE_DIR = os.environ.get('BASE_DIR', '/home/specify/attachments/')
+
 
 # Originals and thumbnails are stored in separate directories.
 THUMB_DIR = 'thumbnails'
