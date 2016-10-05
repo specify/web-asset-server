@@ -95,6 +95,10 @@ sudo start web-asset-server
 By default, the server's logs go to standard output which *upstart* will redirect
 to `/var/log/upstart/web-asset-server.log`
 
+HTTPS
+-----
+The easiest way to add HTTPS support, which is necessary to use the asset server with a Specify 7 server that is using HTTPS, is to place the asset server behind a reverse proxy such as Nginx. This also makes it possible to forego *authbind* and run the asset server on an unprivileged port. The proxy must be configured to rewrite the `web_asset_store.xml` resource to adjust the links therein. An example configuration can be found in [this gist](https://gist.github.com/benanhalt/d43a3fa7bf04edfc0bcdc11c612b2278).
+
 
 Specify settings
 ----------------
