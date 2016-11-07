@@ -61,8 +61,11 @@ chmod u+x 80
 sudo mv 80 /etc/authbind/byport
 ```
 
-An *upstart* script can be created to make sure the web asset server is started
-automatically. Create the file `/etc/init/web-asset-server.conf` with the following
+An *upstart* script or *systemd* unit file can be created to make sure the web asset server is started
+automatically.
+
+### Upstart
+Create the file `/etc/init/web-asset-server.conf` with the following
 contents, adjusting the `setuid` user and directories as appropriate:
 
 ```
@@ -77,6 +80,22 @@ setuid anhalt
 chdir /home/anhalt/web-asset-server
 exec /usr/bin/authbind /usr/bin/python /home/anhalt/web-asset-server/server.py
 respawn
+```
+
+### Systemd
+
+Create the file `/etc/systemd/system/web-asset-server.conf` with the following
+contents, adjusting the usernames and paths as appropriate:
+
+```conf
+[Unit]
+Description=Specify Web Asset Server
+Wants=network.target
+
+[Service]
+User=specify
+WorkingDirectory=/home/specify/web-asset-server
+ExecStart=/usr/bin/authbind /usr/bin/python /home/specify/web-asset-server/server.py
 ```
 
 It is important that the working directory is set to the path containing `server.py`
