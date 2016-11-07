@@ -64,6 +64,12 @@ sudo mv 80 /etc/authbind/byport
 An *upstart* script or *systemd* unit file can be created to make sure the web asset server is started
 automatically.
 
+It is important that the working directory is set to the path containing `server.py`
+so that *bottle.py* can find the template files. See [“TEMPLATE NOT FOUND” IN MOD_WSGI/MOD_PYTHON](http://bottlepy.org/docs/dev/faq.html#template-not-found-in-mod-wsgi-mod-python).
+
+Note: Some users have reported that `authbind` must be provided with the `--deep` option.
+If the asset server is failing to start due to permission problems, this may be a solution.
+
 ### Upstart
 Create the file `/etc/init/web-asset-server.conf` with the following
 contents, adjusting the `setuid` user and directories as appropriate:
@@ -82,6 +88,16 @@ exec /usr/bin/authbind /usr/bin/python /home/anhalt/web-asset-server/server.py
 respawn
 ```
 
+Then reload the init config files and start the server:
+
+```
+sudo initctl reload-configuration
+sudo start web-asset-server
+```
+
+By default, the server's logs go to standard output which *upstart* will redirect
+to `/var/log/upstart/web-asset-server.log`
+
 ### Systemd
 
 Create the file `/etc/systemd/system/web-asset-server.conf` with the following
@@ -98,21 +114,12 @@ WorkingDirectory=/home/specify/web-asset-server
 ExecStart=/usr/bin/authbind /usr/bin/python /home/specify/web-asset-server/server.py
 ```
 
-It is important that the working directory is set to the path containing `server.py`
-so that *bottle.py* can find the template files. See [“TEMPLATE NOT FOUND” IN MOD_WSGI/MOD_PYTHON](http://bottlepy.org/docs/dev/faq.html#template-not-found-in-mod-wsgi-mod-python).
-
-Note: Some users have reported that `authbind` must be provided with the `--deep` option.
-If the asset server is failing to start due to permission problems, this may be a solution.
-
-Then reload the init config files and start the server:
+Tell Systemd to reload its config with
 
 ```
-sudo initctl reload-configuration
-sudo start web-asset-server
+sudo systemctl daemon-reload
 ```
 
-By default, the server's logs go to standard output which *upstart* will redirect
-to `/var/log/upstart/web-asset-server.log`
 
 HTTPS
 -----
