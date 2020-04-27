@@ -210,7 +210,7 @@ def fileget():
     r = static_file(resolve_file(), root=settings.BASE_DIR)
     download_name = request.query.downloadname
     if download_name:
-        download_name = quote(path.basename(download_name))
+        download_name = quote(path.basename(download_name).encode('ascii', 'replace'))
         r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
     return r
 
