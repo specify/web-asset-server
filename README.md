@@ -9,7 +9,7 @@ Dependencies
 
 The dependencies are:
 
-1. *Python* 2.7 is known to work. (see below for Python 2.6)
+1. *Python* 3.6 is known to work. (see below for older versions of Python)
 1. *ExifRead* for EXIF metadata.
 1. *sh* the Python shell command utility.
 1. *bottlepy* the Python web micro-framework.
@@ -145,6 +145,10 @@ to configure access to the asset server:
 
 If these properties do not already exist, they can be added using the *Add Property*
 button. 
+
+Python 2.7 compatibility
+------------------------
+Web Asset server for Python 2.7 can be found here - [https://github.com/specify/web-asset-server](https://github.com/specify/web-asset-server)
 
 Python 2.6 compatibility
 ------------------------
