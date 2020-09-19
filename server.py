@@ -361,6 +361,11 @@ def web_asset_store():
     return template('web_asset_store.xml', host="%s:%d" % (settings.HOST, settings.PORT))
 
 
+@route('/')
+def main_page():
+    return 'It works!'
+
+
 if __name__ == '__main__':
     from bottle import run
 
