@@ -1,21 +1,27 @@
-from os import path, mkdir, remove
-from mimetypes import guess_type
-from sh import convert
-from glob import glob
-from urllib import pathname2url, quote
 from collections import defaultdict, OrderedDict
 from functools import wraps
-import exifread, json, hmac, time
+from glob import glob
+from mimetypes import guess_type
+from os import path, mkdir, remove
+from urllib.parse import quote
+from urllib.request import pathname2url
 
-from bottle import (
-    Response, request, response, static_file, template, abort,
-    HTTPError, HTTPResponse, route, hook)
+import exifread
+import hmac
+import json
+import time
+from sh import convert
 
 import settings
+from bottle import (
+    Response, request, response, static_file, template, abort,
+    HTTPResponse, route)
+
 
 def log(msg):
     if settings.DEBUG:
-        print msg
+        print(msg)
+
 
 def get_rel_path(coll, thumb_p):
     """Return originals or thumbnails subdirectory of the main
@@ -33,6 +39,7 @@ def get_rel_path(coll, thumb_p):
 
     return path.join(coll_dir, type_dir)
 
+
 def generate_token(timestamp, filename):
     """Generate the auth token for the given filename and timestamp.
     This is for comparing to the client submited token.
@@ -41,15 +48,18 @@ def generate_token(timestamp, filename):
     mac = hmac.new(settings.KEY, timestamp + filename)
     return ':'.join((mac.hexdigest(), timestamp))
 
+
 class TokenException(Exception):
     """Raised when an auth token is invalid for some reason."""
     pass
+
 
 def get_timestamp():
     """Return an integer timestamp with one second resolution for
     the current moment.
     """
     return int(time.time())
+
 
 def validate_token(token_in, filename):
     """Validate the input token for given filename using the secret key
@@ -77,6 +87,7 @@ def validate_token(token_in, filename):
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
 
+
 def require_token(filename_param, always=False):
     """Decorate a view function to require an auth token to be present for access.
 
@@ -89,6 +100,7 @@ def require_token(filename_param, always=False):
     Automatically adds the X-Timestamp header to responses to help clients stay
     syncronized.
     """
+
     def decorator(func):
         @include_timestamp
         @wraps(func)
@@ -102,23 +114,30 @@ def require_token(filename_param, always=False):
                     response.status = 403
                     return e
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 def include_timestamp(func):
     """Decorate a view function to include the X-Timestamp header to help clients
     maintain time syncronization.
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
         (result if isinstance(result, Response) else response) \
-                .set_header('X-Timestamp', str(get_timestamp()))
+            .set_header('X-Timestamp', str(get_timestamp()))
         return result
+
     return wrapper
+
 
 def allow_cross_origin(func):
     """Decorate a view function to allow cross domain access."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
@@ -128,9 +147,11 @@ def allow_cross_origin(func):
             raise
 
         (result if isinstance(result, Response) else response) \
-                .set_header('Access-Control-Allow-Origin', '*')
+            .set_header('Access-Control-Allow-Origin', '*')
         return result
+
     return wrapper
+
 
 def resolve_file():
     """Inspect the request object to determine the file being requested.
@@ -179,7 +200,7 @@ def resolve_file():
     input_spec = orig_path
     convert_args = ('-resize', "%dx%d>" % (scale, scale))
     if mimetype == 'application/pdf':
-        input_spec += '[0]'     # only thumbnail first page of PDF
+        input_spec += '[0]'  # only thumbnail first page of PDF
         convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
 
     log("Scaling thumbnail to %d" % scale)
@@ -187,12 +208,14 @@ def resolve_file():
 
     return path.join(relpath, scaled_name)
 
+
 @route('/static/<path:path>')
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
     return static_file(path, root=settings.BASE_DIR)
+
 
 @route('/getfileref')
 @allow_cross_origin
@@ -203,6 +226,8 @@ def getfileref():
     response.content_type = 'text/plain; charset=utf-8'
     return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
                                        pathname2url(resolve_file()))
+
+
 @route('/fileget')
 @require_token('filename')
 def fileget():
@@ -214,11 +239,13 @@ def fileget():
         r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
     return r
 
+
 @route('/fileupload', method='OPTIONS')
 @allow_cross_origin
 def fileupload_options():
     response.content_type = "text/plain; charset=utf-8"
     return ''
+
 
 @route('/fileupload', method='POST')
 @allow_cross_origin
@@ -238,11 +265,12 @@ def fileupload():
     if not path.exists(basepath):
         mkdir(basepath)
 
-    upload = request.files.values()[0]
+    upload = list(request.files.values())[0]
     upload.save(pathname, overwrite=True)
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
+
 
 @route('/filedelete', method='POST')
 @require_token('filename')
@@ -271,6 +299,7 @@ def filedelete():
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
+
 @route('/getmetadata')
 @require_token('filename')
 def getmetadata():
@@ -297,7 +326,7 @@ def getmetadata():
             abort(404, 'DateTime not found in EXIF')
 
     data = defaultdict(dict)
-    for key, value in tags.items():
+    for key, value in list(tags.items()):
         parts = key.split()
         if len(parts) < 2: continue
         try:
@@ -308,10 +337,11 @@ def getmetadata():
         data[parts[0]][parts[1]] = str(v)
 
     response.content_type = 'application/json'
-    data = [OrderedDict( (('Name', key), ('Fields', value)) )
-            for key,value in data.items()]
+    data = [OrderedDict((('Name', key), ('Fields', value)))
+            for key, value in list(data.items())]
 
     return json.dumps(data, indent=4)
+
 
 @route('/testkey')
 @require_token('random', always=True)
@@ -319,8 +349,9 @@ def testkey():
     """If access to this resource succeeds, clients can conclude
     that they have a valid access key.
     """
-    response.content_type ='text/plain; charset=utf-8'
+    response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
+
 
 @route('/web_asset_store.xml')
 @include_timestamp
@@ -329,7 +360,9 @@ def web_asset_store():
     response.content_type = 'text/xml; charset=utf-8'
     return template('web_asset_store.xml', host="%s:%d" % (settings.HOST, settings.PORT))
 
+
 if __name__ == '__main__':
     from bottle import run
+
     run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)
