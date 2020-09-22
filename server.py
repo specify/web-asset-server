@@ -5,12 +5,15 @@ from mimetypes import guess_type
 from os import path, mkdir, remove
 from urllib.parse import quote
 from urllib.request import pathname2url
+from sh import convert
 
 import exifread
 import hmac
 import json
 import time
-from sh import convert
+import boto3
+import botocore
+import tempfile
 
 import settings
 from bottle import (
@@ -209,12 +212,43 @@ def resolve_file():
     return path.join(relpath, scaled_name)
 
 
+def initialize_digitalocean_connection():
+    global session
+    global client
+
+    if not settings.DIGITALOCEAN_REGION:
+        settings.DIGITALOCEAN_REGION = 'nyc3'
+
+    session = boto3.session.Session()
+    client = session.client('s3',
+                            region_name=settings.DIGITALOCEAN_REGION,
+                            endpoint_url='https://%s.digitaloceanspaces.com' % settings.DIGITALOCEAN_REGION,
+                            aws_access_key_id=settings.DIGITALOCEAN_KEY,
+                            aws_secret_access_key=settings.DIGITALOCEAN_SECRET)
+
+    response = client.list_buckets()
+    buckets = {bucket['name'] for bucket in response['Buckets']}
+
+    if settings.DIGITALOCEAN_SPACE_NAME not in buckets:
+        client.create_bucket(Bucket=settings.DIGITALOCEAN_SPACE_NAME)
+
+    settings.BASE_DIR = ''
+
+
 @route('/static/<path:path>')
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
+
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    return static_file(path, root=settings.BASE_DIR)
+
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        with tempfile.NamedTemporaryFile() as temp_file:
+            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, path, temp_file)
+            return static_file(path.filename(temp_file.name), root=tempfile.tempdir)
+
+    elif settings.STORAGE_TYPE == 'local':
+        return static_file(path, root=settings.BASE_DIR)
 
 
 @route('/getfileref')
@@ -252,9 +286,10 @@ def fileupload_options():
 @require_token('store')
 def fileupload():
     """Accept original file uploads and store them in the proper
-    attchment subdirectory.
+    attachment subdirectory.
     """
     thumb_p = (request.forms['type'] == "T")
+
     storename = request.forms.store
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p))
     pathname = path.join(basepath, storename)
@@ -262,11 +297,19 @@ def fileupload():
     if thumb_p:
         return 'Ignoring thumbnail upload!'
 
-    if not path.exists(basepath):
-        mkdir(basepath)
-
     upload = list(request.files.values())[0]
-    upload.save(pathname, overwrite=True)
+
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        client.put_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                          Key=pathname,
+                          Body=upload.file.read(),
+                          ACL='private')
+
+    elif settings.STORAGE_TYPE == 'local':
+        if not path.exists(basepath):
+            mkdir(basepath)
+
+        upload.save(pathname, overwrite=True)
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
@@ -284,17 +327,41 @@ def filedelete():
     thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
 
     pathname = path.join(basepath, storename)
-    if not path.exists(pathname):
-        abort(404)
-
-    log("Deleting %s" % pathname)
-    remove(pathname)
-
     prefix = storename.split('.att')[0]
-    pattern = path.join(thumbpath, prefix + '*')
-    log("Deleting thumbnails matching %s" % pattern)
-    for name in glob(pattern):
-        remove(name)
+
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        try:
+            object = client.Object(settings.DIGITALOCEAN_SPACE_NAME, pathname).load()
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == "404":
+                abort(404)  # file does not exist
+            else:
+                raise
+        else:
+            log("Deleting %s" % pathname)
+            object.delete()
+
+            # searching for thumbnails
+            pattern = path.join(thumbpath, prefix)
+            log("Deleting thumbnails matching %s" % pattern)
+            response = client.list_objects_v2(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Prefix=pattern)
+            if 'Contents' in response:
+                for thumbnail in response['Contents']:
+                    client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                                         Key=thumbnail['key'])
+
+
+    elif settings.STORAGE_TYPE == 'local':
+        if not path.exists(pathname):
+            abort(404)
+
+        log("Deleting %s" % pathname)
+        remove(pathname)
+
+        pattern = path.join(thumbpath, prefix + '*')
+        log("Deleting thumbnails matching %s" % pattern)
+        for name in glob(pattern):
+            remove(name)
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
@@ -304,6 +371,10 @@ def filedelete():
 @require_token('filename')
 def getmetadata():
     """Provides access to EXIF metadata."""
+
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':  # TODO: decided whether to provide metadata for spaces
+        return '{}'
+
     storename = request.query.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     pathname = path.join(basepath, storename)
@@ -371,3 +442,6 @@ if __name__ == '__main__':
 
     run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)
+
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        initialize_digitalocean_connection()
