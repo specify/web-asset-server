@@ -45,6 +45,7 @@ The dependencies are:
 1. *ImageMagick* for thumbnailing.
 1. *Ghostscript* for PDF thumbnailing.
 1. *Paste* Python web server.
+1. *boto3* and *botocore* for integration with DigitalOcean spaces.
 
 To install dependencies
 the following commands work on Ubuntu:

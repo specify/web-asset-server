@@ -21,6 +21,7 @@ from bottle import (
     HTTPResponse, route)
 
 
+
 def log(msg):
     if settings.DEBUG:
         print(msg)
@@ -164,6 +165,9 @@ def resolve_file():
     Returns the relative path to the requested file in the base
     attachments directory.
     """
+
+    global client
+
     thumb_p = (request.query['type'] == "T")
     storename = request.query.filename
     relpath = get_rel_path(request.query.coll, thumb_p)
@@ -187,33 +191,71 @@ def resolve_file():
     scaled_name = "%s_%d%s" % (root, scale, ext)
     scaled_pathname = path.join(basepath, scaled_name)
 
-    if path.exists(scaled_pathname):
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        try:
+            client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=scaled_pathname)
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] != "404":
+                raise
+        else:
+            return path.join(relpath, scaled_name)
+
+    elif settings.STORAGE_TYPE == 'local' and path.exists(scaled_pathname):
         log("Serving previously scaled thumbnail")
         return path.join(relpath, scaled_name)
 
-    if not path.exists(basepath):
+    if settings.STORAGE_TYPE != 'digitalocean_spaces' and not path.exists(basepath):
         mkdir(basepath)
 
     orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     orig_path = path.join(orig_dir, storename)
 
-    if not path.exists(orig_path):
-        abort(404, "Missing original: %s" % orig_path)
+    path_exists = True
 
-    input_spec = orig_path
-    convert_args = ('-resize', "%dx%d>" % (scale, scale))
-    if mimetype == 'application/pdf':
-        input_spec += '[0]'  # only thumbnail first page of PDF
-        convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
+    with tempfile.NamedTemporaryFile() as temp_file:
+        if settings.STORAGE_TYPE == 'digitalocean_spaces':
+            try:
+                client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, orig_path, temp_file)
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == "404":
+                    path_exists = False  # file does not exist
+                else:
+                    raise
+            temp_file.seek(0)
+            input_spec = temp_file.name
+        else:
+            path_exists = path.exists(orig_path)
+            input_spec = orig_path
 
-    log("Scaling thumbnail to %d" % scale)
-    convert(input_spec, *(convert_args + (scaled_pathname,)))
+        if not path_exists:
+            abort(404, "Missing original: %s" % orig_path)
 
-    return path.join(relpath, scaled_name)
+
+        convert_args = ('-thumbnail', "%dx%d>" % (scale, scale))
+        if mimetype == 'application/pdf':
+            input_spec += '[0]'  # only thumbnail first page of PDF
+            convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
+
+        log("Scaling thumbnail to %d" % scale)
+
+        if settings.STORAGE_TYPE == 'digitalocean_spaces':
+            with tempfile.NamedTemporaryFile(suffix='.png') as temp_result_file:
+                convert(input_spec, *(convert_args + (temp_result_file.name,)))
+                client.put_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                                  Key=scaled_pathname,
+                                  Body=temp_result_file.read(),
+                                  ACL='private',
+                                  Metadata={
+                                      'exif': getmetadata(temp_result_file)
+                                  })
+        else:
+            convert(input_spec, *(convert_args + (scaled_pathname,)))
+
+        return path.join(relpath, scaled_name)
 
 
 def initialize_digitalocean_connection():
-    global session
+
     global client
 
     if not settings.DIGITALOCEAN_REGION:
@@ -227,7 +269,7 @@ def initialize_digitalocean_connection():
                             aws_secret_access_key=settings.DIGITALOCEAN_SECRET)
 
     response = client.list_buckets()
-    buckets = {bucket['name'] for bucket in response['Buckets']}
+    buckets = {bucket['Name'] for bucket in response['Buckets']}
 
     if settings.DIGITALOCEAN_SPACE_NAME not in buckets:
         client.create_bucket(Bucket=settings.DIGITALOCEAN_SPACE_NAME)
@@ -239,13 +281,15 @@ def initialize_digitalocean_connection():
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
 
+    global client
+
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
 
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         with tempfile.NamedTemporaryFile() as temp_file:
-            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, path, temp_file)
-            return static_file(path.filename(temp_file.name), root=tempfile.tempdir)
+            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, path, temp_file.name)
+            return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
 
     elif settings.STORAGE_TYPE == 'local':
         return static_file(path, root=settings.BASE_DIR)
@@ -266,12 +310,21 @@ def getfileref():
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
-    r = static_file(resolve_file(), root=settings.BASE_DIR)
-    download_name = request.query.downloadname
-    if download_name:
-        download_name = quote(path.basename(download_name).encode('ascii', 'replace'))
-        r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
-    return r
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+        filename = resolve_file()
+        _, file_extension = path.splitext(filename)
+        with tempfile.NamedTemporaryFile(suffix=file_extension) as temp_file:
+            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, filename, temp_file)
+            temp_file.seek(0)
+            return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
+
+    elif settings.STORAGE_TYPE == 'local':
+        r = static_file(resolve_file(), root=settings.BASE_DIR)
+        download_name = request.query.downloadname
+        if download_name:
+            download_name = quote(path.basename(download_name).encode('ascii', 'replace'))
+            r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
+        return r
 
 
 @route('/fileupload', method='OPTIONS')
@@ -288,6 +341,9 @@ def fileupload():
     """Accept original file uploads and store them in the proper
     attachment subdirectory.
     """
+
+    global client
+
     thumb_p = (request.forms['type'] == "T")
 
     storename = request.forms.store
@@ -303,7 +359,10 @@ def fileupload():
         client.put_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
                           Key=pathname,
                           Body=upload.file.read(),
-                          ACL='private')
+                          ACL='private',
+                          Metadata={
+                              'exif': getmetadata(upload.file)
+                          })
 
     elif settings.STORAGE_TYPE == 'local':
         if not path.exists(basepath):
@@ -322,6 +381,9 @@ def filedelete():
     if the original file does not exist. Any associated thumbnails will
     also be deleted.
     """
+
+    global client
+
     storename = request.forms.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False))
     thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
@@ -331,7 +393,7 @@ def filedelete():
 
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         try:
-            object = client.Object(settings.DIGITALOCEAN_SPACE_NAME, pathname).load()
+            client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == "404":
                 abort(404)  # file does not exist
@@ -339,16 +401,16 @@ def filedelete():
                 raise
         else:
             log("Deleting %s" % pathname)
-            object.delete()
+            client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)
 
             # searching for thumbnails
-            pattern = path.join(thumbpath, prefix)
+            pattern = path.splitext(path.join(thumbpath, prefix))[0]
             log("Deleting thumbnails matching %s" % pattern)
-            response = client.list_objects_v2(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Prefix=pattern)
-            if 'Contents' in response:
-                for thumbnail in response['Contents']:
+            request_response = client.list_objects(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Prefix=pattern)
+            if 'Contents' in request_response:
+                for thumbnail in request_response['Contents']:
                     client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
-                                         Key=thumbnail['key'])
+                                         Key=thumbnail['Key'])
 
 
     elif settings.STORAGE_TYPE == 'local':
@@ -369,26 +431,33 @@ def filedelete():
 
 @route('/getmetadata')
 @require_token('filename')
-def getmetadata():
+def getmetadata(file=None):
     """Provides access to EXIF metadata."""
 
-    if settings.STORAGE_TYPE == 'digitalocean_spaces':  # TODO: decided whether to provide metadata for spaces
-        return '{}'
+    global client
+
+    fetch_metadata = settings.STORAGE_TYPE == 'digitalocean_spaces' and file is None
 
     storename = request.query.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     pathname = path.join(basepath, storename)
     datatype = request.query.dt
 
-    if not path.exists(pathname):
+    if fetch_metadata:
+        return client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)['Metadata']['exif']
+
+    if settings.STORAGE_TYPE != 'digitalocean_spaces' and not path.exists(pathname):
         abort(404)
 
-    with open(pathname, 'rb') as f:
-        try:
-            tags = exifread.process_file(f)
-        except:
-            log("Error reading exif data.")
-            tags = {}
+    try:
+        if file is not None:
+            tags = exifread.process_file(file)
+        else:
+            with open(pathname, 'rb') as f:
+                tags = exifread.process_file(f)
+    except:
+        log("Error reading exif data.")
+        tags = {}
 
     if datatype == 'date':
         try:
@@ -440,8 +509,8 @@ def main_page():
 if __name__ == '__main__':
     from bottle import run
 
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
-        debug=settings.DEBUG, reloader=settings.DEBUG)
-
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         initialize_digitalocean_connection()
+
+    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
+        debug=settings.DEBUG, reloader=settings.DEBUG)

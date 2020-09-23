@@ -47,8 +47,20 @@ DEVELOPMENT_PORT = PORT
 
 COLLECTION_DIRS = None
 
+
+# Use local storage or DigitalOcean Spaces
+STORAGE_TYPE = 'local'  # local/digitalocean_spaces
+
+# Used only when STORAGE_TYPE is `local`:
 # Base directory for all attachments.
 BASE_DIR = '/home/specify/attachments/'
+
+# Used only when STORAGE_TYPE is `digitalocean_spaces`:
+# Credentials for DigitalOcean Spaces
+DIGITALOCEAN_REGION = ''  # if regions is not specified, nyc3 is used
+DIGITALOCEAN_SPACE_NAME = ''  # if space does not exist, it would be created
+DIGITALOCEAN_KEY = ''
+DIGITALOCEAN_SECRET = ''
 
 # Originals and thumbnails are stored in separate directories.
 THUMB_DIR = 'thumbnails'
@@ -59,5 +71,4 @@ CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'applicat
 
 # What HTTP server to use for stand-alone operation.
 # SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
-SERVER = 'wsgiref'  # For testing. Requires no extra packages.
 
