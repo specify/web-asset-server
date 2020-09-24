@@ -71,4 +71,5 @@ CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'applicat
 
 # What HTTP server to use for stand-alone operation.
 # SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
+SERVER = 'wsgiref'  # For testing. Requires no extra packages.
 
