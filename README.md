@@ -29,6 +29,7 @@ under GNU General Public License 2 (GPL2).
        * [Systemd](#systemd)
    * [HTTPS](#https)
    * [Specify Settings](#specify-settings)
+   * [Transferring local files to digitalocean](#transferring-local-files-to-digitalocean)
    * [Compatibility with older versions of Python](#compatibility-with-older-versions-of-python)
 
 
@@ -174,7 +175,8 @@ to configure access to the asset server:
 If these properties do not already exist, they can be added using the *Add Property*
 button. 
 
-Compatibility with older versions of Python
+# Transferring local files to digitalocean
+`tranfser.py` file can be used to transfer local files to a digitalocean bucket.
 
 # Compatibility with older versions of Python
 
