@@ -1,9 +1,7 @@
 import settings
 import boto3
-import botocore
-import sys
+import commons
 from os import path
-from glob import glob
 from pathlib import Path
 from server import getmetadata
 from time import time
@@ -37,17 +35,6 @@ def validate_settings():
     return True
 
 
-def confirm_action(action):
-    choice = ' '
-    while choice != 'y' and choice != '':
-        if choice in 'n':
-            print('Abort')
-            sys.exit(0)
-        else:
-            print(action + ' [Y/n]')
-        choice = input().lower()
-
-
 # Validating settings before proceeding
 assert validate_settings()
 
@@ -74,22 +61,17 @@ number_of_results = len(files_to_transfer)
 print('%d files would be transferred.' % number_of_results)
 
 # Confirm transfer before starting
-confirm_action('Do you want to continue?')
+commons.confirm_action('Do you want to continue?')
 
 # Connecting to the bucket
-session = boto3.session.Session()
-client = session.client('s3',
-                        region_name=settings.DIGITALOCEAN_REGION,
-                        endpoint_url='https://%s.digitaloceanspaces.com' % settings.DIGITALOCEAN_REGION,
-                        aws_access_key_id=settings.DIGITALOCEAN_KEY,
-                        aws_secret_access_key=settings.DIGITALOCEAN_SECRET)
+client = commons.connect()
 
 response = client.list_buckets()
 buckets = {bucket['Name'] for bucket in response['Buckets']}
 
 # Creating new bucket if needed
 if settings.DIGITALOCEAN_SPACE_NAME not in buckets:
-    confirm_action('Bucket %s does not exist. Create bucket?' % settings.DIGITALOCEAN_SPACE_NAME)
+    commons.confirm_action('Bucket %s does not exist. Create bucket?' % settings.DIGITALOCEAN_SPACE_NAME)
     client.create_bucket(Bucket=settings.DIGITALOCEAN_SPACE_NAME)
 
 # Uploading files one by one (no bulk upload option available)

@@ -14,6 +14,7 @@ import time
 import boto3
 import botocore
 import tempfile
+import commons
 
 import settings
 from bottle import (
@@ -261,12 +262,7 @@ def initialize_digitalocean_connection():
     if not settings.DIGITALOCEAN_REGION:
         settings.DIGITALOCEAN_REGION = 'nyc3'
 
-    session = boto3.session.Session()
-    client = session.client('s3',
-                            region_name=settings.DIGITALOCEAN_REGION,
-                            endpoint_url='https://%s.digitaloceanspaces.com' % settings.DIGITALOCEAN_REGION,
-                            aws_access_key_id=settings.DIGITALOCEAN_KEY,
-                            aws_secret_access_key=settings.DIGITALOCEAN_SECRET)
+    client = commons.connect()
 
     response = client.list_buckets()
     buckets = {bucket['Name'] for bucket in response['Buckets']}
