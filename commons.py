@@ -38,11 +38,14 @@ A multipurpose object that can tell whether a file exists and return it's metada
 @param {object} client - a pointer to a connection client (returned by commons.connect())
 @param {str} file_name - a file key as stored in the digitalocean's space
 @param {str} return_type - a type of data to be requested from the server
-                           if return_type is 'meta', then returns file's metadata. Returns [] if file does not exist
+                           if return_type is 'meta', then returns file's metadata. Returns {} if file does not exist
                            if return_type is 'file', writes file content into `file_object`. Returns whether file exists
+                           if return_type is 'file_exists', returns whether file exists
 @param {mixed} - if return_type is 'file' - {TextIOWrapper} a file object to write result to
 @param {bool} follow_redirect - whether to follow redirects to source file
-@returns if return_type is 'meta' - {dict} file metadata if file exists, {} if file does not exist
+@returns if return_type is 'meta' - {Set} file_exists, file_metadata
+                if file_exists, then file_metadata is file's metadata
+                else, file_metadata = {}
          if return_type is 'file' - {bool} file exists if
 """
 def digitalocean_get_file(client,
@@ -59,7 +62,9 @@ def digitalocean_get_file(client,
             meta = client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=file_name)['Metadata']
 
         if return_type == 'meta':
-            return meta
+            return True, meta
+        elif return_type == 'file_exists':
+            return True
         elif return_type == 'file':
             client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, file_name, file_object)
             file_object.seek(0)
@@ -67,7 +72,9 @@ def digitalocean_get_file(client,
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
             if return_type == 'meta':
-                return {}
+                return False, {}
+            elif return_type == 'file_exists':
+                return False
             elif return_type == 'file':
                 return False
         else:

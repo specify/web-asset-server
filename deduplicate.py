@@ -109,25 +109,37 @@ for file_hash, files in objects.items():
     except IndexError:
         continue
 
-    metadata = commons.digitalocean_get_file(client=client,
-                                             file_name=first_file_name,
-                                             return_type='meta')
+    _, metadata = commons.digitalocean_get_file(client=client,
+                                                file_name=first_file_name,
+                                                return_type='meta')
 
-    metadata['references'] = json.dumps(files)  # saving the list of references to this file
+    tag_exists, tag_metadata = commons.digitalocean_get_file(client=client,
+                                                             file_name=file_hash,
+                                                             return_type='meta')
 
     print('[%d/%d] Uploading deduplicated file' % (current_file, number_of_unique_files))
+
+    if tag_exists:  # if hash already exists, append to it's references
+        tag_metadata['references'] = json.loads(tag_metadata['references'])
+        tag_metadata['references'] = list(set().union(tag_metadata['references'], files))
+        copy_source = file_hash
+
+    else:
+        metadata['references'] = json.dumps(files)  # saving the list of references to this file
+        copy_source = first_file_name
 
     client.copy_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
                        Key=file_hash,
                        CopySource={
                            'Bucket': settings.DIGITALOCEAN_SPACE_NAME,
-                           'Key': first_file_name,
+                           'Key': copy_source,
                        },
-                       Metadata=metadata)
+                       Metadata=metadata,
+                       MetadataDirective='REPLACE')
 
     duplicate_object_metadata = {
-                                  'redirect': file_hash
-                              }
+        'redirect': file_hash
+    }
 
     for file_name in files:
         print('[%d/%d] Creating links from duplicates to target files' %

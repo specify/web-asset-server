@@ -194,7 +194,7 @@ def resolve_file():
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         if commons.digitalocean_get_file(client=client,
                                          file_name=scaled_pathname,
-                                         return_type='meta'):
+                                         return_type='file_exists'):
             return path.join(relpath, scaled_name)
 
     elif settings.STORAGE_TYPE == 'local' and path.exists(scaled_pathname):
@@ -392,22 +392,25 @@ def filedelete():
     pathname = path.join(basepath, storename)
     prefix = storename.split('.att')[0]
 
-    if settings.STORAGE_TYPE == 'digitalocean_spaces' and commons.digitalocean_get_file(client=client,
-                                                                                        file_name=pathname,
-                                                                                        return_type='meta'):
+    if settings.STORAGE_TYPE == 'digitalocean_spaces':
+
+        file_exists, meta = commons.digitalocean_get_file(client=client,
+                                                          file_name=pathname,
+                                                          return_type='meta',
+                                                          follow_redirect=False)
+
+        assert file_exists
+
         log("Deleting %s" % pathname)
-        meta = commons.digitalocean_get_file(client=client,
-                                             file_name=pathname,
-                                             return_type='meta',
-                                             follow_redirect=False)
 
         # if this attachment is a redirect, remove link from parent's 'references' attribute
         if 'redirect' in meta:
-            parent_meta = commons.digitalocean_get_file(client=client,
-                                                        file_name=meta['redirect'],
-                                                        return_type='meta')
+            file_exists, parent_meta = commons.digitalocean_get_file(client=client,
+                                                                     file_name=meta['redirect'],
+                                                                     return_type='meta',
+                                                                     follow_redirect=False)
 
-            if 'references' in parent_meta:
+            if file_exists and 'references' in parent_meta:
                 try:
                     parent_meta['references'] = json.loads(parent_meta['references'])
                     parent_meta['references'].remove(pathname)
@@ -415,7 +418,7 @@ def filedelete():
                 except ValueError:
                     pass
                 else:
-                    if len(parent_meta['references']) == 0:
+                    if len(parent_meta['references']) == 2:
                         # if this was the only reference to the parent, remove the parent element
                         client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=meta['redirect'])
                     else:
@@ -438,7 +441,6 @@ def filedelete():
             for thumbnail in request_response['Contents']:
                 client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
                                      Key=thumbnail['Key'])
-
 
     elif settings.STORAGE_TYPE == 'local':
         if not path.exists(pathname):
@@ -471,9 +473,9 @@ def getmetadata(file=None):
     datatype = request.query.dt
 
     if fetch_metadata:
-        meta = commons.digitalocean_get_file(client=client,
-                                             file_name=pathname,
-                                             return_type='meta')
+        _, meta = commons.digitalocean_get_file(client=client,
+                                                          file_name=pathname,
+                                                          return_type='meta')
 
         if 'exif' in meta:
             return meta['exit']
