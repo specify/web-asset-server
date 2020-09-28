@@ -2,8 +2,14 @@ import settings
 import boto3
 import sys
 import commons
+import json
+from os import path
+from tempfile import NamedTemporaryFile
 from collections import defaultdict
 from time import time
+
+print('Warning! This script is only supposed to work with files that are already in a digitalocean bucket\n' +
+      'If you have local files, please run `transfer.py` first\n')
 
 
 def validate_settings():
@@ -58,7 +64,12 @@ last_key = ''
 while True:
     response = client.list_object_versions(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
                                            KeyMarker=last_key)
-    {objects[item['ETag']].append(item['Key']) for item in response['Versions']}
+
+    if 'Versions' not in response and last_key == '':
+        print('No files were found in the digitalocean space. Make sure you run `transfer.py` beforehand')
+        sys.exit(0)
+
+    {objects[item['ETag']].append(item['Key']) for item in response['Versions'] if item['Size'] != 0}
     if response['IsTruncated']:
         last_key = response['Version'][-1]['Key']
     else:
@@ -70,6 +81,10 @@ objects = {file_hash: files for file_hash, files in objects.items() if len(files
 
 number_of_unique_files = len(objects.keys())
 number_of_non_unique_files = len([file for files in objects.values() for file in files])
+
+if number_of_unique_files == 0:
+    print('There were no duplicate files found')
+    sys.exit(0)
 
 print('The following duplicate files were found: \n'
       '%s\n'
@@ -84,6 +99,49 @@ commons.confirm_action('Do you want to continue?')
 
 # Uploading files one by one (no bulk upload option available)
 start_time = time()
+current_file = 1
+current_position = 1
+
+for file_hash, files in objects.items():
+
+    try:
+        first_file_name = files[0]
+    except IndexError:
+        continue
+
+    metadata = commons.digitalocean_get_file(client=client,
+                                             file_name=first_file_name,
+                                             return_type='meta')
+
+    metadata['references'] = json.dumps(files)  # saving the list of references to this file
+
+    print('[%d/%d] Uploading deduplicated file' % (current_file, number_of_unique_files))
+
+    client.copy_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                       Key=file_hash,
+                       CopySource={
+                           'Bucket': settings.DIGITALOCEAN_SPACE_NAME,
+                           'Key': first_file_name,
+                       },
+                       Metadata=metadata)
+
+    duplicate_object_metadata = {
+                                  'redirect': file_hash
+                              }
+
+    for file_name in files:
+        print('[%d/%d] Creating links from duplicates to target files' %
+              (current_position, number_of_non_unique_files)
+              )
+        client.put_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                          Key=file_name,
+                          Body='',
+                          ACL='private',
+                          Metadata=duplicate_object_metadata)
+
+        current_position = current_position + 1
+
+    current_file = current_file + 1
 
 end_time = time()
 

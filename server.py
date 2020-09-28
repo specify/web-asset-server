@@ -22,7 +22,6 @@ from bottle import (
     HTTPResponse, route)
 
 
-
 def log(msg):
     if settings.DEBUG:
         print(msg)
@@ -193,12 +192,9 @@ def resolve_file():
     scaled_pathname = path.join(basepath, scaled_name)
 
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
-        try:
-            client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=scaled_pathname)
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != "404":
-                raise
-        else:
+        if commons.digitalocean_get_file(client=client,
+                                         file_name=scaled_pathname,
+                                         return_type='meta'):
             return path.join(relpath, scaled_name)
 
     elif settings.STORAGE_TYPE == 'local' and path.exists(scaled_pathname):
@@ -215,14 +211,10 @@ def resolve_file():
 
     with tempfile.NamedTemporaryFile() as temp_file:
         if settings.STORAGE_TYPE == 'digitalocean_spaces':
-            try:
-                client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, orig_path, temp_file)
-            except botocore.exceptions.ClientError as e:
-                if e.response['Error']['Code'] == "404":
-                    path_exists = False  # file does not exist
-                else:
-                    raise
-            temp_file.seek(0)
+            path_exists = commons.digitalocean_get_file(client=client,
+                                                        file_name=orig_path,
+                                                        return_type='file',
+                                                        file_object=temp_file)
             input_spec = temp_file.name
         else:
             path_exists = path.exists(orig_path)
@@ -230,7 +222,6 @@ def resolve_file():
 
         if not path_exists:
             abort(404, "Missing original: %s" % orig_path)
-
 
         convert_args = ('-thumbnail', "%dx%d>" % (scale, scale))
         if mimetype == 'application/pdf':
@@ -256,7 +247,6 @@ def resolve_file():
 
 
 def initialize_digitalocean_connection():
-
     global client
 
     if not settings.DIGITALOCEAN_REGION:
@@ -284,8 +274,15 @@ def static(path):
 
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         with tempfile.NamedTemporaryFile() as temp_file:
-            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, path, temp_file.name)
-            return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
+            file_exists = commons.digitalocean_get_file(client=client,
+                                                        file_name=path,
+                                                        return_type='file',
+                                                        file_object=temp_file)
+
+            if file_exists:
+                return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
+            else:
+                abort(404)
 
     elif settings.STORAGE_TYPE == 'local':
         return static_file(path, root=settings.BASE_DIR)
@@ -309,10 +306,18 @@ def fileget():
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
         filename = resolve_file()
         _, file_extension = path.splitext(filename)
+
         with tempfile.NamedTemporaryFile(suffix=file_extension) as temp_file:
-            client.download_fileobj(settings.DIGITALOCEAN_SPACE_NAME, filename, temp_file)
-            temp_file.seek(0)
-            return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
+
+            file_exists = commons.digitalocean_get_file(client=client,
+                                                        file_name=filename,
+                                                        return_type='file',
+                                                        file_object=temp_file)
+
+            if file_exists:
+                return static_file(path.basename(temp_file.name), root=tempfile.tempdir)
+            else:
+                abort(404)
 
     elif settings.STORAGE_TYPE == 'local':
         r = static_file(resolve_file(), root=settings.BASE_DIR)
@@ -387,26 +392,52 @@ def filedelete():
     pathname = path.join(basepath, storename)
     prefix = storename.split('.att')[0]
 
-    if settings.STORAGE_TYPE == 'digitalocean_spaces':
-        try:
-            client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == "404":
-                abort(404)  # file does not exist
-            else:
-                raise
-        else:
-            log("Deleting %s" % pathname)
-            client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)
+    if settings.STORAGE_TYPE == 'digitalocean_spaces' and commons.digitalocean_get_file(client=client,
+                                                                                        file_name=pathname,
+                                                                                        return_type='meta'):
+        log("Deleting %s" % pathname)
+        meta = commons.digitalocean_get_file(client=client,
+                                             file_name=pathname,
+                                             return_type='meta',
+                                             follow_redirect=False)
 
-            # searching for thumbnails
-            pattern = path.splitext(path.join(thumbpath, prefix))[0]
-            log("Deleting thumbnails matching %s" % pattern)
-            request_response = client.list_objects(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Prefix=pattern)
-            if 'Contents' in request_response:
-                for thumbnail in request_response['Contents']:
-                    client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
-                                         Key=thumbnail['Key'])
+        # if this attachment is a redirect, remove link from parent's 'references' attribute
+        if 'redirect' in meta:
+            parent_meta = commons.digitalocean_get_file(client=client,
+                                                        file_name=meta['redirect'],
+                                                        return_type='meta')
+
+            if 'references' in parent_meta:
+                try:
+                    parent_meta['references'] = json.loads(parent_meta['references'])
+                    parent_meta['references'].remove(pathname)
+                    parent_meta['references'] = json.dumps(parent_meta['references'])
+                except ValueError:
+                    pass
+                else:
+                    if len(parent_meta['references']) == 0:
+                        # if this was the only reference to the parent, remove the parent element
+                        client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=meta['redirect'])
+                    else:
+                        client.copy_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                                           Key=meta['redirect'],
+                                           CopySource={
+                                               'Bucket': settings.DIGITALOCEAN_SPACE_NAME,
+                                               'Key': meta['redirect'],
+                                           },
+                                           Metadata=parent_meta,
+                                           MetadataDirective="REPLACE")
+
+        client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)
+
+        # searching for thumbnails
+        pattern = path.splitext(path.join(thumbpath, prefix))[0]
+        log("Deleting thumbnails matching %s" % pattern)
+        request_response = client.list_objects(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Prefix=pattern)
+        if 'Contents' in request_response:
+            for thumbnail in request_response['Contents']:
+                client.delete_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME,
+                                     Key=thumbnail['Key'])
 
 
     elif settings.STORAGE_TYPE == 'local':
@@ -440,7 +471,14 @@ def getmetadata(file=None):
     datatype = request.query.dt
 
     if fetch_metadata:
-        return client.head_object(Bucket=settings.DIGITALOCEAN_SPACE_NAME, Key=pathname)['Metadata']['exif']
+        meta = commons.digitalocean_get_file(client=client,
+                                             file_name=pathname,
+                                             return_type='meta')
+
+        if 'exif' in meta:
+            return meta['exit']
+        else:
+            return '{}'
 
     if settings.STORAGE_TYPE != 'digitalocean_spaces' and not path.exists(pathname):
         abort(404)
@@ -499,7 +537,7 @@ def web_asset_store():
 
 @route('/')
 def main_page():
-    return 'It works!'
+    return 'It works!<br><br>Storage type: %s' % settings.STORAGE_TYPE
 
 
 if __name__ == '__main__':
