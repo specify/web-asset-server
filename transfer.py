@@ -8,7 +8,8 @@ from time import time
 
 
 print('This script will copy all of the local files from web-asset-server into a digitalocean space.\n' +
-      'Your local files would not be modified or deleted in the process\n')
+      'Your local files would not be modified or deleted in the process\n' +
+      'If you want to skip prompts, run this file with `-y` option\n')
 
 
 def validate_settings():

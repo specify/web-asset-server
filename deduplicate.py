@@ -9,7 +9,8 @@ from collections import defaultdict
 from time import time
 
 print('Warning! This script is only supposed to work with files that are already in a digitalocean bucket\n' +
-      'If you have local files, please run `transfer.py` first\n')
+      'If you have local files, please run `transfer.py` first\n' +
+      'If you want to skip prompts, run this file with `-y` option\n')
 
 
 def validate_settings():

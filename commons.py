@@ -9,6 +9,10 @@ Span a prompt asking user to confirm a certain action
 @param {str} confirmation_message - The message that would be shown to the user
 """
 def confirm_action(confirmation_message: str):
+
+    if len(sys.argv) > 1 and sys.argv[1] == '-y':
+        return
+
     choice = ' '
     while choice != 'y' and choice != '':
         if choice in 'n':
