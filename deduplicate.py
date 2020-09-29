@@ -3,8 +3,6 @@ import boto3
 import sys
 import commons
 import json
-from os import path
-from tempfile import NamedTemporaryFile
 from collections import defaultdict
 from time import time
 

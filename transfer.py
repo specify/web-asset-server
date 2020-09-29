@@ -1,5 +1,4 @@
 import settings
-import boto3
 import commons
 from os import path
 from pathlib import Path
