@@ -252,15 +252,21 @@ def initialize_digitalocean_connection():
     if not settings.DIGITALOCEAN_REGION:
         settings.DIGITALOCEAN_REGION = 'nyc3'
 
-    client = commons.connect()
+    try:
+        client = commons.connect()
 
-    response = client.list_buckets()
-    buckets = {bucket['Name'] for bucket in response['Buckets']}
+        response = client.list_buckets()
+        buckets = {bucket['Name'] for bucket in response['Buckets']}
 
-    if settings.DIGITALOCEAN_SPACE_NAME not in buckets:
-        client.create_bucket(Bucket=settings.DIGITALOCEAN_SPACE_NAME)
+        if settings.DIGITALOCEAN_SPACE_NAME not in buckets:
+            client.create_bucket(Bucket=settings.DIGITALOCEAN_SPACE_NAME)
 
-    settings.BASE_DIR = ''
+        settings.BASE_DIR = ''
+
+        return True
+
+    except:
+        return False
 
 
 @route('/static/<path:path>')
@@ -474,11 +480,11 @@ def getmetadata(file=None):
 
     if fetch_metadata:
         _, meta = commons.digitalocean_get_file(client=client,
-                                                          file_name=pathname,
-                                                          return_type='meta')
+                                                file_name=pathname,
+                                                return_type='meta')
 
         if 'exif' in meta:
-            return meta['exit']
+            return meta['exif']
         else:
             return '{}'
 
@@ -507,6 +513,8 @@ def getmetadata(file=None):
         if len(parts) < 2: continue
         try:
             v = str(value).decode('ascii', 'replace').encode('utf-8')
+        except AttributeError:
+            v = str(value).encode('utf-8')
         except TypeError:
             v = repr(value)
 
@@ -516,7 +524,7 @@ def getmetadata(file=None):
     data = [OrderedDict((('Name', key), ('Fields', value)))
             for key, value in list(data.items())]
 
-    return json.dumps(data, indent=4)
+    return json.dumps(data)
 
 
 @route('/testkey')
@@ -546,7 +554,12 @@ if __name__ == '__main__':
     from bottle import run
 
     if settings.STORAGE_TYPE == 'digitalocean_spaces':
-        initialize_digitalocean_connection()
+        if not initialize_digitalocean_connection():  # default to local storage if failed to connect
+            settings.STORAGE_TYPE = 'local'
+            print('Failed to connect to remote storage. Using local storage instead.')
+            if not settings.BASE_DIR:
+                print('No base path provided, can\'t use base storage')
+                raise SystemExit
 
     run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)
