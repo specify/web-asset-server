@@ -45,7 +45,7 @@ def generate_token(timestamp, filename):
     This is for comparing to the client submited token.
     """
     timestamp = str(timestamp)
-    mac = hmac.new(settings.KEY, timestamp + filename)
+    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode())
     return ':'.join((mac.hexdigest(), timestamp))
 
 
@@ -358,7 +358,7 @@ def testkey():
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host="%s:%d" % (settings.HOST, settings.PORT))
+    return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
 
 
 @route('/')
