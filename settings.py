@@ -31,6 +31,9 @@ ALLOW_STATIC_FILE_ACCESS = True
 HOST = 'localhost'
 PORT = 8080
 
+SERVER_NAME = HOST
+SERVER_PORT = PORT
+
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
 
