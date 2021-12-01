@@ -45,7 +45,7 @@ def generate_token(timestamp, filename):
     This is for comparing to the client submited token.
     """
     timestamp = str(timestamp)
-    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode())
+    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), 'md5')
     return ':'.join((mac.hexdigest(), timestamp))
 
 
