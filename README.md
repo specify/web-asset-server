@@ -36,6 +36,8 @@ under GNU General Public License 2 (GPL2).
 
 ## Installing system dependencies
 
+
+
 The dependencies are:
 
 1. *Python* 3.6 is known to work. ([2.6 and 2.7 is available with modifications](#compatibility-with-older-versions-of-python)).
@@ -179,3 +181,13 @@ Compatibility with older versions of Python
 
 * [Web Asset server for Python 2.7](https://github.com/specify/web-asset-server)
 * [Python 2.6 compatibility](https://github.com/specify/web-asset-server#python-2.6-compatibility)
+
+# TODO
+
+  * Test with TIFF
+  * Test thumbnailing with TIFF
+  * Rewrite dockerfile to contain nginx and mysql
+  * Test redacted records - if we add an image to a redacted record, security is limited to the MD5 hash; 
+    it's still on the server and can be served with a static URL.
+  * convert to universal URLS (n2t.net) and database same (images.universal_urls). Our id=42754. http://n2t.
+    net/e/n2t_apidoc.html
