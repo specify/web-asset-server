@@ -1,16 +1,25 @@
+import os.path
 from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
-from os import path, mkdir, remove
+from os import path, makedirs, remove
 from urllib.parse import quote
 from urllib.request import pathname2url
-
+from distutils.util import strtobool
+from time import sleep
 import exifread
 import hmac
 import json
 import time
 from sh import convert
+from datetime import datetime
+import logging
+from bottle import Bottle,run
+
+import db_connector
+app = application = Bottle()
+logging.basicConfig(level=logging.DEBUG)
 
 import settings
 from bottle import (
@@ -19,25 +28,34 @@ from bottle import (
 
 
 def log(msg):
-    if settings.DEBUG:
-        print(msg)
+    logging.debug(msg)
 
 
-def get_rel_path(coll, thumb_p):
+
+def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
     attachments directory for the given collection.
     """
-    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
 
+    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+    first_subdir = storename[0:2]
+    second_subdir = storename[2:4]
     if settings.COLLECTION_DIRS is None:
-        return type_dir
+        return path.join(type_dir, first_subdir, second_subdir)
 
     try:
         coll_dir = settings.COLLECTION_DIRS[coll]
     except KeyError:
+        err = f"Unknown collection: {coll}"
+        log(err)
+        # response.content_type = 'text/plain; charset=utf-8'
+        # response.status = 403
+        # response.text = err
+        # log (err)
+        # return response
         abort(404, "Unknown collection: %r" % coll)
 
-    return path.join(coll_dir, type_dir)
+    return path.join(coll_dir, type_dir, first_subdir, second_subdir)
 
 
 def generate_token(timestamp, filename):
@@ -45,7 +63,12 @@ def generate_token(timestamp, filename):
     This is for comparing to the client submited token.
     """
     timestamp = str(timestamp)
-    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), 'md5')
+    if timestamp is None:
+        log(f"Missing timestamp; token generation failure.")
+    if filename is None:
+        log(f"Missing filename, token generation failure.")
+    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), digestmod='md5')
+    log(f"Generated new token for {filename} at {timestamp}.")
     return ':'.join((mac.hexdigest(), timestamp))
 
 
@@ -66,6 +89,7 @@ def validate_token(token_in, filename):
     in settings. Checks that the token is within the time tolerance and
     is valid.
     """
+    log(f"Validating token: {token_in} for file {filename}")
     if settings.KEY is None:
         return
     if token_in == '':
@@ -86,6 +110,7 @@ def validate_token(token_in, filename):
 
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
+    log(f"Valid token: {token_in} time: {timestr}")
 
 
 def require_token(filename_param, always=False):
@@ -112,6 +137,7 @@ def require_token(filename_param, always=False):
                 except TokenException as e:
                     response.content_type = 'text/plain; charset=utf-8'
                     response.status = 403
+                    log(f"Invalid token: {params.token}")
                     return e
             return func(*args, **kwargs)
 
@@ -153,7 +179,7 @@ def allow_cross_origin(func):
     return wrapper
 
 
-def resolve_file():
+def resolve_file(filename, collection, type, scale):
     """Inspect the request object to determine the file being requested.
     If the request is for a thumbnail and it has not been generated, do
     so before returning.
@@ -161,16 +187,18 @@ def resolve_file():
     Returns the relative path to the requested file in the base
     attachments directory.
     """
-    thumb_p = (request.query['type'] == "T")
-    storename = request.query.filename
-    relpath = get_rel_path(request.query.coll, thumb_p)
+
+    thumb_p = (type == "T")
+    storename = filename
+
+
+    relpath = get_rel_path(collection, thumb_p, storename)
 
     if not thumb_p:
         return path.join(relpath, storename)
-
+    scale = int(scale)
     basepath = path.join(settings.BASE_DIR, relpath)
 
-    scale = int(request.query.scale)
     mimetype, encoding = guess_type(storename)
 
     assert mimetype in settings.CAN_THUMBNAIL
@@ -189,9 +217,9 @@ def resolve_file():
         return path.join(relpath, scaled_name)
 
     if not path.exists(basepath):
-        mkdir(basepath)
+        makedirs(basepath)
 
-    orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
+    orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False, storename=storename))
     orig_path = path.join(orig_dir, storename)
 
     if not path.exists(orig_path):
@@ -209,70 +237,175 @@ def resolve_file():
     return path.join(relpath, scaled_name)
 
 
-@route('/static/<path:path>')
+@app.route('/static/<path:path>')
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
+    filename = path.split('/')[-1]
+    records = db_connector.get_image_record_by_internal_filename(filename)
+    if len(records) < 1:
+        log(f"Static record not found: {request.query.filename}")
+        response.content_type = 'text/plain; charset=utf-8'
+        response.status = 404
+        return response
+    if records[0]['redacted']:
+        response.content_type = 'text/plain; charset=utf-8'
+        response.status = 403
+        log(f"Token required")
+        return response
+
+
     return static_file(path, root=settings.BASE_DIR)
 
 
-@route('/getfileref')
+def getFileUrl(filename, collection, image_type,scale):
+    return "http://%s:%d/static/%s" % (settings.SERVER_NAME, settings.SERVER_PORT,
+                                       pathname2url(resolve_file(filename,
+                                                                 collection,
+                                                                 image_type,
+                                                                 scale)))
+
+
+@app.route('/getfileref')
 @allow_cross_origin
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
     response.content_type = 'text/plain; charset=utf-8'
-    return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
-                                       pathname2url(resolve_file()))
+    return getFileUrl(request.query.filename,
+                      request.query.coll,
+                      request.query['type'],
+                      request.query.scale)
 
 
-@route('/fileget')
+@app.route('/fileget')
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
-    r = static_file(resolve_file(), root=settings.BASE_DIR)
+
+    records = db_connector.get_image_record_by_internal_filename(request.query.filename)
+    if len(records) < 1:
+        log(f"Record not found: {request.query.filename}")
+        response.content_type = 'text/plain; charset=utf-8'
+        response.status = 404
+        return response
+    if records[0]['redacted']:
+        log(f"Redacted, check auth token")
+
+        try:
+            # Note, we're hitting this twice with the @require_token decorator
+            validate_token(request.query.token, request.query.filename)
+        except TokenException as e:
+            response.content_type = 'text/plain; charset=utf-8'
+            response.status = 403
+            log(f"Invalid token for redacted record: {request.query.token}")
+            return e
+        log(f"Token validated for redacted record...")
+    else:
+        log(f"Not redacted, no check required")
+
+    resolved_file = resolve_file(request.query.filename,
+                                 request.query.coll,
+                                 request.query['type'],
+                                 request.query.scale)
+    r = static_file(resolved_file,
+                    root=settings.BASE_DIR)
     download_name = request.query.downloadname
     if download_name:
         download_name = quote(path.basename(download_name).encode('ascii', 'replace'))
         r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
+    log(f"Get complete:{request.query.filename}")
     return r
 
 
-@route('/fileupload', method='OPTIONS')
+@app.route('/fileupload', method='OPTIONS')
 @allow_cross_origin
 def fileupload_options():
     response.content_type = "text/plain; charset=utf-8"
     return ''
 
 
-@route('/fileupload', method='POST')
+@app.route('/fileupload', method='POST')
 @allow_cross_origin
 @require_token('store')
 def fileupload():
     """Accept original file uploads and store them in the proper
     attchment subdirectory.
     """
+    start_save = time.time()
+    log(f"Post request for fileupload...")
     thumb_p = (request.forms['type'] == "T")
     storename = request.forms.store
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p))
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p, storename))
+
     pathname = path.join(basepath, storename)
+
+    if len(storename) < 7:
+        log(f"Name too short: {storename}")
+        response.content_type = 'text/plain; charset=utf-8'
+        response.status = 400
+        return response
+
 
     if thumb_p:
         return 'Ignoring thumbnail upload!'
 
     if not path.exists(basepath):
-        mkdir(basepath)
+        makedirs(basepath)
 
     upload = list(request.files.values())[0]
+    log(f"Saving upload: {upload}")
+    if os.path.isfile(pathname):
+        log("Duplicate file; return failure:")
+        response.content_type = 'text/plain; charset=utf-8'
+        response.status = 409
+        return response
+
+
     upload.save(pathname, overwrite=True)
 
     response.content_type = 'text/plain; charset=utf-8'
+    original_filename = None
+    original_path = None
+    notes = None
+    redacted = False
+    datetime_now = datetime.utcnow()
+    if 'original_filename' in request.forms.keys():
+        log("original filnname field set")
+        original_filename = request.forms['original_filename']
+    else:
+        log("original filename field is not set")
+    if 'original_path' in request.forms.keys():
+        original_path = request.forms['original_path']
+    if 'notes' in request.forms.keys():
+        notes = request.forms['notes']
+    if 'redacted' in request.forms.keys():
+        redacted = strtobool(request.forms['redacted'])
+    if 'datetime' in request.forms.keys():
+        datetime_now = datetime.strptime(request.forms['datetime'], db_connector.TIME_FORMAT)
+
+    try:
+        db_connector.create_image_record(original_filename,
+                                         getFileUrl(storename, request.forms.coll, 'file',0),
+                                         storename,
+                                         request.forms.coll,
+                                         original_path,
+                                         notes,
+                                         redacted,
+                                         datetime_now)
+    except Exception as ex:
+        print(f"Unexpected error: {ex}")
+
+
+    log(f"Image upload complete: original filename {original_filename} mapped to {storename}")
+    end_save = time.time()
+    log(f"Total time: {end_save - start_save}")
     return 'Ok.'
 
 
-@route('/filedelete', method='POST')
+@app.route('/filedelete', method='POST')
 @require_token('filename')
 def filedelete():
     """Delete the file indicated by the query parameters. Returns 404
@@ -280,8 +413,8 @@ def filedelete():
     also be deleted.
     """
     storename = request.forms.filename
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False))
-    thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
+    thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
 
     pathname = path.join(basepath, storename)
     if not path.exists(pathname):
@@ -291,21 +424,47 @@ def filedelete():
     remove(pathname)
 
     prefix = storename.split('.att')[0]
-    pattern = path.join(thumbpath, prefix + '*')
+    base_filename = prefix[0:prefix.rfind('.')]
+    pattern = path.join(thumbpath, base_filename + '*' + prefix[prefix.rfind('.') + 1:])
+
     log("Deleting thumbnails matching %s" % pattern)
     for name in glob(pattern):
         remove(name)
 
     response.content_type = 'text/plain; charset=utf-8'
+    db_connector.delete_image_record(storename)
     return 'Ok.'
 
+def json_datetime_handler(x):
+    if isinstance(x, datetime):
+        return x.strftime(db_connector.TIME_FORMAT)
+    raise TypeError("Unknown type")
 
-@route('/getmetadata')
+# json.dumps(data, default=json_datetime_handler)
+
+@app.route('/getImageRecordByOrigFilename')
+@require_token('filename', always=True)
+def get_image_record_by_original_filename():
+    filename = request.query.filename
+    exact = False
+    collection = None
+    if 'exact' in request.query.keys():
+        exact = strtobool(request.query['exact'])
+    if 'coll' in request.query.keys():
+        collection = request.query['coll']
+    record_list = db_connector.get_image_record_by_original_filename(filename,exact,collection)
+    log(f"Record list: {record_list}")
+    if len(record_list) == 0:
+        abort(404)
+    return json.dumps(record_list, indent=4, sort_keys=True,default=json_datetime_handler)
+
+
+@app.route('/getmetadata')
 @require_token('filename')
-def getmetadata():
+def get_exif_metadata():
     """Provides access to EXIF metadata."""
     storename = request.query.filename
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
+    basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False, storename=storename))
     pathname = path.join(basepath, storename)
     datatype = request.query.dt
 
@@ -333,6 +492,8 @@ def getmetadata():
             v = str(value).decode('ascii', 'replace').encode('utf-8')
         except TypeError:
             v = repr(value)
+        except AttributeError:
+            v = value
 
         data[parts[0]][parts[1]] = str(v)
 
@@ -340,10 +501,10 @@ def getmetadata():
     data = [OrderedDict((('Name', key), ('Fields', value)))
             for key, value in list(data.items())]
 
-    return json.dumps(data, indent=4)
+    return json.dumps(data, indent=4, sort_keys=True,default=json_datetime_handler)
 
 
-@route('/testkey')
+@app.route('/testkey')
 @require_token('random', always=True)
 def testkey():
     """If access to this resource succeeds, clients can conclude
@@ -353,7 +514,7 @@ def testkey():
     return 'Ok.'
 
 
-@route('/web_asset_store.xml')
+@app.route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
@@ -361,13 +522,29 @@ def web_asset_store():
     return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
 
 
-@route('/')
+@app.route('/')
 def main_page():
-    return 'It works!'
+    log("Hit root")
+    return 'Specify attachment server'
 
 
 if __name__ == '__main__':
-    from bottle import run
+    log("Starting up....")
 
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
-        debug=settings.DEBUG, reloader=settings.DEBUG)
+
+    while db_connector.connect() is not True:
+        sleep(5)
+        log("Retrying db connection....")
+    log("Db connected.")
+    db_connector.create_tables()
+    log("running server...")
+
+    app.run(host='0.0.0.0',
+        port=settings.PORT,
+        server=settings.SERVER,
+        debug=settings.DEBUG,
+        reloader=settings.DEBUG)
+
+
+    log("Exiting.")
+

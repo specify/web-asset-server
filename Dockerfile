@@ -1,38 +1,19 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
-LABEL maintainer="Specify Collections Consortium <github.com/specify>"
-
-RUN apt-get update && apt-get -y install --no-install-recommends \
-        ghostscript \
+RUN apt-get update \
+    && apt-get -y --no-install-recommends install \
         imagemagick \
-        python3.6 \
-        python3-venv \
-        && apt-get clean && rm -rf /var/lib/apt/lists/*
+        uwsgi \
+        uwsgi-plugin-python3 \
+	python3 \
+	python3-pip
 
-RUN groupadd -g 999 specify && \
-        useradd -r -u 999 -g specify specify
+WORKDIR /tmp
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+ENV TZ=America/Los_Angeles
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+WORKDIR /code
 
-RUN mkdir -p /home/specify && chown specify.specify /home/specify
+#CMD [ "python3", "./server.py" ]
 
-USER specify
-WORKDIR /home/specify
-
-COPY --chown=specify:specify requirements.txt .
-
-RUN python3.6 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
-
-COPY --chown=specify:specify *.py views ./
-
-RUN mkdir -p /home/specify/attachments/
-
-RUN echo \
-        "import os" \
-        "\nSERVER = 'paste'" \
-        "\nSERVER_NAME = os.environ['SERVER_NAME']" \
-        "\nSERVER_PORT = int(os.getenv('SERVER_PORT', 8080))" \
-        "\nKEY = os.environ['ATTACHMENT_KEY']" \
-        "\nDEBUG = os.getenv('DEBUG_MODE', 'false').lower() == 'true'" \
-        >> settings.py
-
-EXPOSE 8080
-CMD ve/bin/python server.py
