@@ -17,20 +17,23 @@ under GNU General Public License 2 (GPL2).
     1345 Jayhawk Blvd.
     Lawrence, KS 66045 USA
 
-## Table of Contents
 
-   * [Web Asset Server](#web-asset-server)
-     * [Table of Contents](#table-of-contents)
-   * [Installation](#installation)
-     * [Installing system dependencies](#installing-system-dependencies)
-     * [Cloning Web Asset Server source repository](#cloning-web-asset-server-source-repository)
-     * [Deployment](#deployment)
-       * [Upstart](#upstart)
-       * [Systemd](#systemd)
-   * [HTTPS](#https)
-   * [Specify Settings](#specify-settings)
-   * [Compatibility with older versions of Python](#compatibility-with-older-versions-of-python)
+# New features:
 
+* Internal mysql database tracks all imports and allows querying to map a URL 
+back to an original filename
+  
+* Subdirectories created based on the first four letters of the internal filename; prevents very large 
+  directory listings
+  
+* Import client with example specify integration. Import directory trees with files that match a regular 
+  expression, descend recursively
+  
+* Prevents duplicate filename import in a given collection/namespace
+
+* Supports redacted images
+
+* Docker integration with nginx for performance and security
 
 # Installation
 
@@ -40,13 +43,12 @@ under GNU General Public License 2 (GPL2).
 
 The dependencies are:
 
-1. *Python* 3.6 is known to work. ([2.6 and 2.7 is available with modifications](#compatibility-with-older-versions-of-python)).
+1. *Python* 3.6 is known to work. 
 1. *ExifRead* for EXIF metadata.
 1. *sh* the Python shell command utility.
 1. *bottlepy* the Python web micro-framework.
 1. *ImageMagick* for thumbnailing.
 1. *Ghostscript* for PDF thumbnailing.
-1. *Paste* Python web server.
 
 To install dependencies
 the following commands work on Ubuntu:
@@ -67,91 +69,24 @@ git clone git://github.com/specify/web-asset-server.git
 
 ## Deployment
 
-Adjust the settings in the `settings.py` in your working directory. Then
-run the server with the following command:
+Copy  `botany_importer_config.template.py`  `docker-compose.template.yml` and `settings.template.py` to their 
+respective filenames without 'template' and adjust settings accordingly. Note that you can run the
+system without using docker; simply launch the database with the `start_images_development_db.sh` script
+and then run the server with "python3 server.py". This is recommended for initial setup and testing.
+Note that for testing, you'll need to use a non-privlidged port such as 8080. 
 
-```shell
-python server.py
-```
-
-In my experience, it has been easiest to deploy using the Python *Paste* server.
-
-In `settings.py` set the value `SERVER = 'paste'`.
-
-To run the server on a privileged port, e.g. 80, the utility 
-[authbind](http://en.wikipedia.org/wiki/Authbind) is recommended.
-
-```shell
-sudo apt-get install authbind
-```
-
-Assuming you are logged in as the user that will be used to run the server process,
-the following commands will tell *authbind* to allow port 80 to be used:
-
-```shell
-touch 80
-chmod u+x 80
-sudo mv 80 /etc/authbind/byport
-```
-
-An *upstart* script or *systemd* unit file can be created to make sure the web asset server is started
-automatically.
+Once testing is complete, stop the docker container running the database, and type `docker-compose up -d`
+to start the full server.
 
 It is important that the working directory is set to the path containing `server.py`
 so that *bottle.py* can find the template files. See [“TEMPLATE NOT FOUND” IN MOD_WSGI/MOD_PYTHON](http://bottlepy.org/docs/dev/faq.html#template-not-found-in-mod-wsgi-mod-python).
 
-Note: Some users have reported that `authbind` must be provided with the `--deep` option.
-If the asset server is failing to start due to permission problems, this may be a solution.
 
-### Upstart
-Create the file `/etc/init/web-asset-server.conf` with the following
-contents, adjusting the `setuid` user and directories as appropriate:
 
-```
-description "Specify Web Asset Server"
-author "Ben Anhalt <anhalt@ku.edu>"
-
-start on runlevel [234]
-stop on runlevel [0156]
-
-setuid anhalt
-
-chdir /home/anhalt/web-asset-server
-exec /usr/bin/authbind /usr/bin/python /home/anhalt/web-asset-server/server.py
-respawn
-```
-
-Then reload the init config files and start the server:
-
-```shell
-sudo initctl reload-configuration
-sudo start web-asset-server
-```
 
 By default, the server's logs go to standard output which *upstart* will redirect
 to `/var/log/upstart/web-asset-server.log`
 
-### Systemd
-
-Create the file `/etc/systemd/system/web-asset-server.conf` with the following
-contents, adjusting the usernames and paths as appropriate:
-
-```conf
-[Unit]
-Description=Specify Web Asset Server
-Wants=network.target
-
-[Service]
-User=specify
-WorkingDirectory=/home/specify/web-asset-server
-ExecStart=/usr/bin/authbind /usr/bin/python /home/specify/web-asset-server/server.py
-```
-
-Tell Systemd to reload its config with
-
-```shell
-sudo systemctl daemon-reload
-```
 
 
 # HTTPS
@@ -177,17 +112,9 @@ button.
 
 Compatibility with older versions of Python
 
-# Compatibility with older versions of Python
-
-* [Web Asset server for Python 2.7](https://github.com/specify/web-asset-server)
-* [Python 2.6 compatibility](https://github.com/specify/web-asset-server#python-2.6-compatibility)
-
 # TODO
 
   * Test with TIFF
   * Test thumbnailing with TIFF
-  * Rewrite dockerfile to contain nginx and mysql
-  * Test redacted records - if we add an image to a redacted record, security is limited to the MD5 hash; 
-    it's still on the server and can be served with a static URL.
   * convert to universal URLS (n2t.net) and database same (images.universal_urls). Our id=42754. http://n2t.
     net/e/n2t_apidoc.html
