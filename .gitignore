@@ -3,6 +3,8 @@
 venv
 docker-compose.yml
 settings.py
+settings.production.py
+settings.development.py
 botany_importer_config.py
 /data
 /env

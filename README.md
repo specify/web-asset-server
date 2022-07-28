@@ -87,6 +87,7 @@ so that *bottle.py* can find the template files. See [“TEMPLATE NOT FOUND” I
 By default, the server's logs go to standard output which *upstart* will redirect
 to `/var/log/upstart/web-asset-server.log`
 
+# Usage
 
 
 # HTTPS

@@ -12,7 +12,7 @@ DEBUG = False
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = 'secret_key'
+KEY = 'redacted'
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
@@ -30,28 +30,29 @@ ALLOW_STATIC_FILE_ACCESS = True
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
+# HOST = '192.168.1.224'
 
-HOST = servername.org
+# Image server host and port info
+if "EXTERNAL_IP" in os.environ:
+    HOST = os.getenv('EXTERNAL_IP')
+    # print(f"Got external Ip from environment:{HOST}")
+else:
+    import socket
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    HOST = local_ip
+    # print(f"Got external Ip from gethostbyname:{HOST}")
+
+
 PORT = 80
-
+HOST='http://instutution.org'
 SERVER_NAME = HOST
 SERVER_PORT = PORT
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
 
-# Map collection names to directories.  Set to None to store
-# everything in the same originals and thumbnail directories.  This is
-# recommended unless some provision is made to allow attachments for
-# items scoped above collections to be found.
 
-COLLECTION_DIRS = {
-    # 'COLLECTION_NAME': 'DIRECTORY_NAME',
-    'Botany': 'botany',
-    'KUFishtissue': 'Ichthyology',
-}
-
-# COLLECTION_DIRS = None
 
 # Base directory for all attachments.
 BASE_DIR = './attachments/'
@@ -67,8 +68,9 @@ CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'applicat
 # SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
 SERVER = 'wsgiref'  # For testing. Requires no extra packages.
 
-SQL_USER='root'
-SQL_PASSWORD='sql_root_password'
-SQL_HOST=HOST
+#Image databse connection information
+SQL_USER='redacted'
+SQL_PASSWORD='redacted'
+SQL_HOST='ibss-images.calacademy.org'
 SQL_PORT=3306
 SQL_DATABASE='images'

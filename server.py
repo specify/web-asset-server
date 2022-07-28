@@ -12,15 +12,18 @@ import exifread
 import hmac
 import json
 import time
+from image_client.collection_definitions import COLLECTION_DIRS
 from sh import convert
 from datetime import datetime
 import logging
-from bottle import Bottle,run
+from bottle import Bottle, run
 
-import db_connector
+from image_client.image_db import ImageDb
+from image_client.image_db import TIME_FORMAT
+
 app = application = Bottle()
-logging.basicConfig(level=logging.DEBUG)
-
+# logging.basicConfig(level=logging.DEBUG)
+image_db = None
 import settings
 from bottle import (
     Response, request, response, static_file, template, abort,
@@ -31,7 +34,6 @@ def log(msg):
     logging.debug(msg)
 
 
-
 def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
     attachments directory for the given collection.
@@ -40,11 +42,11 @@ def get_rel_path(coll, thumb_p, storename):
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
     first_subdir = storename[0:2]
     second_subdir = storename[2:4]
-    if settings.COLLECTION_DIRS is None:
+    if COLLECTION_DIRS is None:
         return path.join(type_dir, first_subdir, second_subdir)
 
     try:
-        coll_dir = settings.COLLECTION_DIRS[coll]
+        coll_dir = COLLECTION_DIRS[coll]
     except KeyError:
         err = f"Unknown collection: {coll}"
         log(err)
@@ -137,8 +139,9 @@ def require_token(filename_param, always=False):
                 except TokenException as e:
                     response.content_type = 'text/plain; charset=utf-8'
                     response.status = 403
-                    log(f"Invalid token: {params.token}")
-                    return e
+                    response.body = f"403 - forbidden. Invalid token: '{params.token}'"
+                    log(response.body)
+                    return response
             return func(*args, **kwargs)
 
         return wrapper
@@ -191,7 +194,6 @@ def resolve_file(filename, collection, type, scale):
     thumb_p = (type == "T")
     storename = filename
 
-
     relpath = get_rel_path(collection, thumb_p, storename)
 
     if not thumb_p:
@@ -243,7 +245,7 @@ def static(path):
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
     filename = path.split('/')[-1]
-    records = db_connector.get_image_record_by_internal_filename(filename)
+    records = image_db.get_image_record_by_internal_filename(filename)
     if len(records) < 1:
         log(f"Static record not found: {request.query.filename}")
         response.content_type = 'text/plain; charset=utf-8'
@@ -255,11 +257,10 @@ def static(path):
         log(f"Token required")
         return response
 
-
     return static_file(path, root=settings.BASE_DIR)
 
 
-def getFileUrl(filename, collection, image_type,scale):
+def getFileUrl(filename, collection, image_type, scale):
     return "http://%s:%d/static/%s" % (settings.SERVER_NAME, settings.SERVER_PORT,
                                        pathname2url(resolve_file(filename,
                                                                  collection,
@@ -285,7 +286,7 @@ def getfileref():
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
 
-    records = db_connector.get_image_record_by_internal_filename(request.query.filename)
+    records = image_db.get_image_record_by_internal_filename(request.query.filename)
     if len(records) < 1:
         log(f"Record not found: {request.query.filename}")
         response.content_type = 'text/plain; charset=utf-8'
@@ -300,8 +301,9 @@ def fileget():
         except TokenException as e:
             response.content_type = 'text/plain; charset=utf-8'
             response.status = 403
-            log(f"Invalid token for redacted record: {request.query.token}")
-            return e
+            response.body = f"403 - forbidden. Invalid token: '{request.query.token}'"
+            log(response.body)
+            return response
         log(f"Token validated for redacted record...")
     else:
         log(f"Not redacted, no check required")
@@ -348,7 +350,6 @@ def fileupload():
         response.status = 400
         return response
 
-
     if thumb_p:
         return 'Ignoring thumbnail upload!'
 
@@ -362,7 +363,6 @@ def fileupload():
         response.content_type = 'text/plain; charset=utf-8'
         response.status = 409
         return response
-
 
     upload.save(pathname, overwrite=True)
 
@@ -384,20 +384,20 @@ def fileupload():
     if 'redacted' in request.forms.keys():
         redacted = strtobool(request.forms['redacted'])
     if 'datetime' in request.forms.keys():
-        datetime_now = datetime.strptime(request.forms['datetime'], db_connector.TIME_FORMAT)
+        datetime_now = datetime.strptime(request.forms['datetime'], TIME_FORMAT)
 
     try:
-        db_connector.create_image_record(original_filename,
-                                         getFileUrl(storename, request.forms.coll, 'file',0),
-                                         storename,
-                                         request.forms.coll,
-                                         original_path,
-                                         notes,
-                                         redacted,
-                                         datetime_now)
+        image_db.create_image_record(original_filename,
+                                     getFileUrl(storename, request.forms.coll, 'file', 0),
+                                     storename,
+                                     request.forms.coll,
+                                     original_path,
+                                     notes,
+                                     redacted,
+                                     datetime_now)
     except Exception as ex:
         print(f"Unexpected error: {ex}")
-
+        abort(500, f'Unexpected error: {ex}')
 
     log(f"Image upload complete: original filename {original_filename} mapped to {storename}")
     end_save = time.time()
@@ -432,13 +432,15 @@ def filedelete():
         remove(name)
 
     response.content_type = 'text/plain; charset=utf-8'
-    db_connector.delete_image_record(storename)
+    image_db.delete_image_record(storename)
     return 'Ok.'
+
 
 def json_datetime_handler(x):
     if isinstance(x, datetime):
-        return x.strftime(db_connector.TIME_FORMAT)
+        return x.strftime(TIME_FORMAT)
     raise TypeError("Unknown type")
+
 
 # json.dumps(data, default=json_datetime_handler)
 
@@ -446,17 +448,20 @@ def json_datetime_handler(x):
 @require_token('filename', always=True)
 def get_image_record_by_original_filename():
     filename = request.query.filename
+    log(f"requesting image {filename}")
+
     exact = False
     collection = None
     if 'exact' in request.query.keys():
         exact = strtobool(request.query['exact'])
     if 'coll' in request.query.keys():
         collection = request.query['coll']
-    record_list = db_connector.get_image_record_by_original_filename(filename,exact,collection)
+    record_list = image_db.get_image_record_by_original_filename(filename, exact, collection)
     log(f"Record list: {record_list}")
     if len(record_list) == 0:
+        log("Image not found, returning 404")
         abort(404)
-    return json.dumps(record_list, indent=4, sort_keys=True,default=json_datetime_handler)
+    return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
 
 
 @app.route('/getmetadata')
@@ -501,7 +506,7 @@ def get_exif_metadata():
     data = [OrderedDict((('Name', key), ('Fields', value)))
             for key, value in list(data.items())]
 
-    return json.dumps(data, indent=4, sort_keys=True,default=json_datetime_handler)
+    return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
 
 
 @app.route('/testkey')
@@ -530,21 +535,19 @@ def main_page():
 
 if __name__ == '__main__':
     log("Starting up....")
+    image_db = ImageDb()
 
-
-    while db_connector.connect() is not True:
+    while image_db.connect() is not True:
         sleep(5)
         log("Retrying db connection....")
     log("Db connected.")
-    db_connector.create_tables()
+    image_db.create_tables()
     log("running server...")
 
     app.run(host='0.0.0.0',
-        port=settings.PORT,
-        server=settings.SERVER,
-        debug=settings.DEBUG,
-        reloader=settings.DEBUG)
-
+            port=settings.PORT,
+            server=settings.SERVER,
+            debug=settings.DEBUG,
+            reloader=settings.DEBUG)
 
     log("Exiting.")
-
