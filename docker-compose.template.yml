@@ -19,10 +19,11 @@ services:
     restart: always
 
   image-server:
+#    image: ghcr.io/garutilorenzo/bottle-be:dev
     build: ./
     container_name: image-server
     environment:
-      - EXTERNAL_IP=ibss.calacademy.org
+      - EXTERNAL_IP=institution.org
     volumes:
       - ./:/code
     command: ['uwsgi', '--plugin', '/usr/lib/uwsgi/plugins/python3_plugin.so','--ini', 'uwsgi.ini']
@@ -37,7 +38,7 @@ services:
     volumes:
       - ./data:/var/lib/mysql:delegated
     environment:
-      MYSQL_ROOT_PASSWORD: 'sql_root_password'
+      MYSQL_ROOT_PASSWORD: 'redacted'
       MYSQL_DATABASE: 'images'
       TZ: America/Los_Angeles
 
