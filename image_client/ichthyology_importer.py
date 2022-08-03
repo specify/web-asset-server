@@ -23,6 +23,9 @@ ICH_SCAN_FOLDERS = [f'CAS types{sla}Archive{sla}illustrations',
                     f'CAS other{sla}radiographs']
 '''
 
+class FilenameFormatException(Exception):
+    pass
+
 class IchthyologyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.IchthyologyImporter')
@@ -55,6 +58,9 @@ class IchthyologyImporter(Importer):
 #        pattern = re.compile("(CAS)?(SU)?(ICH)?([0-9]*)")
         pattern = re.compile("cas-(ich)?(su)?-([0-9]+)")
         rematch = pattern.match(filename)
+        if rematch is None:
+            print (f"No matches for filename: {filename}")
+            raise FilenameFormatException()
         list(rematch.groups())
         number = rematch.groups()[2]
         if number is None or number == '':
@@ -79,7 +85,10 @@ class IchthyologyImporter(Importer):
         filename = os.path.basename(full_path)
         if "." not in filename:
             return
-        catalog_number, collection = self.get_catalog_number(filename)
+        try:
+            catalog_number, collection = self.get_catalog_number(filename)
+        except FilenameFormatException:
+            catalog_number = None
         if catalog_number is None:
             logging.debug(f"Can't find catalog number for {filename}")
             return
