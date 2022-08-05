@@ -192,7 +192,7 @@ class Importer:
                 self.logger.debug(f"  No valid files for {unique_filename}")
                 continue
 
-            if os.path.getsize(jpg_found) < 300000:
+            if os.path.getsize(jpg_found) < 100000:
                 self.logger.info(f"This image is too small; {os.path.getsize(jpg_found)}, skipping.")
                 continue
             self.logger.debug(f"  Will upload:{jpg_found} for {unique_filename}")
