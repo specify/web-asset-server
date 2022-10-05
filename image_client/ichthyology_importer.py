@@ -81,7 +81,7 @@ class IchthyologyImporter(Importer):
         # logging.debug(f"Ich importer verify file: {full_path}")
         if not filetype.is_image(full_path):
             logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")
-            if full_path.endswith(".tif") or full_path.endswith(".tiff"):
+            if full_path.lower().endswith(".tif") or full_path.lower().endswith(".tiff"):
                 print("Tiff file misidentified as not an image, overriding auto-recognition")
             else:
                 return
