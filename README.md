@@ -5,7 +5,7 @@ This is a sample attachment server implementation for Specify. This implementati
 
 The Specify Collections Consortium is funded by its member
 institutions. The Consortium web site is:
-http://wwww.specifysoftware.org
+http://www.specifysoftware.org
 
 Web Asset Server Copyright © 2021 Specify Collections Consortium. Specify
 comes with ABSOLUTELY NO WARRANTY.  This is free software licensed
