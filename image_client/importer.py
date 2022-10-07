@@ -160,9 +160,9 @@ class Importer:
             for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
                 if cur_file_base == unique_filename:
 
-                    if cur_file_ext == "jpg":
+                    if cur_file_ext == "jpg" or cur_file_ext == "jpeg":
                         jpg_found = cur_filepath
-                    if cur_file_ext == "tif":
+                    if cur_file_ext == "tif" or cur_file_ext == "tiff":
                         tif_found = cur_filepath
             original_full_path = jpg_found
             if not jpg_found and tif_found:
@@ -192,7 +192,7 @@ class Importer:
                 self.logger.debug(f"  No valid files for {unique_filename}")
                 continue
 
-            if os.path.getsize(jpg_found) < 100000:
+            if os.path.getsize(jpg_found) < 1000:
                 self.logger.info(f"This image is too small; {os.path.getsize(jpg_found)}, skipping.")
                 continue
             self.logger.debug(f"  Will upload:{jpg_found} for {unique_filename}")

@@ -3,12 +3,13 @@ import db_utils
 from db_utils import DatabaseInconsistentError
 import logging
 
+
 class AttachmentUtils:
 
-    def __init__(self,db_utils):
+    def __init__(self, db_utils):
         self.db_utils = db_utils
 
-    def get_collectionobjectid_from_filename(self,attachment_location):
+    def get_collectionobjectid_from_filename(self, attachment_location):
         sql = f"""
         select cat.CollectionObjectID
                from attachment as at
@@ -22,7 +23,7 @@ class AttachmentUtils:
 
         return coid
 
-    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url,agent_id):
+    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id):
         # image type example 'image/png'
 
         sql = (f"""
@@ -79,7 +80,6 @@ class AttachmentUtils:
         sql = f"select attachmentid from attachment where guid='{uuid}'"
         return self.db_utils.get_one_record(sql)
 
-
     def get_ordinal_for_collection_object_attachment(self, collection_object_id):
         sql = f"select max(ordinal) from collectionobjectattachment where CollectionObjectID={collection_object_id}"
         return self.db_utils.get_one_record(sql)
@@ -108,16 +108,24 @@ class AttachmentUtils:
         return False
 
     def get_is_collection_object_redacted(self, collection_object_id):
-        sql = f"""
-        select co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2,ta.TaxonID
-    from collectionobject as co,
-         taxon as ta,
-         determination as de
-    where co.CollectionObjectID = {collection_object_id}
-      and de.CollectionObjectID = co.CollectionObjectID
-      and de.TaxonID = ta.TaxonID
-      and de.isCurrent = 1
+    #     sql = f"""
+    #     select co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2,ta.TaxonID
+    # from collectionobject as co,
+    #      taxon as ta,
+    #      determination as de
+    # where co.CollectionObjectID = {collection_object_id}
+    #   and de.CollectionObjectID = co.CollectionObjectID
+    #   and de.TaxonID = ta.TaxonID
+    #   and de.isCurrent = 1
+    #     """
+
+        sql = f"""SELECT co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2, ta.TaxonID
+                  FROM collectionobject as co
+                  LEFT JOIN determination as de ON co.CollectionObjectID = de.CollectionObjectID and de.isCurrent = 1
+                  LEFT JOIN taxon as ta ON de.TaxonID = ta.TaxonID
+                  WHERE co.CollectionObjectID = {collection_object_id};
         """
+
         cursor = self.db_utils.get_cursor()
 
         cursor.execute(sql)
@@ -125,7 +133,7 @@ class AttachmentUtils:
         cursor.close()
         if retval is None:
             logging.error(f"Error fetching collection object id: {collection_object_id}\n sql:{sql}")
-            raise DatabaseInconsistentError()
+            raise DatabaseInconsistentError(f"DB error. SQL: {sql}")
 
         logging.debug(f"Taxonid {retval[-1]}")
         retval = retval[:4]
