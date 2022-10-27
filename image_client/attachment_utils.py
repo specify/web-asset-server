@@ -108,17 +108,6 @@ class AttachmentUtils:
         return False
 
     def get_is_collection_object_redacted(self, collection_object_id):
-    #     sql = f"""
-    #     select co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2,ta.TaxonID
-    # from collectionobject as co,
-    #      taxon as ta,
-    #      determination as de
-    # where co.CollectionObjectID = {collection_object_id}
-    #   and de.CollectionObjectID = co.CollectionObjectID
-    #   and de.TaxonID = ta.TaxonID
-    #   and de.isCurrent = 1
-    #     """
-
         sql = f"""SELECT co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2, ta.TaxonID
                   FROM collectionobject as co
                   LEFT JOIN determination as de ON co.CollectionObjectID = de.CollectionObjectID and de.isCurrent = 1

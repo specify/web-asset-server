@@ -7,7 +7,6 @@ from uuid import uuid4
 import os
 import re
 import logging
-import pickle
 import filetype
 from dir_tools import DirTools
 
