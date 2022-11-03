@@ -3,6 +3,7 @@ import argparse
 import logging
 import collection_definitions
 from botany_importer import BotanyImporter
+from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
 from image_client import ImageClient
@@ -53,6 +54,8 @@ def main(args):
              BotanyImporter()
         elif args.collection == "Ichthyology":
             IchthyologyImporter()
+        elif args.collection == "IZ":
+            IzImporter()
     elif args.subcommand == 'purge':
         logger.debug("Purge!")
 
@@ -77,7 +80,6 @@ def setup_logging(verbosity: int):
     global logger
     print("setting up logging...")
     logger = logging.getLogger('Client')
-    logger.setLevel(logging.DEBUG)  # better to have too much log than not enough
     console_handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter("%(name)s — %(levelname)s — %(funcName)s:%(lineno)d - %(message)s")
     console_handler.setFormatter(formatter)
@@ -96,6 +98,7 @@ def setup_logging(verbosity: int):
         logger.setLevel(logging.INFO)
     elif verbosity >= 4:
         logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)  # better to have too much log than not enough
 
 
 def bad_collection():

@@ -8,5 +8,6 @@ COLLECTION_DIRS = {
     # 'COLLECTION_NAME': 'DIRECTORY_NAME',
     'Botany': 'botany',
     'KUFishtissue': 'ichthyology_tissue',
-    'Ichthyology': 'ichthyology'
+    'Ichthyology': 'ichthyology',
+    'Invertebrate Zoology':'iz'
 }

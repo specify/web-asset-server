@@ -6,6 +6,7 @@ from time import sleep
 
 class DirTools:
     def __init__(self,callback):
+        self.logger = logging.getLogger('Client.DirTools')
         self.callback = callback
 
     def get_full_path(self, filepath, filename):
@@ -51,12 +52,14 @@ class DirTools:
 
 
     def process_file(self, filepath, filename):
-        logging.debug(f"Processing {filepath}{os.path.sep}{filename}")
+        self.logger.debug(f"Processing {filepath}{os.path.sep}{filename}")
 
         full_path = self.get_full_path(filepath, filename)
+        if full_path is None:
+            return
         try:
             self.callback(full_path)
         except (BlockingIOError, IOError, OSError) as e:
-            print(f"Blocking I/O error on {full_path}, sleeping 10 minutes and retrying", file=sys.stderr, flush=True)
+            print(f"Blocking I/O error: {e}\n\t on {full_path}, sleeping 10 minutes and retrying", file=sys.stderr, flush=True)
             sleep(60*10)
             self.process_file(filepath, filename)
