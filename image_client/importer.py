@@ -13,8 +13,11 @@ from specify_db import SpecifyDb
 import shutil
 from os import listdir
 from os.path import isfile, join
+
+
 class ConvertException(Exception):
     pass
+
 
 class Importer:
     def __init__(self, db_config_class):
@@ -30,7 +33,6 @@ class Importer:
         self.image_client = ImageClient()
         self.attachment_utils = AttachmentUtils(self.specify_db_connection)
         self.duplicates_file = open(f'duplicates-{self.collection_name}.txt', 'w')
-
 
     def tiff_to_jpg(self, tiff_filepath):
         basename = os.path.basename(tiff_filepath)
@@ -51,18 +53,18 @@ class Importer:
         onlyfiles = [f for f in listdir(TMP_JPG) if isfile(join(TMP_JPG, f))]
         if len(onlyfiles) == 0:
             raise ConvertException(f"No files producted from conversion")
-        files_dict={}
+        files_dict = {}
         for file in onlyfiles:
-            files_dict[file]=os.path.getsize(os.path.join(TMP_JPG,file))
+            files_dict[file] = os.path.getsize(os.path.join(TMP_JPG, file))
 
         sort_orders = sorted(files_dict.items(), key=lambda x: x[1], reverse=True)
         top = sort_orders[0][0]
-        target = os.path.join(TMP_JPG,file_name_no_extention+".jpg")
-        os.rename(os.path.join(TMP_JPG,top), target)
+        target = os.path.join(TMP_JPG, file_name_no_extention + ".jpg")
+        os.rename(os.path.join(TMP_JPG, top), target)
         if len(onlyfiles) > 2:
             self.logger.info("multi-file case")
 
-        return target,output
+        return target, output
 
     def get_mime_type(self, filepath):
         mime_type = None
@@ -78,7 +80,7 @@ class Importer:
             mime_type = 'application/pdf'
         return mime_type
 
-    def import_to_specify_database(self, filepath, attach_loc, url, collection_object_id, agent_id):
+    def import_to_specify_database(self, filepath, attach_loc, url, collection_object_id, agent_id,copyright=None):
         attachment_guid = uuid4()
 
         file_created_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(filepath))
@@ -91,7 +93,8 @@ class Importer:
                                                 guid=attachment_guid,
                                                 image_type=mime_type,
                                                 url=url,
-                                                agent_id=agent_id)
+                                                agent_id=agent_id,
+                                                copyright=copyright)
         attachment_id = self.attachment_utils.get_attachment_id(attachment_guid)
         ordinal = self.attachment_utils.get_ordinal_for_collection_object_attachment(collection_object_id)
         if ordinal is None:
@@ -119,7 +122,7 @@ class Importer:
             num /= 1024.0
         return f"{num:.1f} Yi{suffix}"
 
-    def clean_duplicate_files(self,filepath_list):
+    def clean_duplicate_files(self, filepath_list):
         basename_list = [os.path.basename(filepath[0]) for filepath in filepath_list]
         basename_set = set(basename_list)
         filepath_only_list = [filepath[0] for filepath in filepath_list]
@@ -140,9 +143,7 @@ class Importer:
                     clean_list.append(filepath_set)
         return clean_list
 
-
-
-    def process_id(self, id, filepath_list, collection_object_id, collection, agent_id,skeleton=False):
+    def process_id(self, id, filepath_list, collection_object_id, collection, agent_id, skeleton=False,copyright_map=None):
         filepath_list = self.clean_duplicate_files(filepath_list)
         unique_filenames = {}
 
@@ -153,7 +154,7 @@ class Importer:
             jpg_found = False
             tif_found = False
             deleteme = None
-            if self.image_client.check_image_db_if_already_imported(collection, unique_filename + ".jpg",exact=True):
+            if self.image_client.check_image_db_if_already_imported(collection, unique_filename + ".jpg", exact=True):
                 self.logger.info(f"  Abort; already uploaded {unique_filename}")
                 continue
 
@@ -168,7 +169,7 @@ class Importer:
             if not jpg_found and tif_found:
                 self.logger.debug(f"  Must create jpg for {unique_filename} from {tif_found}")
                 try:
-                    jpg_found,output = self.tiff_to_jpg(tif_found)
+                    jpg_found, output = self.tiff_to_jpg(tif_found)
                     self.logger.info(f"Converted to: {jpg_found}")
                 except TimeoutError:
                     self.logger.error(f"Timeout converting {tif_found}")
@@ -183,10 +184,8 @@ class Importer:
                     self.logger.debug(f"Imagemagik output: \n\n{output}\n\n")
                     continue
 
-
                 deleteme = jpg_found
                 original_full_path = tif_found
-
 
             if not jpg_found and tif_found:
                 self.logger.debug(f"  No valid files for {unique_filename}")
@@ -210,8 +209,12 @@ class Importer:
                                                                            is_redacted,
                                                                            collection,
                                                                            original_full_path)
-
-                self.import_to_specify_database(jpg_found, attach_loc, url, collection_object_id, agent_id)
+                copyright = None
+                if copyright_map is not None:
+                    if original_full_path in copyright_map:
+                        copyright = copyright_map[original_full_path]
+                self.import_to_specify_database(jpg_found, attach_loc, url, collection_object_id, agent_id,
+                                                copyright=copyright)
             except Exception as e:
                 self.logger.debug(
                     f"Upload failure to image server for file: \n\t{unique_filename} \n\t{jpg_found}: \n\t{original_full_path}")

@@ -12,8 +12,6 @@ from PIL import Image
 import pickle
 import func_timeout
 
-MINIMUM_ID_DIGITS=5
-
 CASIZ_FILE_LOG = "file_log.tsv"
 
 
@@ -21,8 +19,10 @@ class IzImporter(Importer):
     def __init__(self):
         logging.getLogger('PIL').setLevel(logging.ERROR)
         self.log_file = open(CASIZ_FILE_LOG, "w+")
-        self.total_file_count=0
 
+        self.log_file.write(f"casiz\tfilename\tmethod used\tcopyright method\tcopyright\trejected\tpath on disk\n")
+
+        self.total_file_count = 0
 
         self.logger = logging.getLogger('Client.IzImporter')
         self.logger.setLevel(logging.DEBUG)
@@ -32,25 +32,29 @@ class IzImporter(Importer):
         super().__init__(iz_importer_config)
 
         dir_tools = DirTools(self.build_filename_map)
-        # logging.getLogger('Client.DirTools').setLevel(logging.INFO)
 
-        # dir_tools.logger.setLevel(logging.DEBUG)
 
         self.casiz_number_map = {}
+        self.path_copyright_map = {}
 
         self.logger.debug("IZ import mode")
 
-        FILENAME = "iz_importer.bin"
-        if not os.path.exists(FILENAME):
+        NUMBERS_FILENAME = "iz_importer_numbers.bin"
+        COPYRIGHT_FILENAME = "iz_importer_copyright.bin"
+        if not os.path.exists(NUMBERS_FILENAME):
             for cur_dir in iz_importer_config.IZ_SCAN_FOLDERS:
                 cur_full_path = os.path.join(iz_importer_config.IMAGE_DIRECTORY_PREFIX, cur_dir)
                 print(f"Scanning: {cur_full_path}")
                 dir_tools.process_files_or_directories_recursive(cur_full_path)
+            print("WARNING pickle disabled")
+            # outfile = open(NUMBERS_FILENAME, 'wb')
+            # pickle.dump(self.casiz_number_map, outfile)
+            # outfile = open(COPYRIGHT_FILENAME, 'wb')
+            # pickle.dump(self.path_copyright_map, outfile)
 
-            outfile = open(FILENAME, 'wb')
-            pickle.dump(self.casiz_number_map, outfile)
         else:
-            self.casiz_number_map = pickle.load(open(FILENAME, "rb"))
+            self.casiz_number_map = pickle.load(open(NUMBERS_FILENAME, "rb"))
+            self.path_copyright_map = pickle.load(open(COPYRIGHT_FILENAME, "rb"))
         print("Starting to process loaded files...")
         self.process_loaded_files()
 
@@ -67,6 +71,7 @@ class IzImporter(Importer):
                 except ValueError:
                     continue
                 filename_list.append([cur_filepath, cur_file_base, cur_file_ext])
+
             self.process_casiz_number(casiz_number, filename_list)
 
     def process_casiz_number(self, casiz_number, filepath_list):
@@ -88,9 +93,23 @@ class IzImporter(Importer):
                         collection_object_id,
                         iz_importer_config.COLLECTION_NAME,
                         26280,
-                        skeleton=skeleton)
+                        skeleton=skeleton,
+                        copyright_map=self.path_copyright_map)
 
-    def log_file_status(self, id=None, filename=None, path=None, method=None, rejected=None, copyright=None):
+    # CASIZXXXXXX
+    # CASIZ XXXXXX
+    # CASIZ_XXXXXX
+    # CASIZ# XXXXXX
+    # CASIZ XXXXXX or CASIZ XXXXXX
+    # CASIZ XXXXXX or XXXXXX
+    # same as above but with "and" not "or"
+    # same as above but >2 numbers in file name
+    # other characters may precede "CASIZ"
+    # CAT or other characters between CASIZ and # (i.e. CASIZ_CAT_XXXXX)
+    # see above for Label scan files, which lack the CASIZ acronym
+
+    def log_file_status(self, id=None, filename=None, path=None, method=None, rejected=None, copyright_method=None,
+                        copyright=None):
         if rejected is None:
             rejected = "-"
         if method is None:
@@ -99,56 +118,102 @@ class IzImporter(Importer):
             copyright = "-"
         if id is None or rejected is True:
             id = "-"
-
-        self.log_file.write(f"{id}\t{filename}\t{method}\t{copyright}\t{rejected}\t{path}\n")
+        print(f"Logged: {id} copyright method: {copyright_method} copyright: \'{copyright}\' rejected:{rejected}")
+        self.log_file.write(f"{id}\t{filename}\t{method}\t{copyright_method}\t{copyright}\t{rejected}\t{path}\n")
         return
 
     # Hangs on some files, don't know why, needs to be killed
-    @timeout(10, os.strerror(errno.ETIMEDOUT))
-    def exif_data_extrator(self,filepath):
+    @timeout(20, os.strerror(errno.ETIMEDOUT))
+    def exif_data_extrator(self, filepath):
+        print(f"        Extracting exif: {filepath}")
         return Image.open(filepath).getexif()
+
+    def extract_casiz(self, candidate_string):
+        ints = re.findall(iz_importer_config.CASIZ_MATCH, candidate_string)
+        if len(ints) > 0:
+            return ints[0][1]
+        return None
+
+    def extract_copyright(self, copyright_string):
+        copyright = None
+        if '©' in copyright_string:
+            copyright = copyright_string.split('©')[-1]
+        if 'copyright' in copyright_string:
+            copyright = copyright_string.split('copyright')[-1]
+        if copyright is not None:
+            copyright = copyright.strip()
+            copyright = os.path.splitext(copyright)[0]
+        return copyright
 
     def build_filename_map(self, full_path):
         method = None
+        orig_case_directory=os.path.dirname(full_path)
+        orig_case_filename=os.path.basename(full_path)
         full_path = full_path.lower()
         filename = os.path.basename(full_path)
+        directory = os.path.dirname(full_path)
 
-        matched = re.match(iz_importer_config.FILENAME_SIMPLE_MATCH, filename)
-        filename_simple_match = bool(matched)
 
-        matched = re.match(iz_importer_config.FILENAME_COMPLEX_MATCH, filename)
-        filename_complex_match = bool(matched)
+        matched = re.match(iz_importer_config.FILENAME_MATCH, filename)
+        match_filename = bool(matched)
+
+        # matched = re.match(iz_importer_config.FILENAME_COMPLEX_MATCH, filename)
+        # filename_complex_match = bool(matched)
+
+        # matched = re.match(iz_importer_config.FILENAME_EXACT_MATCH, filename)
+        # filename_exact_match = bool(matched)
+
+        matched = re.match(iz_importer_config.FILENAME_OR_MATCH, filename)
+        filename_or_match = bool(matched)
+
+        matched = re.match(iz_importer_config.FILENAME_AND_MATCH, filename)
+        filename_and_match = bool(matched)
+
+        # # If there's more than one number sequence, we don't know which
+        # # is the ID, so reject unless it's an exact match
+        # # of the form casiz[- _]number
+        # number_sequence_count =len(re.findall('[0-9]{4,}', filename))
+        # if number_sequence_count > 1 and not match_filename:
+        #     print(f"Rejected - too many possible IDs: {filename}  -  {full_path}")
+        #     self.log_file_status(filename=filename, path=full_path, rejected="No ID found")
+        #     return
+        if filename_or_match:
+            print(f"Rejected - or condition is ambiguous: {filename}  -  {full_path}")
+            self.log_file_status(filename=filename, path=full_path, rejected="or condition")
+            return
+
+        if filename_and_match:
+            print(f"Rejected - and condition is not handled: {filename}  -  {full_path}")
+            self.log_file_status(filename=filename, path=full_path, rejected="and condition")
+            return
+
+        # if match_filename is False and filename_exact_match is True:
+        #     match_filename = True
+
         casiz_number = None
         #  check directory path to see if the dir has the ID
-        directory = os.path.dirname(full_path)
         directories = directory.split('/')
         match_directory = None
         for cur_directory in reversed(directories):
-            matched = re.search(iz_importer_config.IZ_DIRECRTORY_REGEX, cur_directory)
+            matched = re.search(iz_importer_config.IZ_DIRECTORY_REGEX, cur_directory)
             match_directory = bool(matched)
             if match_directory:
                 directory = cur_directory
                 break
 
-        if not filename_simple_match:
-            print(f"Rejected 4: {filename}  -  {full_path}")
-            self.logger.debug(f"Rejected; not image: {filename}  -  {full_path}")
-
-            # self.log_file_status(None,"Not image")
+        if not (match_filename or match_directory):
+            self.log_file_status(filename=filename, path=full_path, rejected="no match")
             return
-        if filename_complex_match:
-            casiz_number = self.get_first_digits_from_filepath(filename, field_size=0)
+        if match_filename:
+            casiz_number = self.extract_casiz(filename)
             method = "filename"
-        if casiz_number is None and match_directory:
-            directory = os.path.basename(directory)
-            ints = re.findall(r'\d+', directory)
-            if len(ints) > 0:
-                if len(ints[-1]) >= MINIMUM_ID_DIGITS:
 
-                    casiz_number = int(ints[-1])
-                    method = "directory"
+        else: # match_directory:
+            casiz_number = self.extract_casiz(directory)
+            method = "directory"
 
         deocded_exif_data = {}
+
         exif_data = None
         try:
             # func = Image.open
@@ -167,40 +232,59 @@ class IzImporter(Importer):
                         # print(f"  {iz_importer_config.EXIF_DECODER_RING[key]}: {value}")
                         deocded_exif_data[iz_importer_config.EXIF_DECODER_RING[key]] = value
 
-        except errno.ETIMEDOUT as e:
-            print(f"TIMEOUT ------------------: {e}")
+
         except Exception as e:
             self.logger.error(f"Unable to process image for exif: {e}\n\t{full_path}")
             print(f"Unable to process image for exif: {e}\n\t{full_path}")
 
-        if filename_simple_match and casiz_number is None:
+        if casiz_number is None:
             if "ImageDescription" in deocded_exif_data.keys():
                 image_description = deocded_exif_data['ImageDescription']
                 ints = re.findall(r'\d+', image_description)
                 if len(ints) == 0:
                     self.logger.debug(f" Can't find any id number in the image description: {image_description}")
                 else:
-                    if len(ints[0]) >= MINIMUM_ID_DIGITS:
+                    if len(ints[0]) >= iz_importer_config.MINIMUM_ID_DIGITS:
                         casiz_number = int(ints[0])
                         method = "exif"
 
         if casiz_number is None:
-            self.logger.debug(
-                f"Rejected: Can't find casiz_number for {filename}  -  {full_path}. exif data: {exif_data}")
+            reject_string = "Rejected: Can't find casiz_number for {filename}  -  {full_path}. exif data: {exif_data}"
+            self.logger.debug(reject_string)
+
             self.log_file_status(filename=filename, path=full_path, rejected="No ID found")
+            print(reject_string)
             return
 
         self.logger.debug(f"Adding filename to mappings set: {filename}   casiz_number: {casiz_number}")
         print(f"Accepted: {casiz_number}:'{filename}'  ----- '{full_path}'")
         self.total_file_count += 1
-
+        # ================= copyright =================
+        copyright = None
+        copyright_method = None
+        copyright_directory = self.extract_copyright(orig_case_directory)
+        if copyright_directory is not None:
+            print('Copyright symbol detected in directory')
+            copyright = f'{copyright_directory}'
+            copyright_method = 'directory'
+        copyright_filename = self.extract_copyright(orig_case_filename)
+        if copyright_filename is not None:
+            print('Copyright symbol detected in filename')
+            copyright = f'{copyright_filename}'
+            copyright_method = 'filename'
 
         if 'Copyright' in deocded_exif_data.keys():
-            copyright= deocded_exif_data['Copyright']
-        else:
-            copyright = None
+            copyright = deocded_exif_data['Copyright']
+            if copyright.startswith('Â'):
+                copyright = copyright[1:]
+            copyright = copyright
+            copyright_method = 'exif'
+
+        self.path_copyright_map[full_path] = copyright
+        # ================= end copyright =================
+
         self.log_file_status(filename=filename, path=full_path, method=method, id=casiz_number,
-                             copyright=copyright)
+                             copyright_method=copyright_method, copyright=copyright)
 
         if casiz_number not in self.casiz_number_map:
             self.casiz_number_map[casiz_number] = [full_path]
@@ -210,7 +294,6 @@ class IzImporter(Importer):
     def get_collectionobjectid_from_casiz_number(self, casiz_number):
         sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
         return self.specify_db_connection.get_one_record(sql)
-
 
     # returns None if the object is missing.
     def get_collection_object_id(self, filename):

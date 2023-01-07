@@ -23,7 +23,8 @@ class AttachmentUtils:
 
         return coid
 
-    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id):
+    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id,
+                          copyright=None):
         # image type example 'image/png'
 
         sql = (f"""
@@ -34,7 +35,7 @@ class AttachmentUtils:
                                           timestampmodified, title, type, version, visibility, AttachmentImageAttributeID,
                                           CreatedByAgentID, CreatorID, ModifiedByAgentID, VisibilitySetByID)
                 VALUES ('{storename}', NULL, NULL, NULL, 
-                        NULL, NULL, NULL,   '{time_utils.get_pst_date_time_from_datetime(time_utils.get_pst_time(file_created_datetime))}', '{guid}', TRUE, NULL, 
+                        '{copyright}', NULL, NULL,   '{time_utils.get_pst_date_time_from_datetime(time_utils.get_pst_time(file_created_datetime))}', '{guid}', TRUE, NULL, 
                         NULL, NULL, '{image_type}','{original_filename}', '{url}', 4, 
                         0, NULL, NULL, 41, '{time_utils.get_pst_time_now_string()}',
                         '{time_utils.get_pst_time_now_string()}', '{original_filename.split(".")[0]}', NULL, 0, NULL, NULL, 
