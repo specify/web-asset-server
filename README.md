@@ -165,8 +165,11 @@ division name under *System Information* on the right hand side. This will open
 a properties editor for the global preferences. You will need to set four properties
 to configure access to the asset server:
 
-* `USE_GLOBAL_PREFS` `true`
-* `attachment.key`  obtain from asset server `settings.py` file
+* `USE_GLOBAL_PREFS` - `true`
+* `attachment.key` – `##`
+   * Replace `##` with the key from the following location:
+     * obtain from asset server `settings.py` file if you have a local installation of 7
+     * obtain from `docker-compose.yml` file if you use a Docker deployment
 * `attachment.url`  `http://[YOUR_SERVER]/web_asset_store.xml` 
 * `attachment.use_path` `false`
 
