@@ -30,9 +30,7 @@ class IchthyologyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.IchthyologyImporter')
 
-        self.collection_name = "Ichthyology"
-
-        super().__init__(ich_importer_config)
+        super().__init__(ich_importer_config, "Ichthyology")
         self.catalog_number_map = {}
 
         dir_tools = DirTools(self.build_filename_map)
@@ -103,6 +101,17 @@ class IchthyologyImporter(Importer):
         else:
             self.catalog_number_map[final_number].append(full_path)
 
+
+
+
+    def process_loaded_files(self):
+        for catalog_number in self.catalog_number_map.keys():
+            filepath_list = []
+
+            for cur_filepath in self.catalog_number_map[catalog_number]:
+                filepath_list.append(cur_filepath)
+            self.process_catalog_number(catalog_number, filepath_list)
+
     def process_catalog_number(self, catalog_number, filepath_list):
         if catalog_number is None:
             print(f"No catalog number; skipping")
@@ -113,25 +122,7 @@ class IchthyologyImporter(Importer):
         if collection_object_id is None:
             print(f"No record found for catalog number {catalog_number}, skipping.")
             return
-        self.process_id(catalog_number,filepath_list,collection_object_id,'Ichthyology',68835)
-
-
-
-    def process_loaded_files(self):
-        for catalog_number in self.catalog_number_map.keys():
-            filepaths = self.catalog_number_map[catalog_number]
-            filename_list = []
-
-            for cur_filepath in filepaths:
-
-                cur_filename = os.path.basename(cur_filepath)
-                try:
-                    cur_file_base, cur_file_ext = cur_filename.split(".")
-                except ValueError:
-                    continue
-                filename_list.append([cur_filepath, cur_file_base, cur_file_ext])
-            self.process_catalog_number(catalog_number, filename_list)
-
+        self.process_id(filepath_list, collection_object_id, 68835)
 
 
 #         If I find a .jpg, import it.

@@ -188,19 +188,19 @@ class ImageDb():
         cursor.close()
         return record_list
 
-    def get_image_record_by_original_filename(self, original_filename, exact, collection):
+    def get_image_record_by_pattern(self, pattern, column, exact, collection):
         cursor = self.get_cursor()
         if exact:
             query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
             FROM images 
-            WHERE original_filename = '{original_filename}'"""
+            WHERE {column} = '{pattern}'"""
         else:
             query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
             FROM images 
-            WHERE original_filename LIKE '{original_filename}'"""
+            WHERE {column} LIKE '{pattern}'"""
         if collection is not None:
             query += f""" AND collection = '{collection}'"""
-        self.log(f"Query get_image_record_by_original_filename: {query}")
+        self.log(f"Query get_image_record_by_{column}: {query}")
 
         cursor.execute(query)
         record_list = []
@@ -221,6 +221,15 @@ class ImageDb():
             self.log(f"Found at least one record: {record_list[-1]}")
 
         cursor.close()
+        return record_list
+
+    def get_image_record_by_original_path(self, original_path, exact, collection):
+        record_list = self.get_image_record_by_pattern(original_path, 'original_path', exact, collection)
+
+        return record_list
+
+    def get_image_record_by_original_filename(self, original_filename, exact, collection):
+        record_list = self.get_image_record_by_pattern(original_filename, 'original_filename', exact, collection)
         return record_list
 
     def delete_image_record(self, internal_filename):

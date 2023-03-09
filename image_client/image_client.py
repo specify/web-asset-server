@@ -23,7 +23,7 @@ class FileNotFoundException(Exception):
     pass
 
 
-class ImageClient():
+class ImageClient:
     def __init__(self):
         self.datetime_now = datetime.datetime.now(datetime.timezone.utc)
         self.update_time_delta()
@@ -127,24 +127,40 @@ class ImageClient():
 
         return url, attach_loc
 
-    def check_image_db_if_already_imported(self, collection, filename,exact=False):
+    # works for just basename +ext. "exact" does a sql "like" operation
+    def check_image_db_if_filename_imported(self, collection, filename, exact=False):
         params = {
-            'filename': filename,
+            'file_string': filename,
             'coll': collection,
             'exact': exact,
+            'search_type': 'filename',
             'token': self.generate_token(filename)
         }
+        return self.decode_response(params)
 
-        r = requests.get(self.build_url("getImageRecordByOrigFilename"), params=params)
+    # works for full filepath and original extension. "exact" does a sql "like" operation
+    def check_image_db_if_filepath_imported(self, collection, filepath, exact=False):
+        params = {
+            'file_string': filepath,
+            'coll': collection,
+            'exact': exact,
+            'search_type': 'path',
+            'token': self.generate_token(filepath)
+        }
+        return self.decode_response(params)
+
+
+    def decode_response(self,params):
+        r = requests.get(self.build_url("getImageRecord"), params=params)
         if r.status_code == 404:
-            logging.debug(f"Checked {filename} against {collection} and found no duplicates")
+            logging.debug(f"Checked {params['file_string']}  and found no duplicates")
             return False
         if r.status_code == 200:
-            logging.debug(f"Checked {filename} - already imported")
-
+            logging.debug(f"Checked {params['file_string']} - already imported")
+            # return the reference here.
             return True
         if r.status_code == 500:
-            logging.error(f"500: Internal server error checking {filename}")
+            logging.error(f"500: Internal server error checking {params['file_string']}")
             assert False
 
         assert False

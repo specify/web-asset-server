@@ -19,20 +19,34 @@ class ConvertException(Exception):
     pass
 
 
-class Importer:
-    def __init__(self, db_config_class):
-        self.logger = logging.getLogger('Client.importer')
+# class FilePath():
+#     def __init__(self, filepath):
+#         cur_filename = os.path.basename(filepath)
+#
+#         cur_file_base, cur_file_ext = cur_filename.split(".")
+#
+#         self.full_path = filepath
+#         self.filename = cur_filename
+#         self.basename = cur_file_base
+#         self.ext = cur_file_ext
+#
+#     def __str__(self):
+#         return self.full_path
 
+
+class Importer:
+    def __init__(self, db_config_class, collection_name):
+        self.logger = logging.getLogger('Client.importer')
+        self.collection_name = collection_name
         self.specify_db_connection = SpecifyDb(db_config_class)
-        # self.specify_db_connection = DbUtils(
-        #     db_config_class.USER,
-        #     db_config_class.PASSWORD,
-        #     db_config_class.SPECIFY_DATABASE_PORT,
-        #     db_config_class.SPECIFY_DATABASE_HOST,
-        #     db_config_class.SPECIFY_DATABASE)
         self.image_client = ImageClient()
         self.attachment_utils = AttachmentUtils(self.specify_db_connection)
         self.duplicates_file = open(f'duplicates-{self.collection_name}.txt', 'w')
+
+    def split_filepath(self,filepath):
+        cur_filename = os.path.basename(filepath)
+        cur_file_ext = cur_filename.split(".")[1]
+        return cur_filename, cur_file_ext
 
     def tiff_to_jpg(self, tiff_filepath):
         basename = os.path.basename(tiff_filepath)
@@ -80,7 +94,7 @@ class Importer:
             mime_type = 'application/pdf'
         return mime_type
 
-    def import_to_specify_database(self, filepath, attach_loc, url, collection_object_id, agent_id,copyright=None):
+    def import_to_specify_database(self, filepath, attach_loc, url, collection_object_id, agent_id, copyright=None):
         attachment_guid = uuid4()
 
         file_created_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(filepath))
@@ -122,10 +136,12 @@ class Importer:
             num /= 1024.0
         return f"{num:.1f} Yi{suffix}"
 
+    #  Filepath is a list of three element lists - full filepath, the filename, and the extension.
+
     def clean_duplicate_files(self, filepath_list):
-        basename_list = [os.path.basename(filepath[0]) for filepath in filepath_list]
+        basename_list = [os.path.basename(filepath.cur_basename) for filepath in filepath_list]
         basename_set = set(basename_list)
-        filepath_only_list = [filepath[0] for filepath in filepath_list]
+        filepath_only_list = [filepath.full_path for filepath in filepath_list]
         duplicates = [item for item, count in collections.Counter(basename_list).items() if count > 1]
 
         for duplicate in duplicates:
@@ -138,86 +154,112 @@ class Importer:
                 self.duplicates_file.write(f"\t {self.format_filesize(size)}: {dupe_path}\n")
         clean_list = []
         for keep_name in basename_set:
-            for filepath_set in filepath_list:
-                if keep_name in filepath_set[0]:
-                    clean_list.append(filepath_set)
+            for filepath in filepath_list:
+                if keep_name in filepath:
+                    clean_list.append(filepath)
         return clean_list
 
-    def process_id(self, id, filepath_list, collection_object_id, collection, agent_id, skeleton=False,copyright_map=None):
-        filepath_list = self.clean_duplicate_files(filepath_list)
-        unique_filenames = {}
+    def convert_if_required(self, filepath):
+        jpg_found = False
+        tif_found = False
+        deleteme = None
+        filename, filename_ext = self.split_filepath(filepath)
+        if filename_ext == "jpg" or filename_ext == "jpeg":
+            jpg_found = filepath
+        if filename_ext == "tif" or filename_ext == "tiff":
+            tif_found = filepath
+        original_full_path = jpg_found
+        if not jpg_found and tif_found:
+            self.logger.debug(f"  Must create jpg for {filepath} from {tif_found}")
+            try:
+                jpg_found, output = self.tiff_to_jpg(tif_found)
+                self.logger.info(f"Converted to: {jpg_found}")
+            except TimeoutError:
+                self.logger.error(f"Timeout converting {tif_found}")
+            except subprocess.TimeoutExpired:
+                self.logger.error(f"Timeout converting {tif_found}")
+            except ConvertException:
+                self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
+                return False
 
-        for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
-            unique_filenames[cur_file_base] = None
-        for unique_filename in unique_filenames.keys():
-            self.logger.debug(f"  Processing {unique_filename} for {id}")
-            jpg_found = False
-            tif_found = False
-            deleteme = None
-            if self.image_client.check_image_db_if_already_imported(collection, unique_filename + ".jpg", exact=True):
-                self.logger.info(f"  Abort; already uploaded {unique_filename}")
+            if not os.path.exists(jpg_found):
+                self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
+                self.logger.debug(f"Imagemagik output: \n\n{output}\n\n")
+                return False
+            deleteme = jpg_found
+            original_full_path = tif_found
+            if not jpg_found and tif_found:
+                self.logger.debug(f"  No valid files for {filepath.full_path}")
+                return False
+        if os.path.getsize(jpg_found) < 1000:
+            self.logger.info(f"This image is too small; {os.path.getsize(jpg_found)}, skipping.")
+            return False
+        return deleteme
+
+    def upload_filepath_to_image_database(self, filepath, strict=False, redacted=False):
+        if self.image_client.check_image_db_if_filepath_imported(self.collection_name,filepath,exact=True):
+            self.logger.info(f"Full filepath already imported: {filepath}")
+            # return the reference here, see the redef of check_image_db_if_filepath_imported
+            return False
+        filename, filename_ext = self.split_filepath(filepath)
+
+        if strict and self.image_client.check_image_db_if_filename_imported(filename, exact=True):
+            self.logger.info(f"filename already imported: {filename}")
+            # return the reference here
+            return False
+        deleteme = self.convert_if_required(filepath)
+        if deleteme is not None:
+            upload_me = deleteme
+        else:
+            upload_me = filepath.full_path
+
+        self.logger.debug(
+            f"about to import to client:- {redacted}, {upload_me}, {self.collection_name}, {upload_me}")
+
+        url, attach_loc = self.image_client.upload_to_image_server(upload_me,
+                                                                   redacted,
+                                                                   self.collection_name,
+                                                                   filepath)
+        if deleteme is not None:
+            os.remove(deleteme)
+        return (url, attach_loc)
+
+    def process_id(self, filepath_list, collection_object_id, agent_id, skeleton=False, copyright_map=None):
+        # if dedupe_files:
+        #     unique_filenames = {}
+        #
+        # for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
+        #     unique_filenames[cur_file_base] = None
+        # for unique_filename in unique_filenames.keys():
+        for cur_filepath in filepath_list:
+
+            if self.image_client.check_image_db_if_filename_imported(cur_file_base + ".jpg", exact=True):
+                self.logger.info(f"  Abort; already uploaded {cur_filepath}")
                 continue
 
             for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
-                if cur_file_base == unique_filename:
 
-                    if cur_file_ext == "jpg" or cur_file_ext == "jpeg":
-                        jpg_found = cur_filepath
-                    if cur_file_ext == "tif" or cur_file_ext == "tiff":
-                        tif_found = cur_filepath
-            original_full_path = jpg_found
-            if not jpg_found and tif_found:
-                self.logger.debug(f"  Must create jpg for {unique_filename} from {tif_found}")
-                try:
-                    jpg_found, output = self.tiff_to_jpg(tif_found)
-                    self.logger.info(f"Converted to: {jpg_found}")
-                except TimeoutError:
-                    self.logger.error(f"Timeout converting {tif_found}")
-                except subprocess.TimeoutExpired:
-                    self.logger.error(f"Timeout converting {tif_found}")
-                except ConvertException:
-                    self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
-                    continue
-
-                if not os.path.exists(jpg_found):
-                    self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
-                    self.logger.debug(f"Imagemagik output: \n\n{output}\n\n")
-                    continue
-
-                deleteme = jpg_found
-                original_full_path = tif_found
-
-            if not jpg_found and tif_found:
-                self.logger.debug(f"  No valid files for {unique_filename}")
-                continue
-
-            if os.path.getsize(jpg_found) < 1000:
-                self.logger.info(f"This image is too small; {os.path.getsize(jpg_found)}, skipping.")
-                continue
-            self.logger.debug(f"  Will upload:{jpg_found} for {unique_filename}")
-
-            try:
+                is_redacted = False
                 if not skeleton:
                     is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
+
                 else:
                     is_redacted = True
+                (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
 
-                self.logger.debug(
-                    f"about to import to client:- {is_redacted}, {jpg_found}, {collection}, {original_full_path}")
+            try:
 
-                url, attach_loc = self.image_client.upload_to_image_server(jpg_found,
-                                                                           is_redacted,
-                                                                           collection,
-                                                                           original_full_path)
                 copyright = None
                 if copyright_map is not None:
-                    if original_full_path in copyright_map:
-                        copyright = copyright_map[original_full_path]
-                self.import_to_specify_database(jpg_found, attach_loc, url, collection_object_id, agent_id,
+                    if cur_filepath.full_path in copyright_map:
+                        copyright = copyright_map[cur_filepath.full_path]
+                self.import_to_specify_database(cur_filepath.full_path,
+                                                attach_loc,
+                                                url,
+                                                collection_object_id,
+                                                agent_id,
                                                 copyright=copyright)
             except Exception as e:
                 self.logger.debug(
-                    f"Upload failure to image server for file: \n\t{unique_filename} \n\t{jpg_found}: \n\t{original_full_path}")
+                    f"Upload failure to image server for file: \n\t{cur_filepath.full_path} \n\t{jpg_found}: \n\t{original_full_path}")
                 self.logger.debug(f"Exception: {e}")
-            if deleteme is not None:
-                os.remove(deleteme)

@@ -444,11 +444,51 @@ def json_datetime_handler(x):
 
 # json.dumps(data, default=json_datetime_handler)
 
-@app.route('/getImageRecordByOrigFilename')
-@require_token('filename', always=True)
+# @app.route('/getImageRecordByOrigFilename')
+# @require_token('filename', always=True)
+# def get_image_record_by_original_filename():
+#     filename = request.query.filename
+#     log(f"requesting image {filename}")
+#
+#     exact = False
+#     collection = None
+#     if 'exact' in request.query.keys():
+#         exact = strtobool(request.query['exact'])
+#     if 'coll' in request.query.keys():
+#         collection = request.query['coll']
+#     record_list = image_db.get_image_record_by_original_filename(filename, exact, collection)
+#     log(f"Record list: {record_list}")
+#     if len(record_list) == 0:
+#         log("Image not found, returning 404")
+#         abort(404)
+#     return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
+
+
+@app.route('/getImageRecord')
+@require_token('file_string', always=True)
+def get_image_record():
+    search_type = request.query.get('search_type', default='filename')
+    query_string = request.query.get('file_string', default='')
+
+    if search_type == 'filename':
+        record_list = image_db.get_image_record_by_original_filename(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
+    elif search_type == 'path':
+        record_list = image_db.get_image_record_by_original_path(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
+    else:
+        abort(400, 'Invalid search type')
+
+    log(f"Record list: {record_list}")
+    if len(record_list) == 0:
+        log("Image not found, returning 404")
+        abort(404)
+
+    return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
+
+@app.route('/getImageRecordByOrigPath')
+@require_token('path', always=True)
 def get_image_record_by_original_filename():
-    filename = request.query.filename
-    log(f"requesting image {filename}")
+    path = request.query.path
+    log(f"requesting image {path}")
 
     exact = False
     collection = None
@@ -456,13 +496,12 @@ def get_image_record_by_original_filename():
         exact = strtobool(request.query['exact'])
     if 'coll' in request.query.keys():
         collection = request.query['coll']
-    record_list = image_db.get_image_record_by_original_filename(filename, exact, collection)
+    record_list = image_db.get_image_record_by_original_path(path, exact, collection)
     log(f"Record list: {record_list}")
     if len(record_list) == 0:
         log("Image not found, returning 404")
         abort(404)
     return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
-
 
 @app.route('/getmetadata')
 @require_token('filename')

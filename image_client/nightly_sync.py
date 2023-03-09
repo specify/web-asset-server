@@ -75,8 +75,7 @@ def main():
 
     return record_list
 
-
-if __name__ == '__main__':
+def main():
     logging.basicConfig()
     logging.getLogger().setLevel(logging.DEBUG)
     if len(sys.argv) != 2:
@@ -99,4 +98,8 @@ if __name__ == '__main__':
             ich_importer_config.SPECIFY_DATABASE_HOST,
             ich_importer_config.SPECIFY_DATABASE)
 
-main()
+
+if __name__ == '__main__':
+    main()
+
+

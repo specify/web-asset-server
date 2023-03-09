@@ -98,7 +98,6 @@ def setup_logging(verbosity: int):
         logger.setLevel(logging.INFO)
     elif verbosity >= 4:
         logger.setLevel(logging.DEBUG)
-    logger.setLevel(logging.ERROR)  # better to have too much log than not enough
 
 
 def bad_collection():

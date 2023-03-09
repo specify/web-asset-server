@@ -25,8 +25,7 @@ from dir_tools import DirTools
 class BotanyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.BotanyImporter')
-        self.collection_name = "botany"
-        super().__init__(botany_importer_config)
+        super().__init__(botany_importer_config,"botany")
 
         dir_tools = DirTools(self.build_filename_map)
         self.barcode_map = {}
@@ -48,17 +47,10 @@ class BotanyImporter(Importer):
 
     def process_loaded_files(self):
         for barcode in self.barcode_map.keys():
-            filepaths = self.barcode_map[barcode]
             filename_list = []
 
-            for cur_filepath in filepaths:
-
-                cur_filename = os.path.basename(cur_filepath)
-                try:
-                    cur_file_base, cur_file_ext = cur_filename.split(".")
-                except ValueError:
-                    continue
-                filename_list.append([cur_filepath, cur_file_base, cur_file_ext])
+            for cur_filepath in self.barcode_map[barcode]:
+                filename_list.append(cur_filepath)
             self.process_barcode(barcode, filename_list)
 
     def process_barcode(self, barcode, filepath_list):
@@ -72,13 +64,13 @@ class BotanyImporter(Importer):
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
             self.create_skeleton(barcode)
             skeleton = True
+        #  Botany assumes that all
+        filepath_list = self.clean_duplicate_files(filepath_list)
 
-        self.process_id(barcode,
-                        filepath_list,
-                        collection_object_id,
-                        botany_importer_config.COLLECTION_NAME,
-                        95728,
-                        skeleton=skeleton)
+        self.process_id(filepath_list,
+                         [collection_object_id],
+                         95728,
+                         skeleton=skeleton)
 
     def build_filename_map(self, full_path):
         full_path = full_path.lower()
