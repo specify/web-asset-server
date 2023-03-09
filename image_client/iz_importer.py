@@ -111,35 +111,14 @@ class IzImporter(Importer):
 
     def process_casiz_number(self, casiz_number, filepath_list):
         self.logger.debug(f"casiz_numbers: {casiz_number}")
-        collection_object_id = self.get_collectionobjectid_from_casiz_number(casiz_number)
+        sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
+        collection_object_id = self.specify_db_connection.get_one_record(sql)
+        if collection_object_id is None:
+            print(f"No record found for casiz_number {casiz_number}, skipping.")
+            return
+        filepath_list = self.remove_imported_filepaths_from_list(filepath_list)
+        self.import_to_imagedb_and_specify(filepath_list, collection_object_id, 26280,copyright_map=self.path_copyright_map)
 
-        for cur_filepath in filepath_list:
-
-            if self.image_client.check_image_db_if_filepath_imported(self.collection_name,
-                                                                     cur_filepath,
-                                                                     exact=True):
-                self.logger.info(f"  Abort; already uploaded {cur_filepath}")
-                continue
-
-            is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
-            (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
-
-            try:
-
-                copyright = None
-                if self.copyright_map is not None:
-                    if cur_filepath in self.copyright_map:
-                        copyright = self.copyright_map[cur_filepath]
-                self.import_to_specify_database(cur_filepath,
-                                                attach_loc,
-                                                url,
-                                                collection_object_id,
-                                                26280,
-                                                copyright=copyright)
-            except Exception as e:
-                self.logger.debug(
-                    f"Upload failure to image server for file: \n\t{cur_filepath} \n\t{'jpg found'}: \n\t{cur_filepath}")
-                self.logger.debug(f"Exception: {e}")
 
     # CASIZXXXXXX
     # CASIZ XXXXXX
@@ -313,7 +292,8 @@ class IzImporter(Importer):
             print('Copyright symbol detected in filename')
             copyright = f'{copyright_filename}'
             copyright_method = 'filename'
-
+#                     copyrhgit paths are borked
+        joe
         self.path_copyright_map[full_path] = copyright
         # ================= end copyright =================
 
@@ -348,13 +328,6 @@ class IzImporter(Importer):
         sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
         return self.specify_db_connection.get_one_record(sql)
 
-    # returns None if the object is missing.
-    def get_collection_object_id(self, filename):
-        casiz_number = self.get_first_digits_from_filepath(filename)
-        collection_object_id = self.get_collectionobjectid_from_casiz_number(casiz_number)
-        return collection_object_id
 
-    def import_casiz_number_to_specify_database(self, filepath, attach_loc, url):
-        casiz_number = self.get_first_digits_from_filepath(filepath)
-        collection_object_id = self.get_collectionobjectid_from_casiz_number(casiz_number)
-        self.import_to_specify_database(filepath, attach_loc, url, collection_object_id)
+
+

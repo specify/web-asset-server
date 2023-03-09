@@ -58,19 +58,22 @@ class BotanyImporter(Importer):
             self.logger.debug(f"No barcode; skipping")
             return
         self.logger.debug(f"Barcode: {barcode}")
-        collection_object_id = self.get_collectionobjectid_from_barcode(barcode)
-        skeleton = False
+        sql = f"select collectionobjectid  from collectionobject where catalognumber={barcode}"
+        collection_object_id = self.specify_db_connection.get_one_record(sql)
+        force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
             self.create_skeleton(barcode)
-            skeleton = True
-        #  Botany assumes that all
-        filepath_list = self.clean_duplicate_files(filepath_list)
+            force_redacted = True
+        #  we can have multiple filepaths per barcode in the case of barcode-a, barcode-b etc.
+        # not done for modern samples, but historically this exists.
+        filepath_list = self.clean_duplicate_basenames(filepath_list)
+        filepath_list = self.remove_imported_filenames_from_list(filepath_list)
 
-        self.process_id(filepath_list,
-                         [collection_object_id],
-                         95728,
-                         skeleton=skeleton)
+        self.import_to_imagedb_and_specify(filepath_list,
+                                           collection_object_id,
+                                           95728,
+                                           force_redacted=force_redacted)
 
     def build_filename_map(self, full_path):
         full_path = full_path.lower()
@@ -98,10 +101,6 @@ class BotanyImporter(Importer):
             self.barcode_map[barcode] = [full_path]
         else:
             self.barcode_map[barcode].append(full_path)
-
-    def get_collectionobjectid_from_barcode(self, barcode):
-        sql = f"select collectionobjectid  from collectionobject where catalognumber={barcode}"
-        return self.specify_db_connection.get_one_record(sql)
 
     def create_skeleton(self, barcode):
         self.logger.info(f"Creating skeleton for barcode {barcode}")
@@ -162,16 +161,6 @@ class BotanyImporter(Importer):
         self.specify_db_connection.commit()
         cursor.close()
 
-    # returns None if the object is missing.
-    def get_collection_object_id(self, filename):
-        barcode = self.get_first_digits_from_filepath(filename)
-        collection_object_id = self.get_collectionobjectid_from_barcode(barcode)
-        return collection_object_id
-
-    def import_barcode_to_specify_database(self, filepath, attach_loc, url):
-        barcode = self.get_first_digits_from_filepath(filepath)
-        collection_object_id = self.get_collectionobjectid_from_barcode(barcode)
-        self.import_to_specify_database(filepath, attach_loc, url, collection_object_id)
 
     # def import_image(self, is_redacted, full_path):
     #     try:

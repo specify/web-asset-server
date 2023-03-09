@@ -136,28 +136,28 @@ class Importer:
             num /= 1024.0
         return f"{num:.1f} Yi{suffix}"
 
-    #  Filepath is a list of three element lists - full filepath, the filename, and the extension.
-
-    def clean_duplicate_files(self, filepath_list):
-        basename_list = [os.path.basename(filepath.cur_basename) for filepath in filepath_list]
-        basename_set = set(basename_list)
-        filepath_only_list = [filepath.full_path for filepath in filepath_list]
+    # if the basenames are the same, it removes them.
+    def clean_duplicate_basenames(self, filepath_list):
+        basename_list = [os.path.basename(filepath) for filepath in filepath_list]
         duplicates = [item for item, count in collections.Counter(basename_list).items() if count > 1]
 
+        # Write out duplicates file
         for duplicate in duplicates:
-            res = [item for item in filepath_only_list if duplicate in item]
+            res = [item for item in filepath_list if duplicate in item]
             self.duplicates_file.write(f'\nDuplicate: {duplicate}\n')
 
             for dupe_path in res:
                 size = os.path.getsize(dupe_path)
                 self.logger.debug(f"dupe_path: {dupe_path}")
                 self.duplicates_file.write(f"\t {self.format_filesize(size)}: {dupe_path}\n")
-        clean_list = []
-        for keep_name in basename_set:
-            for filepath in filepath_list:
-                if keep_name in filepath:
-                    clean_list.append(filepath)
-        return clean_list
+        seen_basenames = set()
+        unique_filepaths = []
+        for filepath in filepath_list:
+            basename = os.path.basename(filepath)
+            if basename not in seen_basenames:
+                seen_basenames.add(basename)
+                unique_filepaths.append(filepath)
+        return unique_filepaths
 
     def convert_if_required(self, filepath):
         jpg_found = False
@@ -196,22 +196,16 @@ class Importer:
             return False
         return deleteme
 
-    def upload_filepath_to_image_database(self, filepath, strict=False, redacted=False):
+    def upload_filepath_to_image_database(self, filepath, redacted=False):
         if self.image_client.check_image_db_if_filepath_imported(self.collection_name,filepath,exact=True):
             self.logger.info(f"Full filepath already imported: {filepath}")
             # return the reference here, see the redef of check_image_db_if_filepath_imported
-            return False
-        filename, filename_ext = self.split_filepath(filepath)
-
-        if strict and self.image_client.check_image_db_if_filename_imported(filename, exact=True):
-            self.logger.info(f"filename already imported: {filename}")
-            # return the reference here
             return False
         deleteme = self.convert_if_required(filepath)
         if deleteme is not None:
             upload_me = deleteme
         else:
-            upload_me = filepath.full_path
+            upload_me = filepath
 
         self.logger.debug(
             f"about to import to client:- {redacted}, {upload_me}, {self.collection_name}, {upload_me}")
@@ -224,13 +218,27 @@ class Importer:
             os.remove(deleteme)
         return (url, attach_loc)
 
-    def process_id(self, filepath_list, collection_object_id, agent_id, skeleton=False, copyright_map=None):
-        # if dedupe_files:
-        #     unique_filenames = {}
-        #
-        # for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
-        #     unique_filenames[cur_file_base] = None
-        # for unique_filename in unique_filenames.keys():
+    def remove_imported_filepaths_from_list(self,filepath_list):
+        keep_filepaths=[]
+        for cur_filepath in filepath_list:
+            if not self.image_client.check_image_db_if_filepath_imported(cur_filepath, exact=True):
+                keep_filepaths.append(cur_filepath)
+        return keep_filepaths
+
+    def remove_imported_filenames_from_list(self,filepath_list):
+        keep_filepaths=[]
+
+        for cur_filepath in filepath_list:
+            cur_filename = os.path.basename(cur_filepath)
+            cur_file_base, cur_file_ext = cur_filename.split(".")
+
+            if not self.image_client.check_image_db_if_filename_imported(cur_file_base + ".jpg", exact=True):
+                keep_filepaths.append(cur_filepath)
+        return keep_filepaths
+
+
+
+    def import_to_imagedb_and_specify(self, filepath_list, collection_object_id, agent_id, force_redacted=False, copyright_filepath_map=None):
         for cur_filepath in filepath_list:
 
             if self.image_client.check_image_db_if_filename_imported(cur_file_base + ".jpg", exact=True):
@@ -238,22 +246,22 @@ class Importer:
                 continue
 
             for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
-
-                is_redacted = False
-                if not skeleton:
+                if force_redacted:
+                    is_redacted=True
+                else:
                     is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
 
-                else:
-                    is_redacted = True
+
+                #  Joe bad - does an implicit "check filename if imported"; will fail for iz case.
                 (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
 
             try:
 
                 copyright = None
-                if copyright_map is not None:
-                    if cur_filepath.full_path in copyright_map:
-                        copyright = copyright_map[cur_filepath.full_path]
-                self.import_to_specify_database(cur_filepath.full_path,
+                if copyright_filepath_map is not None:
+                    if cur_filepath in copyright_filepath_map:
+                        copyright = copyright_filepath_map[cur_filepath]
+                self.import_to_specify_database(cur_filepath,
                                                 attach_loc,
                                                 url,
                                                 collection_object_id,
@@ -261,5 +269,5 @@ class Importer:
                                                 copyright=copyright)
             except Exception as e:
                 self.logger.debug(
-                    f"Upload failure to image server for file: \n\t{cur_filepath.full_path} \n\t{jpg_found}: \n\t{original_full_path}")
+                    f"Upload failure to image server for file: \n\t{cur_filepath}")
                 self.logger.debug(f"Exception: {e}")

@@ -122,7 +122,9 @@ class IchthyologyImporter(Importer):
         if collection_object_id is None:
             print(f"No record found for catalog number {catalog_number}, skipping.")
             return
-        self.process_id(filepath_list, collection_object_id, 68835)
+        filepath_list = self.clean_duplicate_basenames(filepath_list)
+        filepath_list = self.remove_imported_filenames_from_list(filepath_list)
+        self.import_to_imagedb_and_specify(filepath_list, collection_object_id, 68835)
 
 
 #         If I find a .jpg, import it.
