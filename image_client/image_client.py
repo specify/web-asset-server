@@ -153,7 +153,7 @@ class ImageClient:
     def decode_response(self,params):
         r = requests.get(self.build_url("getImageRecord"), params=params)
         if r.status_code == 404:
-            logging.debug(f"Checked {params['file_string']}  and found no duplicates")
+            logging.debug(f"Checked {params['file_string']} and found no duplicates")
             return False
         if r.status_code == 200:
             logging.debug(f"Checked {params['file_string']} - already imported")

@@ -25,9 +25,10 @@ from dir_tools import DirTools
 class BotanyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.BotanyImporter')
-        super().__init__(botany_importer_config,"botany")
+        super().__init__(botany_importer_config,"Botany")
 
-        dir_tools = DirTools(self.build_filename_map)
+        # limit is for debugging
+        dir_tools = DirTools(self.build_filename_map,limit=10)
         self.barcode_map = {}
 
         self.logger.debug("Botany import mode")
@@ -65,6 +66,8 @@ class BotanyImporter(Importer):
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
             self.create_skeleton(barcode)
             force_redacted = True
+            self.logger.warning(f"Skeletons temporarily disabled in botany")
+            return
         #  we can have multiple filepaths per barcode in the case of barcode-a, barcode-b etc.
         # not done for modern samples, but historically this exists.
         filepath_list = self.clean_duplicate_basenames(filepath_list)
@@ -77,15 +80,10 @@ class BotanyImporter(Importer):
 
     def build_filename_map(self, full_path):
         full_path = full_path.lower()
-        # self.logger.debug(f"Ich importer verify file: {full_path}")
-        if not filetype.is_image(full_path):
+        if not self.check_for_valid_image(full_path):
             return
 
         filename = os.path.basename(full_path)
-        if "." not in filename:
-            self.logger.debug(f"Rejected; no . : {filename}")
-
-            return
         matched = re.match(botany_importer_config.BOTANY_REGEX, filename.lower())
         is_match = bool(matched)
         if not is_match:

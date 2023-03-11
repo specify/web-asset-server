@@ -5,6 +5,7 @@ import os, re, sys
 from image_client import ImageClient
 from db_utils import DbUtils, InvalidFilenameError, DatabaseInconsistentError
 import collections
+import filetype
 
 TMP_JPG = "./tmp_jpg"
 import logging
@@ -159,7 +160,7 @@ class Importer:
                 unique_filepaths.append(filepath)
         return unique_filepaths
 
-    def convert_if_required(self, filepath):
+    def convert_image_if_required(self, filepath):
         jpg_found = False
         tif_found = False
         deleteme = None
@@ -168,7 +169,6 @@ class Importer:
             jpg_found = filepath
         if filename_ext == "tif" or filename_ext == "tiff":
             tif_found = filepath
-        original_full_path = jpg_found
         if not jpg_found and tif_found:
             self.logger.debug(f"  Must create jpg for {filepath} from {tif_found}")
             try:
@@ -187,7 +187,6 @@ class Importer:
                 self.logger.debug(f"Imagemagik output: \n\n{output}\n\n")
                 return False
             deleteme = jpg_found
-            original_full_path = tif_found
             if not jpg_found and tif_found:
                 self.logger.debug(f"  No valid files for {filepath.full_path}")
                 return False
@@ -197,11 +196,8 @@ class Importer:
         return deleteme
 
     def upload_filepath_to_image_database(self, filepath, redacted=False):
-        if self.image_client.check_image_db_if_filepath_imported(self.collection_name,filepath,exact=True):
-            self.logger.info(f"Full filepath already imported: {filepath}")
-            # return the reference here, see the redef of check_image_db_if_filepath_imported
-            return False
-        deleteme = self.convert_if_required(filepath)
+
+        deleteme = self.convert_image_if_required(filepath)
         if deleteme is not None:
             upload_me = deleteme
         else:
@@ -232,7 +228,7 @@ class Importer:
             cur_filename = os.path.basename(cur_filepath)
             cur_file_base, cur_file_ext = cur_filename.split(".")
 
-            if not self.image_client.check_image_db_if_filename_imported(cur_file_base + ".jpg", exact=True):
+            if not self.image_client.check_image_db_if_filename_imported(self.collection_name,cur_file_base + ".jpg", exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
 
@@ -240,20 +236,17 @@ class Importer:
 
     def import_to_imagedb_and_specify(self, filepath_list, collection_object_id, agent_id, force_redacted=False, copyright_filepath_map=None):
         for cur_filepath in filepath_list:
+            # because we'll convert it to a .jpg for purposes of serving and attching to specify
+            if_i_were_a_jpg_name = os.path.splitext(os.path.basename(cur_filepath))[0] + '.jpg'
 
-            if self.image_client.check_image_db_if_filename_imported(cur_file_base + ".jpg", exact=True):
-                self.logger.info(f"  Abort; already uploaded {cur_filepath}")
-                continue
-
-            for cur_filepath, cur_file_base, cur_file_ext in filepath_list:
-                if force_redacted:
-                    is_redacted=True
-                else:
-                    is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
+            if force_redacted:
+                is_redacted=True
+            else:
+                is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
 
 
-                #  Joe bad - does an implicit "check filename if imported"; will fail for iz case.
-                (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
+            #  Joe bad - does an implicit "check filename if imported"; will fail for iz case.
+            (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
 
             try:
 
@@ -271,3 +264,19 @@ class Importer:
                 self.logger.debug(
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
                 self.logger.debug(f"Exception: {e}")
+
+    def check_for_valid_image(self,full_path):
+        # self.logger.debug(f"Ich importer verify file: {full_path}")
+        if not filetype.is_image(full_path):
+            logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")
+            if full_path.lower().endswith(".tif") or full_path.lower().endswith(".tiff"):
+                print("Tiff file misidentified as not an image, overriding auto-recognition")
+            else:
+                return False
+
+        filename = os.path.basename(full_path)
+        if "." not in filename:
+            self.logger.debug(f"Rejected; no . : {filename}")
+
+            return False
+        return True

@@ -76,17 +76,11 @@ class IchthyologyImporter(Importer):
 
     def build_filename_map(self, full_path):
         full_path = full_path.lower()
-        # logging.debug(f"Ich importer verify file: {full_path}")
-        if not filetype.is_image(full_path):
-            logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")
-            if full_path.lower().endswith(".tif") or full_path.lower().endswith(".tiff"):
-                print("Tiff file misidentified as not an image, overriding auto-recognition")
-            else:
-                return
+        if not self.check_for_valid_image(full_path):
+            return
 
         filename = os.path.basename(full_path)
-        if "." not in filename:
-            return
+
         try:
             catalog_number, collection = self.get_catalog_number(filename)
         except FilenameFormatException:
