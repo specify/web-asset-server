@@ -34,6 +34,36 @@ under GNU General Public License 2 (GPL2).
 
 # Installation
 
+## Docker
+
+Docker in the preferred installation method for Web Asset Server.
+
+Example `docker-compose.yml` is provided:
+
+```yaml
+version: '3.7'
+services:
+
+  asset-server:
+    restart: unless-stopped
+    image: specifyconsortium/specify-asset-service
+    init: true
+    volumes:
+      # Store all attachments outside the container, in a separate
+      # volume
+      - "attachments:/home/specify/attachments"
+    environment:
+      # Replace this with the URL at which asset server would be
+      # publicly available
+      - SERVER_NAME=host.docker.internal
+      - SERVER_PORT=80
+      - ATTACHMENT_KEY=your asset server access key
+      - DEBUG_MODE=false
+
+volumes:
+  attachments: # the asset-servers attachment files
+```
+
 ## Installing system dependencies
 
 The dependencies are:
