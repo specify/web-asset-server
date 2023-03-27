@@ -5,7 +5,7 @@ This is a sample attachment server implementation for Specify. This implementati
 
 The Specify Collections Consortium is funded by its member
 institutions. The Consortium web site is:
-http://wwww.specifysoftware.org
+http://www.specifysoftware.org
 
 Web Asset Server Copyright © 2021 Specify Collections Consortium. Specify
 comes with ABSOLUTELY NO WARRANTY.  This is free software licensed
@@ -36,6 +36,36 @@ back to an original filename
 * Docker integration with nginx for performance and security
 
 # Installation
+
+## Docker
+
+Docker in the preferred installation method for Web Asset Server.
+
+Example `docker-compose.yml` is provided:
+
+```yaml
+version: '3.7'
+services:
+
+  asset-server:
+    restart: unless-stopped
+    image: specifyconsortium/specify-asset-service
+    init: true
+    volumes:
+      # Store all attachments outside the container, in a separate
+      # volume
+      - "attachments:/home/specify/attachments"
+    environment:
+      # Replace this with the URL at which asset server would be
+      # publicly available
+      - SERVER_NAME=host.docker.internal
+      - SERVER_PORT=80
+      - ATTACHMENT_KEY=your asset server access key
+      - DEBUG_MODE=false
+
+volumes:
+  attachments: # the asset-servers attachment files
+```
 
 ## Installing system dependencies
 
@@ -103,8 +133,11 @@ division name under *System Information* on the right hand side. This will open
 a properties editor for the global preferences. You will need to set four properties
 to configure access to the asset server:
 
-* `USE_GLOBAL_PREFS` `true`
-* `attachment.key`  obtain from asset server `settings.py` file
+* `USE_GLOBAL_PREFS` - `true`
+* `attachment.key` – `##`
+   * Replace `##` with the key from the following location:
+     * obtain from asset server `settings.py` file if you have a local installation of 7
+     * obtain from `docker-compose.yml` file if you use a Docker deployment
 * `attachment.url`  `http://[YOUR_SERVER]/web_asset_store.xml` 
 * `attachment.use_path` `false`
 
