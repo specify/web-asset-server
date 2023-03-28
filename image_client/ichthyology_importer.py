@@ -1,6 +1,6 @@
 import ich_importer_config
 from importer import Importer
-import filetype
+# import filetype
 import os
 import re
 import logging
@@ -8,8 +8,7 @@ from dir_tools import DirTools
 
 
 logging.basicConfig(level=logging.DEBUG)
-sla = os.path.sep
-ICH_PREFIX = f'ichthyology{sla}images{sla}'
+
 ICH_SCAN_FOLDERS = ['AutomaticSpecifyImport']
 '''
 ICH_SCAN_FOLDERS = [f'CAS types{sla}Archive{sla}illustrations',
@@ -39,7 +38,7 @@ class IchthyologyImporter(Importer):
 
 
         for cur_dir in ICH_SCAN_FOLDERS:
-            cur_dir = os.path.join(prefix, ICH_PREFIX, cur_dir)
+            cur_dir = os.path.join(prefix, ich_importer_config.SCAN_DIR, cur_dir)
             print(f"Scanning: {cur_dir}")
             dir_tools.process_files_or_directories_recursive(cur_dir)
 

@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 import pytz
-from db_connector import TIME_FORMAT_NO_OFFESET
+from image_db import TIME_FORMAT_NO_OFFESET
 from client_utilities import update_time_delta
 from client_utilities import build_url
 from client_utilities import generate_token

@@ -22,17 +22,20 @@ from image_client.image_db import ImageDb
 from image_client.image_db import TIME_FORMAT
 
 app = application = Bottle()
-# logging.basicConfig(level=logging.DEBUG)
-image_db = None
+#logging.basicConfig(level=logging.DEBUG)
+
 import settings
 from bottle import (
     Response, request, response, static_file, template, abort,
     HTTPResponse, route)
 
+def get_image_db():
+    image_db = ImageDb()
+    return image_db
+
 
 def log(msg):
     logging.debug(msg)
-
 
 def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
@@ -245,6 +248,7 @@ def static(path):
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
     filename = path.split('/')[-1]
+    image_db=get_image_db()
     records = image_db.get_image_record_by_internal_filename(filename)
     if len(records) < 1:
         log(f"Static record not found: {request.query.filename}")
@@ -285,8 +289,10 @@ def getfileref():
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
-
+    log (f"fileget {request.query.filename}")
+    image_db=get_image_db()
     records = image_db.get_image_record_by_internal_filename(request.query.filename)
+    log (f"Fileget compelte")
     if len(records) < 1:
         log(f"Record not found: {request.query.filename}")
         response.content_type = 'text/plain; charset=utf-8'
@@ -294,7 +300,6 @@ def fileget():
         return response
     if records[0]['redacted']:
         log(f"Redacted, check auth token")
-
         try:
             # Note, we're hitting this twice with the @require_token decorator
             validate_token(request.query.token, request.query.filename)
@@ -307,7 +312,7 @@ def fileget():
         log(f"Token validated for redacted record...")
     else:
         log(f"Not redacted, no check required")
-
+    log (f"Valid request: {request.query.filename}")
     resolved_file = resolve_file(request.query.filename,
                                  request.query.coll,
                                  request.query['type'],
@@ -336,6 +341,7 @@ def fileupload():
     """Accept original file uploads and store them in the proper
     attchment subdirectory.
     """
+    image_db=get_image_db()
     start_save = time.time()
     log(f"Post request for fileupload...")
     thumb_p = (request.forms['type'] == "T")
@@ -412,6 +418,7 @@ def filedelete():
     if the original file does not exist. Any associated thumbnails will
     also be deleted.
     """
+    image_db = get_image_db()
     storename = request.forms.filename
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
     thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
@@ -467,6 +474,7 @@ def json_datetime_handler(x):
 @app.route('/getImageRecord')
 @require_token('file_string', always=True)
 def get_image_record():
+    image_db = get_image_db()
     search_type = request.query.get('search_type', default='filename')
     query_string = request.query.get('file_string', default='')
 
@@ -487,6 +495,7 @@ def get_image_record():
 @app.route('/getImageRecordByOrigPath')
 @require_token('path', always=True)
 def get_image_record_by_original_filename():
+    image_db = get_image_db()
     path = request.query.path
     log(f"requesting image {path}")
 
@@ -573,9 +582,9 @@ def main_page():
 
 
 if __name__ == '__main__':
+    image_db = get_image_db()
     log("Starting up....")
     image_db = ImageDb()
-
     while image_db.connect() is not True:
         sleep(5)
         log("Retrying db connection....")

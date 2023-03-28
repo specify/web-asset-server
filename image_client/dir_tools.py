@@ -62,7 +62,7 @@ class DirTools:
 
 
     def process_file(self, filepath, filename):
-        if self.processed_num > self.processed_limit:
+        if self.processed_limit is not None and self.processed_num > self.processed_limit:
             return
         self.processed_num += 1
 
