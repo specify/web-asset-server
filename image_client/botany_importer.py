@@ -28,7 +28,7 @@ class BotanyImporter(Importer):
         super().__init__(botany_importer_config,"Botany")
 
         # limit is for debugging
-        dir_tools = DirTools(self.build_filename_map,limit=10)
+        dir_tools = DirTools(self.build_filename_map,limit=None)
         self.barcode_map = {}
 
         self.logger.debug("Botany import mode")
