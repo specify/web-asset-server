@@ -1,6 +1,5 @@
 import ich_importer_config
 from importer import Importer
-# import filetype
 import os
 import re
 import logging
@@ -8,19 +7,6 @@ from dir_tools import DirTools
 
 
 logging.basicConfig(level=logging.DEBUG)
-
-ICH_SCAN_FOLDERS = ['AutomaticSpecifyImport']
-'''
-ICH_SCAN_FOLDERS = [f'CAS types{sla}Archive{sla}illustrations',
-                    f'CAS types{sla}Archive{sla}photographs',
-                    f'CAS types{sla}Archive{sla}radiographs',
-                    f'CAS types{sla}Non-primary types{sla}illustrations',
-                    f'CAS types{sla}Non-primary types{sla}photographs',
-                    f"CAS types{sla}Non-primary types{sla}radiographs",
-                    f'CAS other{sla}illustrations',
-                    f'CAS other{sla}photographs',
-                    f'CAS other{sla}radiographs']
-'''
 
 class FilenameFormatException(Exception):
     pass
@@ -34,11 +20,9 @@ class IchthyologyImporter(Importer):
 
         dir_tools = DirTools(self.build_filename_map)
 
-        prefix = ich_importer_config.IMAGE_DIRECTORY_PREFIX
 
-
-        for cur_dir in ICH_SCAN_FOLDERS:
-            cur_dir = os.path.join(prefix, ich_importer_config.SCAN_DIR, cur_dir)
+        for cur_dir in ich_importer_config.ICH_SCAN_FOLDERS:
+            cur_dir = os.path.join(ich_importer_config.IMAGE_DIRECTORY_PREFIX, ich_importer_config.SCAN_DIR, cur_dir)
             print(f"Scanning: {cur_dir}")
             dir_tools.process_files_or_directories_recursive(cur_dir)
 
