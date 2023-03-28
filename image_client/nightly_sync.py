@@ -39,7 +39,7 @@ def redact(internal_filename, redacted):
         logging.debug(f"No state change required. State is {redacted} object is {internal_filename}")
 
 
-def main():
+def do_import(collection_name,specify_db_connection):
     global image_db, attachment_utils
 
     print(f"Starting sync..")
@@ -97,6 +97,7 @@ def main():
             ich_importer_config.SPECIFY_DATABASE_PORT,
             ich_importer_config.SPECIFY_DATABASE_HOST,
             ich_importer_config.SPECIFY_DATABASE)
+    do_import(collection_name,specify_db_connection)
 
 
 if __name__ == '__main__':
