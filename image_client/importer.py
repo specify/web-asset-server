@@ -44,7 +44,7 @@ class Importer:
         self.attachment_utils = AttachmentUtils(self.specify_db_connection)
         self.duplicates_file = open(f'duplicates-{self.collection_name}.txt', 'w')
 
-    def split_filepath(self,filepath):
+    def split_filepath(self, filepath):
         cur_filename = os.path.basename(filepath)
         cur_file_ext = cur_filename.split(".")[1]
         return cur_filename, cur_file_ext
@@ -214,36 +214,37 @@ class Importer:
             os.remove(deleteme)
         return (url, attach_loc)
 
-    def remove_imported_filepaths_from_list(self,filepath_list):
-        keep_filepaths=[]
+    def remove_imported_filepaths_from_list(self, filepath_list):
+        keep_filepaths = []
         for cur_filepath in filepath_list:
-            if not self.image_client.check_image_db_if_filepath_imported(cur_filepath, exact=True):
+            if not self.image_client.check_image_db_if_filepath_imported(self.collection_name,
+                                                                         cur_filepath,
+                                                                         exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
 
-    def remove_imported_filenames_from_list(self,filepath_list):
-        keep_filepaths=[]
+    def remove_imported_filenames_from_list(self, filepath_list):
+        keep_filepaths = []
 
         for cur_filepath in filepath_list:
             cur_filename = os.path.basename(cur_filepath)
             cur_file_base, cur_file_ext = cur_filename.split(".")
 
-            if not self.image_client.check_image_db_if_filename_imported(self.collection_name,cur_file_base + ".jpg", exact=True):
+            if not self.image_client.check_image_db_if_filename_imported(self.collection_name, cur_file_base + ".jpg",
+                                                                         exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
 
-
-
-    def import_to_imagedb_and_specify(self, filepath_list, collection_object_id, agent_id, force_redacted=False, copyright_filepath_map=None):
+    def import_to_imagedb_and_specify(self, filepath_list, collection_object_id, agent_id, force_redacted=False,
+                                      copyright_filepath_map=None):
         for cur_filepath in filepath_list:
             # because we'll convert it to a .jpg for purposes of serving and attching to specify
             if_i_were_a_jpg_name = os.path.splitext(os.path.basename(cur_filepath))[0] + '.jpg'
 
             if force_redacted:
-                is_redacted=True
+                is_redacted = True
             else:
                 is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
-
 
             #  Joe bad - does an implicit "check filename if imported"; will fail for iz case.
             (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
@@ -265,7 +266,7 @@ class Importer:
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
                 self.logger.debug(f"Exception: {e}")
 
-    def check_for_valid_image(self,full_path):
+    def check_for_valid_image(self, full_path):
         # self.logger.debug(f"Ich importer verify file: {full_path}")
         if not filetype.is_image(full_path):
             logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")

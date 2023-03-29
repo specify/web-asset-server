@@ -154,7 +154,6 @@ class ImageClient:
         r = requests.get(self.build_url("getImageRecord"), params=params)
         if r.status_code == 404:
             logging.debug(f"Checked {params['file_string']} and found no duplicates")
-            print("Joe debug stop")
             sys.exit(1)
             return False
         if r.status_code == 200:

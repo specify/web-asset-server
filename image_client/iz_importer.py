@@ -72,21 +72,26 @@ class IzImporter(Importer):
 
         self.logger.debug("IZ import mode")
 
-        NUMBERS_FILENAME = "iz_importer_numbers.bin"
+        casiz_filepath_map_filename = "iz_importer_casiz_filepath.bin"
+        filepath_casiz_map_filename = "iz_importer_filepath_casiz.bin"
+
         COPYRIGHT_FILENAME = "iz_importer_copyright.bin"
-        if not os.path.exists(NUMBERS_FILENAME):
+        if not os.path.exists(casiz_filepath_map_filename):
             for cur_dir in iz_importer_config.IZ_SCAN_FOLDERS:
                 cur_full_path = os.path.join(iz_importer_config.IMAGE_DIRECTORY_PREFIX, cur_dir)
                 print(f"Scanning: {cur_full_path}")
                 dir_tools.process_files_or_directories_recursive(cur_full_path)
-            print("WARNING pickle disabled")
-            # outfile = open(NUMBERS_FILENAME, 'wb')
-            # pickle.dump(self.casiz_number_map, outfile)
-            # outfile = open(COPYRIGHT_FILENAME, 'wb')
-            # pickle.dump(self.path_copyright_map, outfile)
+            # print("WARNING pickle disabled")
+            outfile = open(casiz_filepath_map_filename, 'wb')
+            pickle.dump(self.casiz_filepath_map, outfile)
+            outfile = open(filepath_casiz_map_filename, 'wb')
+            pickle.dump(self.filepath_casiz_map, outfile)
+            outfile = open(COPYRIGHT_FILENAME, 'wb')
+            pickle.dump(self.path_copyright_map, outfile)
 
         else:
-            self.casiz_filepath_map = pickle.load(open(NUMBERS_FILENAME, "rb"))
+            self.filepath_casiz_map = pickle.load(open(filepath_casiz_map_filename, "rb"))
+            self.casiz_filepath_map = pickle.load(open(casiz_filepath_map_filename, "rb"))
             self.path_copyright_map = pickle.load(open(COPYRIGHT_FILENAME, "rb"))
         print("Starting to process loaded files...")
         self.process_loaded_files()
@@ -292,8 +297,7 @@ class IzImporter(Importer):
             print('Copyright symbol detected in filename')
             copyright = f'{copyright_filename}'
             copyright_method = 'filename'
-#                     copyrhgit paths are borked
-        joe
+
         self.path_copyright_map[full_path] = copyright
         # ================= end copyright =================
 
