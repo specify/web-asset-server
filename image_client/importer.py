@@ -230,7 +230,7 @@ class Importer:
                     select at.AttachmentId
                            from attachment as at,
                            collectionobjectattachment as cat
-                           where at.AttachmentLocation='{cur_filepath}' and 
+                           where at.OrigFilename='{cur_filepath}' and 
                            cat.CollectionObjectID='{collection_object_id}'
                            and cat.AttachmentId = at.AttachmentId
                     """
@@ -290,9 +290,9 @@ class Importer:
                                                 agent_id,
                                                 copyright=copyright)
             except Exception as e:
-                self.logger.debug(
+                self.logger.error(
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
-                self.logger.debug(f"Exception: {e}")
+                self.logger.error(f"Exception: {e}")
             except TimeoutError:
                 self.logger.error(f"Timeout converting {cur_filepath}")
 

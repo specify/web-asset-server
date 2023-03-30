@@ -2,6 +2,7 @@ import time_utils
 import db_utils
 from db_utils import DatabaseInconsistentError
 import logging
+import os
 
 
 class AttachmentUtils:
@@ -9,11 +10,11 @@ class AttachmentUtils:
     def __init__(self, db_utils):
         self.db_utils = db_utils
 
-    def get_attachmentid_from_filepath(self, attachment_location):
+    def get_attachmentid_from_filepath(self, orig_filepath):
         sql = f"""
         select at.AttachmentID
                from attachment as at
-               where at.AttachmentLocation='{attachment_location}'
+               where at.OrigFilename='{orig_filepath}'
         """
         aid = self.db_utils.get_one_record(sql)
         if aid is not None:
@@ -36,8 +37,7 @@ class AttachmentUtils:
     #
     #     return coid
 
-    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id,
-                          copyright=None):
+    def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id,copyright=None):
         # image type example 'image/png'
 
         sql = (f"""
@@ -51,7 +51,7 @@ class AttachmentUtils:
                         '{copyright}', NULL, NULL,   '{time_utils.get_pst_date_time_from_datetime(time_utils.get_pst_time(file_created_datetime))}', '{guid}', TRUE, NULL, 
                         NULL, NULL, '{image_type}','{original_filename}', '{url}', 4, 
                         0, NULL, NULL, 41, '{time_utils.get_pst_time_now_string()}',
-                        '{time_utils.get_pst_time_now_string()}', '{original_filename.split(".")[0]}', NULL, 0, NULL, NULL, 
+                        '{time_utils.get_pst_time_now_string()}', '{os.path.basename(original_filename).split(".")[0]}', NULL, 0, NULL, NULL, 
                         {agent_id}, NULL, NULL, NULL)
         """)
         cursor = self.db_utils.get_cursor()

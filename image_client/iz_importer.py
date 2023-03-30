@@ -67,13 +67,12 @@ class IzImporter(Importer):
         dir_tools = DirTools(self.build_filename_map)
 
         self.casiz_filepath_map = {}
-        self.filepath_casiz_map = {}
+        # self.filepath_casiz_map = {}
         self.path_copyright_map = {}
 
         self.logger.debug("IZ import mode")
 
         casiz_filepath_map_filename = "iz_importer_casiz_filepath.bin"
-        filepath_casiz_map_filename = "iz_importer_filepath_casiz.bin"
 
         COPYRIGHT_FILENAME = "iz_importer_copyright.bin"
         if not os.path.exists(casiz_filepath_map_filename):
@@ -82,27 +81,21 @@ class IzImporter(Importer):
                 print(f"Scanning: {cur_full_path}")
                 dir_tools.process_files_or_directories_recursive(cur_full_path)
             # print("WARNING pickle disabled")
-            outfile = open(casiz_filepath_map_filename, 'wb')
-            pickle.dump(self.casiz_filepath_map, outfile)
-            outfile = open(filepath_casiz_map_filename, 'wb')
-            pickle.dump(self.filepath_casiz_map, outfile)
-            outfile = open(COPYRIGHT_FILENAME, 'wb')
-            pickle.dump(self.path_copyright_map, outfile)
+            # outfile = open(casiz_filepath_map_filename, 'wb')
+            # pickle.dump(self.casiz_filepath_map, outfile)
+            # outfile = open(COPYRIGHT_FILENAME, 'wb')
+            # pickle.dump(self.path_copyright_map, outfile)
 
         else:
-            self.filepath_casiz_map = pickle.load(open(filepath_casiz_map_filename, "rb"))
             self.casiz_filepath_map = pickle.load(open(casiz_filepath_map_filename, "rb"))
             self.path_copyright_map = pickle.load(open(COPYRIGHT_FILENAME, "rb"))
         print("Starting to process loaded files...")
         self.process_loaded_files()
 
     def process_loaded_files(self):
-        # joe this is fubar; we can no longer use this method because
-        # we can have a set of files map to a set of casiz numbers
         for casiz_number in self.casiz_filepath_map.keys():
             filepaths = self.casiz_filepath_map[casiz_number]
             filepath_list = []
-            #  remove filepaths without extension? what's the case here?
             for cur_filepath in filepaths:
 
                 cur_filename = os.path.basename(cur_filepath)
@@ -248,8 +241,6 @@ class IzImporter(Importer):
         if not re.search(iz_importer_config.IMAGE_SUFFIX, filename):
             self.log_file_status(filename=filename, path=full_path, rejected="not an image file")
             return
-        # FILENAME_CONJUNCTION_MATCH = '^'+CASIZ_MATCH  + f'(([ ]*(and|or| )[ ]*({CASIZ_PREFIX})?{CASIZ_NUMBER}))*' + IMAGE_SUFFIX
-        # FILENAME_CONJUNCTION_MATCH = '^'+CASIZ_MATCH  + f'([ ]*(and|or| )[ ]*({CASIZ_PREFIX})?{CASIZ_NUMBER})' + IMAGE_SUFFIX
         matched = re.match(iz_importer_config.FILENAME_MATCH, filename)
         match_filename = bool(matched)
 
@@ -345,15 +336,15 @@ class IzImporter(Importer):
         if casiz_numbers is None:
             casiz_numbers = [casiz_number]
 
-        for cur_casiz_number in casiz_numbers:
+        for cur_casiz_number in list(set(casiz_numbers)):
             if cur_casiz_number not in self.casiz_filepath_map:
                 self.casiz_filepath_map[cur_casiz_number] = [full_path]
             else:
                 self.casiz_filepath_map[cur_casiz_number].append(full_path)
-            if full_path not in self.filepath_casiz_map:
-                self.filepath_casiz_map[full_path] = [cur_casiz_number]
-            else:
-                self.filepath_casiz_map[full_path].append(cur_casiz_number)
+            # if full_path not in self.filepath_casiz_map:
+            #     self.filepath_casiz_map[full_path] = [cur_casiz_number]
+            # else:
+            #     self.filepath_casiz_map[full_path].append(cur_casiz_number)
 
     def get_collectionobjectid_from_casiz_number(self, casiz_number):
         sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
