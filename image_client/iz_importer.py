@@ -81,10 +81,10 @@ class IzImporter(Importer):
                 print(f"Scanning: {cur_full_path}")
                 dir_tools.process_files_or_directories_recursive(cur_full_path)
             # print("WARNING pickle disabled")
-            # outfile = open(casiz_filepath_map_filename, 'wb')
-            # pickle.dump(self.casiz_filepath_map, outfile)
-            # outfile = open(COPYRIGHT_FILENAME, 'wb')
-            # pickle.dump(self.path_copyright_map, outfile)
+            outfile = open(casiz_filepath_map_filename, 'wb')
+            pickle.dump(self.casiz_filepath_map, outfile)
+            outfile = open(COPYRIGHT_FILENAME, 'wb')
+            pickle.dump(self.path_copyright_map, outfile)
 
         else:
             self.casiz_filepath_map = pickle.load(open(casiz_filepath_map_filename, "rb"))
@@ -98,11 +98,11 @@ class IzImporter(Importer):
             filepath_list = []
             for cur_filepath in filepaths:
 
-                cur_filename = os.path.basename(cur_filepath)
-                try:
-                    cur_file_base, cur_file_ext = cur_filename.split(".")
-                except ValueError:
-                    continue
+                # cur_filename = os.path.basename(cur_filepath)
+                # try:
+                #     cur_file_base, cur_file_ext = cur_filename.split(".")
+                # except ValueError:
+                #     continue
                 filepath_list.append(cur_filepath)
 
             self.process_casiz_number(casiz_number, filepath_list)
@@ -253,8 +253,7 @@ class IzImporter(Importer):
         for cur_directory in reversed(directories):
             matched = re.search(iz_importer_config.IZ_DIRECTORY_REGEX, cur_directory)
             match_directory = bool(matched)
-            if " and " in filename or " or " in cur_directory:
-                print("And found - directory joe check stop here")
+
             if match_directory:
                 directory = cur_directory
                 break

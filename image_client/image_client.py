@@ -28,6 +28,11 @@ class ImageClient:
         self.datetime_now = datetime.datetime.now(datetime.timezone.utc)
         self.update_time_delta()
 
+    def split_filepath(self, filepath):
+        cur_filename = os.path.basename(filepath)
+        cur_file_ext = cur_filename.split(".")[-1]
+        return cur_filename, cur_file_ext
+
     def build_url(self, endpoint):
         host = server_host_settings.SERVER_NAME
         port = server_host_settings.SERVER_PORT
@@ -83,7 +88,7 @@ class ImageClient:
             raise UploadFailureException(errstring)
         local_filename = full_path
         uuid = str(uuid4())
-        name, extension = splitext(local_filename)
+        extension = local_filename.split(".")[-1]
         attach_loc = uuid + extension
         if original_path is not None:
             upload_path = original_path

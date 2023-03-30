@@ -14,25 +14,18 @@ from specify_db import SpecifyDb
 import shutil
 from os import listdir
 from os.path import isfile, join
+import traceback
+
 
 
 class ConvertException(Exception):
     pass
 
+class TooSmallException(Exception):
+    pass
 
-# class FilePath():
-#     def __init__(self, filepath):
-#         cur_filename = os.path.basename(filepath)
-#
-#         cur_file_base, cur_file_ext = cur_filename.split(".")
-#
-#         self.full_path = filepath
-#         self.filename = cur_filename
-#         self.basename = cur_file_base
-#         self.ext = cur_file_ext
-#
-#     def __str__(self):
-#         return self.full_path
+class MissingPathException(Exception):
+    pass
 
 
 class Importer:
@@ -46,7 +39,7 @@ class Importer:
 
     def split_filepath(self, filepath):
         cur_filename = os.path.basename(filepath)
-        cur_file_ext = cur_filename.split(".")[1]
+        cur_file_ext = cur_filename.split(".")[-1]
         return cur_filename, cur_file_ext
 
     def tiff_to_jpg(self, tiff_filepath):
@@ -56,7 +49,7 @@ class Importer:
         else:
             shutil.rmtree(TMP_JPG)
             os.mkdir(TMP_JPG)
-        file_name_no_extention, extention = basename.split('.')
+        file_name_no_extention, extention = self.split_filepath(basename)
         if extention != 'tif':
             self.logger.error(f"Bad filename, can't convert {tiff_filepath}")
             raise ConvertException(f"Bad filename, can't convert {tiff_filepath}")
@@ -115,7 +108,8 @@ class Importer:
                                    url,
                                    collection_object_id,
                                    agent_id,
-                                   copyright=None):
+                                   copyright=None,
+                                   is_public=True):
         attachment_guid = uuid4()
 
         file_created_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(filepath))
@@ -129,7 +123,8 @@ class Importer:
                                                 image_type=mime_type,
                                                 url=url,
                                                 agent_id=agent_id,
-                                                copyright=copyright)
+                                                copyright=copyright,
+                                                is_public=is_public)
         attachment_id = self.attachment_utils.get_attachment_id(attachment_guid)
         self.connect_existing_attachment_to_collection_object_id(attachment_id, collection_object_id, agent_id)
 
@@ -193,14 +188,14 @@ class Importer:
             if not os.path.exists(jpg_found):
                 self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
                 self.logger.debug(f"Imagemagik output: \n\n{output}\n\n")
-                return False
+                raise MissingPathException
             deleteme = jpg_found
             if not jpg_found and tif_found:
                 self.logger.debug(f"  No valid files for {filepath.full_path}")
-                return False
+                raise InvalidFilenameError
         if os.path.getsize(jpg_found) < 1000:
             self.logger.info(f"This image is too small; {os.path.getsize(jpg_found)}, skipping.")
-            return False
+            return TooSmallException
         return deleteme
 
     def upload_filepath_to_image_database(self, filepath, redacted=False):
@@ -288,11 +283,9 @@ class Importer:
                                                 url,
                                                 collection_object_id,
                                                 agent_id,
-                                                copyright=copyright)
-            except Exception as e:
-                self.logger.error(
-                    f"Upload failure to image server for file: \n\t{cur_filepath}")
-                self.logger.error(f"Exception: {e}")
+                                                copyright=copyright,
+                                                is_public=(not force_redacted))
+
             except TimeoutError:
                 self.logger.error(f"Timeout converting {cur_filepath}")
 
@@ -300,6 +293,11 @@ class Importer:
                 self.logger.error(f"Timeout converting {cur_filepath}")
             except ConvertException:
                 self.logger.error(f"  Conversion failure for {cur_filepath}; skipping.")
+            except Exception as e:
+                self.logger.error(
+                    f"Upload failure to image server for file: \n\t{cur_filepath}")
+                self.logger.error(f"Exception: {e}")
+                traceback.print_exc()
 
     def check_for_valid_image(self, full_path):
         # self.logger.debug(f"Ich importer verify file: {full_path}")
