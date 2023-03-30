@@ -137,7 +137,7 @@ class IzImporter(Importer):
 
             else:
                 # If not:
-                self.import_to_imagedb_and_specify(filepath_list,
+                self.import_to_imagedb_and_specify([cur_filepath],
                                                    collection_object_id,
                                                    self.AGENT_ID,
                                                    copyright_filepath_map=self.path_copyright_map,

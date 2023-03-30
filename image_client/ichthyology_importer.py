@@ -79,8 +79,6 @@ class IchthyologyImporter(Importer):
             self.catalog_number_map[final_number].append(full_path)
 
 
-
-
     def process_loaded_files(self):
         for catalog_number in self.catalog_number_map.keys():
             filepath_list = []

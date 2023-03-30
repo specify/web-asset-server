@@ -185,16 +185,10 @@ class Importer:
             tif_found = filepath
         if not jpg_found and tif_found:
             self.logger.debug(f"  Must create jpg for {filepath} from {tif_found}")
-            try:
-                jpg_found, output = self.tiff_to_jpg(tif_found)
-                self.logger.info(f"Converted to: {jpg_found}")
-            except TimeoutError:
-                self.logger.error(f"Timeout converting {tif_found}")
-            except subprocess.TimeoutExpired:
-                self.logger.error(f"Timeout converting {tif_found}")
-            except ConvertException:
-                self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
-                return False
+
+            jpg_found, output = self.tiff_to_jpg(tif_found)
+            self.logger.info(f"Converted to: {jpg_found}")
+
 
             if not os.path.exists(jpg_found):
                 self.logger.error(f"  Conversion failure for {tif_found}; skipping.")
@@ -212,6 +206,7 @@ class Importer:
     def upload_filepath_to_image_database(self, filepath, redacted=False):
 
         deleteme = self.convert_image_if_required(filepath)
+
         if deleteme is not None:
             upload_me = deleteme
         else:
@@ -281,9 +276,8 @@ class Importer:
             else:
                 is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
 
-            (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
-
             try:
+                (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
 
                 copyright = None
                 if copyright_filepath_map is not None:
@@ -299,6 +293,13 @@ class Importer:
                 self.logger.debug(
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
                 self.logger.debug(f"Exception: {e}")
+            except TimeoutError:
+                self.logger.error(f"Timeout converting {cur_filepath}")
+
+            except subprocess.TimeoutExpired:
+                self.logger.error(f"Timeout converting {cur_filepath}")
+            except ConvertException:
+                self.logger.error(f"  Conversion failure for {cur_filepath}; skipping.")
 
     def check_for_valid_image(self, full_path):
         # self.logger.debug(f"Ich importer verify file: {full_path}")
