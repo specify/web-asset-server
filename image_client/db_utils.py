@@ -1,5 +1,7 @@
 import logging
 import sys
+import traceback
+
 from mysql.connector import errorcode
 import mysql.connector
 
@@ -80,8 +82,11 @@ class DbUtils:
 
         except Exception as e:
             print(f"Exception thrown while processing sql: {sql}\n{e}\n", file=sys.stderr, flush=True)
+            self.logger.error(traceback.format_exc())
+
             retval = None
         if retval is None:
+
             self.logger.warning(f"Warning: No results from: \n\n{sql}\n")
         else:
             retval = retval[0]

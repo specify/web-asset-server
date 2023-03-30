@@ -9,19 +9,32 @@ class AttachmentUtils:
     def __init__(self, db_utils):
         self.db_utils = db_utils
 
-    def get_collectionobjectid_from_filename(self, attachment_location):
+    def get_attachmentid_from_filepath(self, attachment_location):
         sql = f"""
-        select cat.CollectionObjectID
+        select at.AttachmentID
                from attachment as at
-               , collectionobjectattachment as cat
-
                where at.AttachmentLocation='{attachment_location}'
-        and cat.AttachmentId = at.AttachmentId
         """
-        coid = self.db_utils.get_one_record(sql)
-        logging.debug(f"Got collectionObjectId: {coid}")
+        aid = self.db_utils.get_one_record(sql)
+        if aid is not None:
+            logging.debug(f"Got AttachmentId: {aid}")
 
-        return coid
+        return aid
+
+    # not used - can be multiple in IZ, so dropping
+    # def get_collectionobjectid_from_filepath(self, attachment_location):
+    #     sql = f"""
+    #     select cat.CollectionObjectID
+    #            from attachment as at
+    #            , collectionobjectattachment as cat
+    #
+    #            where at.AttachmentLocation='{attachment_location}'
+    #     and cat.AttachmentId = at.AttachmentId
+    #     """
+    #     coid = self.db_utils.get_one_record(sql)
+    #     logging.debug(f"Got collectionObjectId: {coid}")
+    #
+    #     return coid
 
     def create_attachment(self, storename, original_filename, file_created_datetime, guid, image_type, url, agent_id,
                           copyright=None):

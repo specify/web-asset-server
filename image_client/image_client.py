@@ -149,6 +149,9 @@ class ImageClient:
         }
         return self.decode_response(params)
 
+    def check_specify_if_filepath_attached_to_collection_object_id(self,collection,filepath,collection_object_id):
+        pass
+
 
     def decode_response(self,params):
         r = requests.get(self.build_url("getImageRecord"), params=params)

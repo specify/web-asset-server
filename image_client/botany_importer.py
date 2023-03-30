@@ -71,7 +71,7 @@ class BotanyImporter(Importer):
         #  we can have multiple filepaths per barcode in the case of barcode-a, barcode-b etc.
         # not done for modern samples, but historically this exists.
         filepath_list = self.clean_duplicate_basenames(filepath_list)
-        filepath_list = self.remove_imported_filenames_from_list(filepath_list)
+        filepath_list = self.remove_imagedb_imported_filenames_from_list(filepath_list)
 
         self.import_to_imagedb_and_specify(filepath_list,
                                            collection_object_id,
