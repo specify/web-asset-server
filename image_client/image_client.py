@@ -149,12 +149,14 @@ class ImageClient:
         }
         return self.decode_response(params)
 
+    def check_specify_if_filepath_attached_to_collection_object_id(self,collection,filepath,collection_object_id):
+        pass
+
 
     def decode_response(self,params):
         r = requests.get(self.build_url("getImageRecord"), params=params)
         if r.status_code == 404:
             logging.debug(f"Checked {params['file_string']} and found no duplicates")
-            print("Joe debug stop")
             sys.exit(1)
             return False
         if r.status_code == 200:

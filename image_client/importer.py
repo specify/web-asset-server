@@ -44,7 +44,7 @@ class Importer:
         self.attachment_utils = AttachmentUtils(self.specify_db_connection)
         self.duplicates_file = open(f'duplicates-{self.collection_name}.txt', 'w')
 
-    def split_filepath(self,filepath):
+    def split_filepath(self, filepath):
         cur_filename = os.path.basename(filepath)
         cur_file_ext = cur_filename.split(".")[1]
         return cur_filename, cur_file_ext
@@ -95,7 +95,27 @@ class Importer:
             mime_type = 'application/pdf'
         return mime_type
 
-    def import_to_specify_database(self, filepath, attach_loc, url, collection_object_id, agent_id, copyright=None):
+    def connect_existing_attachment_to_collection_object_id(self,
+                                                            attachment_id,
+                                                            collection_object_id,
+                                                            agent_id):
+        ordinal = self.attachment_utils.get_ordinal_for_collection_object_attachment(collection_object_id)
+        if ordinal is None:
+            ordinal = 0
+        else:
+            ordinal += 1
+        self.attachment_utils.create_collection_object_attachment(attachment_id,
+                                                                  collection_object_id,
+                                                                  ordinal,
+                                                                  agent_id)
+
+    def import_to_specify_database(self,
+                                   filepath,
+                                   attach_loc,
+                                   url,
+                                   collection_object_id,
+                                   agent_id,
+                                   copyright=None):
         attachment_guid = uuid4()
 
         file_created_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(filepath))
@@ -103,7 +123,7 @@ class Importer:
         mime_type = self.get_mime_type(filepath)
 
         self.attachment_utils.create_attachment(storename=attach_loc,
-                                                original_filename=os.path.basename(filepath),
+                                                original_filename=filepath,
                                                 file_created_datetime=file_created_datetime,
                                                 guid=attachment_guid,
                                                 image_type=mime_type,
@@ -111,13 +131,7 @@ class Importer:
                                                 agent_id=agent_id,
                                                 copyright=copyright)
         attachment_id = self.attachment_utils.get_attachment_id(attachment_guid)
-        ordinal = self.attachment_utils.get_ordinal_for_collection_object_attachment(collection_object_id)
-        if ordinal is None:
-            ordinal = 0
-        else:
-            ordinal += 1
-        self.attachment_utils.create_collection_object_attachment(attachment_id, collection_object_id, ordinal,
-                                                                  agent_id)
+        self.connect_existing_attachment_to_collection_object_id(attachment_id, collection_object_id, agent_id)
 
     def get_first_digits_from_filepath(self, filepath, field_size=9):
         basename = os.path.basename(filepath)
@@ -214,38 +228,59 @@ class Importer:
             os.remove(deleteme)
         return (url, attach_loc)
 
-    def remove_imported_filepaths_from_list(self,filepath_list):
-        keep_filepaths=[]
+    def remove_specify_imported_and_id_linked_from_path(self, filepath_list, collection_object_id):
+        keep_filepaths = []
         for cur_filepath in filepath_list:
-            if not self.image_client.check_image_db_if_filepath_imported(cur_filepath, exact=True):
+            sql = f"""
+                    select at.AttachmentId
+                           from attachment as at,
+                           collectionobjectattachment as cat
+                           where at.AttachmentLocation='{cur_filepath}' and 
+                           cat.CollectionObjectID='{collection_object_id}'
+                           and cat.AttachmentId = at.AttachmentId
+                    """
+            aid = self.attachment_utils.db_utils.get_one_record(sql)
+
+            if aid is None:
+                keep_filepaths.append(cur_filepath)
+            else:
+                logging.debug(f"Already has an attachment with attachment_id: {aid}, sklipping")
+        return keep_filepaths
+
+    #
+    def remove_imagedb_imported_filepaths_from_list(self, filepath_list):
+        keep_filepaths = []
+        for cur_filepath in filepath_list:
+            if not self.image_client.check_image_db_if_filepath_imported(self.collection_name,
+                                                                         cur_filepath,
+                                                                         exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
 
-    def remove_imported_filenames_from_list(self,filepath_list):
-        keep_filepaths=[]
+    def remove_imagedb_imported_filenames_from_list(self, filepath_list):
+        keep_filepaths = []
 
         for cur_filepath in filepath_list:
             cur_filename = os.path.basename(cur_filepath)
             cur_file_base, cur_file_ext = cur_filename.split(".")
 
-            if not self.image_client.check_image_db_if_filename_imported(self.collection_name,cur_file_base + ".jpg", exact=True):
+            if not self.image_client.check_image_db_if_filename_imported(self.collection_name, cur_file_base + ".jpg",
+                                                                         exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
 
-
-
-    def import_to_imagedb_and_specify(self, filepath_list, collection_object_id, agent_id, force_redacted=False, copyright_filepath_map=None):
+    def import_to_imagedb_and_specify(self,
+                                      filepath_list,
+                                      collection_object_id,
+                                      agent_id,
+                                      force_redacted=False,
+                                      copyright_filepath_map=None):
         for cur_filepath in filepath_list:
-            # because we'll convert it to a .jpg for purposes of serving and attching to specify
-            if_i_were_a_jpg_name = os.path.splitext(os.path.basename(cur_filepath))[0] + '.jpg'
-
             if force_redacted:
-                is_redacted=True
+                is_redacted = True
             else:
                 is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
 
-
-            #  Joe bad - does an implicit "check filename if imported"; will fail for iz case.
             (url, attach_loc) = self.upload_filepath_to_image_database(cur_filepath, redacted=is_redacted)
 
             try:
@@ -265,7 +300,7 @@ class Importer:
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
                 self.logger.debug(f"Exception: {e}")
 
-    def check_for_valid_image(self,full_path):
+    def check_for_valid_image(self, full_path):
         # self.logger.debug(f"Ich importer verify file: {full_path}")
         if not filetype.is_image(full_path):
             logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")

@@ -50,6 +50,7 @@ class IzImporter(Importer):
 
     def __init__(self):
         logging.getLogger('PIL').setLevel(logging.ERROR)
+        self.AGENT_ID = 26280
         self.log_file = open(CASIZ_FILE_LOG, "w+")
         self.item_mappings = []
         self.log_file.write(f"casiz\tfilename\tCASIZ method\tcopyright method\tcopyright\trejected\tpath on disk\n")
@@ -67,26 +68,30 @@ class IzImporter(Importer):
 
         self.casiz_filepath_map = {}
         self.filepath_casiz_map = {}
-
         self.path_copyright_map = {}
 
         self.logger.debug("IZ import mode")
 
-        NUMBERS_FILENAME = "iz_importer_numbers.bin"
+        casiz_filepath_map_filename = "iz_importer_casiz_filepath.bin"
+        filepath_casiz_map_filename = "iz_importer_filepath_casiz.bin"
+
         COPYRIGHT_FILENAME = "iz_importer_copyright.bin"
-        if not os.path.exists(NUMBERS_FILENAME):
+        if not os.path.exists(casiz_filepath_map_filename):
             for cur_dir in iz_importer_config.IZ_SCAN_FOLDERS:
                 cur_full_path = os.path.join(iz_importer_config.IMAGE_DIRECTORY_PREFIX, cur_dir)
                 print(f"Scanning: {cur_full_path}")
                 dir_tools.process_files_or_directories_recursive(cur_full_path)
-            print("WARNING pickle disabled")
-            # outfile = open(NUMBERS_FILENAME, 'wb')
-            # pickle.dump(self.casiz_number_map, outfile)
-            # outfile = open(COPYRIGHT_FILENAME, 'wb')
-            # pickle.dump(self.path_copyright_map, outfile)
+            # print("WARNING pickle disabled")
+            outfile = open(casiz_filepath_map_filename, 'wb')
+            pickle.dump(self.casiz_filepath_map, outfile)
+            outfile = open(filepath_casiz_map_filename, 'wb')
+            pickle.dump(self.filepath_casiz_map, outfile)
+            outfile = open(COPYRIGHT_FILENAME, 'wb')
+            pickle.dump(self.path_copyright_map, outfile)
 
         else:
-            self.casiz_filepath_map = pickle.load(open(NUMBERS_FILENAME, "rb"))
+            self.filepath_casiz_map = pickle.load(open(filepath_casiz_map_filename, "rb"))
+            self.casiz_filepath_map = pickle.load(open(casiz_filepath_map_filename, "rb"))
             self.path_copyright_map = pickle.load(open(COPYRIGHT_FILENAME, "rb"))
         print("Starting to process loaded files...")
         self.process_loaded_files()
@@ -97,7 +102,7 @@ class IzImporter(Importer):
         for casiz_number in self.casiz_filepath_map.keys():
             filepaths = self.casiz_filepath_map[casiz_number]
             filepath_list = []
-
+            #  remove filepaths without extension? what's the case here?
             for cur_filepath in filepaths:
 
                 cur_filename = os.path.basename(cur_filepath)
@@ -116,9 +121,27 @@ class IzImporter(Importer):
         if collection_object_id is None:
             print(f"No record found for casiz_number {casiz_number}, skipping.")
             return
-        filepath_list = self.remove_imported_filepaths_from_list(filepath_list)
-        self.import_to_imagedb_and_specify(filepath_list, collection_object_id, 26280,copyright_map=self.path_copyright_map)
+        # remove the subset of already-seen filepaths from the filepath import list.
+        # "is this in specify attached to this casiz" query
+        filepath_list = self.remove_specify_imported_and_id_linked_from_path(filepath_list, collection_object_id)
 
+        # now, check if the attachment is already in there (AND case):
+        for cur_filepath in filepath_list:
+            attachment_id = self.attachment_utils.get_attachmentid_from_filepath(cur_filepath)
+
+            if attachment_id is not None:
+                # if so, link attachment to this COID:
+                self.connect_existing_attachment_to_collection_object_id(attachment_id,
+                                                                         collection_object_id,
+                                                                         self.AGENT_ID)
+
+            else:
+                # If not:
+                self.import_to_imagedb_and_specify(filepath_list,
+                                                   collection_object_id,
+                                                   self.AGENT_ID,
+                                                   copyright_filepath_map=self.path_copyright_map,
+                                                   force_redacted=True)
 
     # CASIZXXXXXX
     # CASIZ XXXXXX
@@ -209,6 +232,11 @@ class IzImporter(Importer):
                     return casiz_number
         return None
 
+    def has_multiple_number_groups(self, string):
+        pattern = r'\d{4,}'  # Matches sequences of at least 4 digits
+        matches = re.findall(pattern, string)
+        return len(matches) > 1
+
     def build_filename_map(self, full_path):
         method = None
         orig_case_directory = os.path.dirname(full_path)
@@ -220,7 +248,8 @@ class IzImporter(Importer):
         if not re.search(iz_importer_config.IMAGE_SUFFIX, filename):
             self.log_file_status(filename=filename, path=full_path, rejected="not an image file")
             return
-
+        # FILENAME_CONJUNCTION_MATCH = '^'+CASIZ_MATCH  + f'(([ ]*(and|or| )[ ]*({CASIZ_PREFIX})?{CASIZ_NUMBER}))*' + IMAGE_SUFFIX
+        # FILENAME_CONJUNCTION_MATCH = '^'+CASIZ_MATCH  + f'([ ]*(and|or| )[ ]*({CASIZ_PREFIX})?{CASIZ_NUMBER})' + IMAGE_SUFFIX
         matched = re.match(iz_importer_config.FILENAME_MATCH, filename)
         match_filename = bool(matched)
 
@@ -292,8 +321,7 @@ class IzImporter(Importer):
             print('Copyright symbol detected in filename')
             copyright = f'{copyright_filename}'
             copyright_method = 'filename'
-#                     copyrhgit paths are borked
-        joe
+
         self.path_copyright_map[full_path] = copyright
         # ================= end copyright =================
 
@@ -303,15 +331,18 @@ class IzImporter(Importer):
                              id=casiz_number,
                              copyright_method=copyright_method,
                              copyright=copyright)
-
+        casiz_numbers = None
         if filename_conjunction_match:
             p = re.compile(iz_importer_config.FILENAME_CONJUNCTION_MATCH)
             result = p.search(filename)
-            casiz_numbers = [int(num) for num in re.findall(r'\b\d+\b', result.group(0))]
-            print(f"Matched conjunction on {filename}. IDs: {casiz_numbers[0]} and {casiz_numbers[1]}")
-            self.log_file_status(filename=filename, path=full_path, conjunction=f"{casiz_number[0]},{casiz_number[1]}",
-                                 rejected=False)
-        else:
+            found_substring = result.groups()[0]
+            if self.has_multiple_number_groups(found_substring):
+
+                casiz_numbers = [int(num) for num in re.findall(r'\b\d+\b', found_substring)]
+                print(f"Matched conjunction on {filename}. IDs: {casiz_numbers[0]} and {casiz_numbers[1]}")
+                self.log_file_status(filename=filename, path=full_path, conjunction=f"{casiz_number[0]},{casiz_number[1]}",
+                                     rejected=False)
+        if casiz_numbers is None:
             casiz_numbers = [casiz_number]
 
         for cur_casiz_number in casiz_numbers:
@@ -327,7 +358,3 @@ class IzImporter(Importer):
     def get_collectionobjectid_from_casiz_number(self, casiz_number):
         sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
         return self.specify_db_connection.get_one_record(sql)
-
-
-
-
