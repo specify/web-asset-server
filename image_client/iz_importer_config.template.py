@@ -7,7 +7,6 @@ SPECIFY_DATABASE = 'casiz'
 USER = 'redacrted'
 PASSWORD = 'redacted'
 
-IMAGE_DIRECTORY_PREFIX = "/Volumes/data/izg/IZ Images"
 COLLECTION_NAME = 'IZ'
 
 MINIMUM_ID_DIGITS = 5
@@ -24,7 +23,7 @@ IZ_DIRECTORY_REGEX = CASIZ_MATCH
 PREFIX = f"{sla}"
 
 
-IZ_SCAN_FOLDERS = [
+IZ_CORE_SCAN_FOLDERS = [
     f'.'
 ]
 # https://exiv2.org/tags.html
