@@ -270,10 +270,10 @@ class IzImporter(Importer):
         orig_case_full_path = full_path
         full_path = full_path.lower()
         if self.exclude_by_extension(full_path):
-            print(f"Will not import, exluded extension: {full_path}")
+            print(f"Will not import, excluded extension: {full_path}")
             self.log_file_status(filename=os.path.basename(full_path),
                                  path=full_path,
-                                 rejected="forbidden extension")
+                                 rejected="Forbidden extension")
             return False
 
         if self.check_already_attached(full_path):
@@ -306,6 +306,10 @@ class IzImporter(Importer):
 
         if self.copyright:
             self.path_copyright_map[full_path] = self.copyright
+
+        # This little horror ensures that we're all ints in the list of numbers.
+        self.casiz_numbers = list(
+            map(lambda x: int(x) if str(x).isdigit() else int(''.join(filter(str.isdigit, str(x)))), self.casiz_numbers))
 
         for cur_casiz_number in self.casiz_numbers:
             if cur_casiz_number not in self.casiz_filepath_map:
