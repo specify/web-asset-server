@@ -43,19 +43,18 @@ class IzImporter(Importer):
 
         self.logger.debug("IZ import mode")
 
-        print("SELF AUX LABEL FILES DISABLED JOE JOE JOE")
-        # # aux label files - simple regex
-        # self.cur_conjunction_match = None
-        # self.cur_filename_match = iz_importer_config.NUMBER_ONLY_MATCH
-        # self.cur_directory_match = None
-        # self.cur_directory_conjunction_match = None
+        # aux label files - simple regex
+        self.cur_conjunction_match = None
+        self.cur_filename_match = iz_importer_config.NUMBER_ONLY_MATCH
+        self.cur_directory_match = None
+        self.cur_directory_conjunction_match = None
 
-        # self.cur_casiz_match = iz_importer_config.CASIZ_NUMBER
-        # self.cur_extract_casiz = self.extract_casiz_single
-        # for cur_dir in iz_importer_config.IZ_AUX_SCAN_FOLDERS:
-        #     cur_full_path = os.path.join(cur_dir)
-        #     print(f"Scanning: {cur_full_path}")
-        #     dir_tools.process_files_or_directories_recursive(cur_full_path)
+        self.cur_casiz_match = iz_importer_config.CASIZ_NUMBER
+        self.cur_extract_casiz = self.extract_casiz_single
+        for cur_dir in iz_importer_config.IZ_AUX_SCAN_FOLDERS:
+            cur_full_path = os.path.join(cur_dir)
+            print(f"Scanning: {cur_full_path}")
+            dir_tools.process_files_or_directories_recursive(cur_full_path)
 
         print("Starting to process loaded label files...")
         self.process_loaded_files()
@@ -205,17 +204,14 @@ class IzImporter(Importer):
         if re.search(self.cur_filename_match, filename):
             self.casiz_numbers = [self.cur_extract_casiz(filename)]
             return True
-        if re.search(self.cur_conjunction_match, filename):
-            p = re.compile(self.cur_conjunction_match)
-            result = p.search(filename)
-            found_substring = result.groups()[0]
-            self.casiz_numbers = list(set([int(num) for num in re.findall(r'\b\d+\b', found_substring)]))
-            print(f"Matched conjunction on {filename}. IDs: {self.casiz_numbers}")
-            self.log_file_status(filename=filename,
-                                 path=full_path,
-                                 conjunction=f"{self.casiz_numbers}",
-                                 rejected=False)
-            return True
+        if self.cur_conjunction_match is not None:
+            if re.search(self.cur_conjunction_match, filename):
+                p = re.compile(self.cur_conjunction_match)
+                result = p.search(filename)
+                found_substring = result.groups()[0]
+                self.casiz_numbers = list(set([int(num) for num in re.findall(r'\b\d+\b', found_substring)]))
+                print(f"Matched conjunction on {filename}. IDs: {self.casiz_numbers}")
+                return True
         return False
 
     def attempt_directory_copyright_extraction(self, directory_orig_case):
