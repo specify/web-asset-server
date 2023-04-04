@@ -22,6 +22,7 @@ under GNU General Public License 2 (GPL2).
    * [Web Asset Server](#web-asset-server)
      * [Table of Contents](#table-of-contents)
    * [Installation](#installation)
+     * [Docker](#docker)
      * [Installing system dependencies](#installing-system-dependencies)
      * [Cloning Web Asset Server source repository](#cloning-web-asset-server-source-repository)
      * [Deployment](#deployment)
@@ -185,15 +186,16 @@ sudo systemctl daemon-reload
 # HTTPS
 The easiest way to add HTTPS support, which is necessary to use the asset server with a Specify 7 server that is using HTTPS, is to place the asset server behind a reverse proxy such as Nginx. This also makes it possible to forego *authbind* and run the asset server on an unprivileged port. The proxy must be configured to rewrite the `web_asset_store.xml` resource to adjust the links therein. An example configuration can be found in [this gist](https://gist.github.com/benanhalt/d43a3fa7bf04edfc0bcdc11c612b2278).
 
-# Specify Settings
-You will generally want to add the asset server settings to the global Specify 
-preferences so that all of the Specify clients obtain the same configuration.
+# Specify 6 Settings
+You will generally want to add the asset server settings to the global Specify preferences so that all of the Specify clients obtain the same configuration.
 
-The easiest way to do this is to open the database in Specify and navigate to
-the *About* option in the help menu. In the resulting dialog double-click on the
-division name under *System Information* on the right hand side. This will open
-a properties editor for the global preferences. You will need to set four properties
-to configure access to the asset server:
+The easiest way to do this is to open the database in Specify and navigate to the *About* option in the help menu. 
+
+![About Specify](https://user-images.githubusercontent.com/37256050/229819923-fb3a114e-c6fc-4591-8ea2-ae564f4ec099.png)
+
+In the resulting dialog double-click on the **division** name under *System Information* on the right hand side. This will open a properties editor for the global preferences. 
+
+You will need to set four properties to configure access to the asset server:
 
 * `USE_GLOBAL_PREFS` - `true`
 * `attachment.key` – `##`
@@ -203,10 +205,54 @@ to configure access to the asset server:
 * `attachment.url`  `http://[YOUR_SERVER]/web_asset_store.xml` 
 * `attachment.use_path` `false`
 
-If these properties do not already exist, they can be added using the *Add Property*
-button. 
+If these properties do not already exist, they can be added using the *Add Property* button. 
 
-Compatibility with older versions of Python
+# Specify 7 Settings
+
+If you are using the [Docker deployment method](https://discourse.specifysoftware.org/t/specify-7-installation-instructions/755#docker-compositions-2), you need to make sure that the `attachment.key` and `attachment.url` match the configuration in Specify 6.
+
+For both the `specify7` and `specify7-worker` sections, you need to make sure that:
+
+- `attachment.key` = `ASSET_SERVER_KEY`
+- `attachment.url` = `ASSET_SERVER_URL`
+
+```yml
+  specify7:
+    restart: unless-stopped
+    image: specifyconsortium/specify7-service:v7
+    init: true
+    volumes:
+      - "specify6:/opt/Specify:ro"
+      - "static-files:/volumes/static-files"
+    environment:
+      - DATABASE_HOST=mariadb
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=specify
+      - MASTER_NAME=master
+      - MASTER_PASSWORD=master
+      - SECRET_KEY=change this to some unique random string
+      - ASSET_SERVER_URL=http://host.docker.internal/web_asset_store.xml
+      - ASSET_SERVER_KEY=your asset server access key
+      - REPORT_RUNNER_HOST=report-runner
+      - REPORT_RUNNER_PORT=8080
+      - CELERY_BROKER_URL=redis://redis/0
+      - CELERY_RESULT_BACKEND=redis://redis/1
+      - LOG_LEVEL=WARNING
+      - SP7_DEBUG=false
+```
+
+If you are using a  local installation, in the `settings.py` file, you need to make sure that:
+
+- `attachment.key` = `WEB_ATTACHMENT_KEY`
+- `attachment.url` = `WEB_ATTACHMENT_URL`
+
+```py
+# The Specify web attachment server URL.
+WEB_ATTACHMENT_URL = None
+
+# The Specify web attachment server key.
+WEB_ATTACHMENT_KEY = None
+```
 
 # Compatibility with older versions of Python
 
