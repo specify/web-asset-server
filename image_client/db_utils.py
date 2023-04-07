@@ -1,6 +1,7 @@
 import logging
 import sys
 import traceback
+import re
 
 from mysql.connector import errorcode
 import mysql.connector
@@ -72,6 +73,9 @@ class DbUtils:
         else:
             pass
             # self.logger.debug(f"Already connected db {self.database_host}...")
+
+
+
 
     def get_one_record(self, sql):
         self.connect()

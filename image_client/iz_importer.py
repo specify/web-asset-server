@@ -43,22 +43,6 @@ class IzImporter(Importer):
 
         self.logger.debug("IZ import mode")
 
-        # aux label files - simple regex
-        self.cur_conjunction_match = None
-        self.cur_filename_match = iz_importer_config.NUMBER_ONLY_MATCH
-        self.cur_directory_match = None
-        self.cur_directory_conjunction_match = None
-
-        self.cur_casiz_match = iz_importer_config.CASIZ_NUMBER
-        self.cur_extract_casiz = self.extract_casiz_single
-        for cur_dir in iz_importer_config.IZ_AUX_SCAN_FOLDERS:
-            cur_full_path = os.path.join(cur_dir)
-            print(f"Scanning: {cur_full_path}")
-            dir_tools.process_files_or_directories_recursive(cur_full_path)
-
-        print("Starting to process loaded label files...")
-        self.process_loaded_files()
-
         self.cur_conjunction_match = iz_importer_config.FILENAME_CONJUNCTION_MATCH + iz_importer_config.IMAGE_SUFFIX
         self.cur_filename_match = iz_importer_config.FILENAME_MATCH + iz_importer_config.IMAGE_SUFFIX
         self.cur_directory_match = iz_importer_config.FILENAME_MATCH
@@ -73,7 +57,23 @@ class IzImporter(Importer):
             dir_tools.process_files_or_directories_recursive(cur_full_path)
 
         print("Starting to process loaded core files...")
-        self.process_loaded_files()
+        # self.process_loaded_files()
+
+        # aux label files - simple regex
+        self.cur_conjunction_match = None
+        self.cur_filename_match = iz_importer_config.CASIZ_NUMBER+iz_importer_config.IMAGE_EXTENSION
+        self.cur_directory_match = None
+        self.cur_directory_conjunction_match = None
+
+        self.cur_casiz_match = iz_importer_config.CASIZ_NUMBER
+        self.cur_extract_casiz = self.extract_casiz_single
+        for cur_dir in iz_importer_config.IZ_AUX_SCAN_FOLDERS:
+            cur_full_path = os.path.join(cur_dir)
+            print(f"Scanning: {cur_full_path}")
+            dir_tools.process_files_or_directories_recursive(cur_full_path)
+
+        print("Starting to process loaded label files...")
+        # self.process_loaded_files()
 
     def process_loaded_files(self):
         print("PROCESSING TEMPORARILY DISABLED FOR TESTING JOE JOE JOE")
@@ -201,9 +201,6 @@ class IzImporter(Importer):
     def attempt_filename_match(self, full_path):
         filename = os.path.basename(full_path)
 
-        if re.search(self.cur_filename_match, filename):
-            self.casiz_numbers = [self.cur_extract_casiz(filename)]
-            return True
         if self.cur_conjunction_match is not None:
             if re.search(self.cur_conjunction_match, filename):
                 p = re.compile(self.cur_conjunction_match)
@@ -212,6 +209,11 @@ class IzImporter(Importer):
                 self.casiz_numbers = list(set([int(num) for num in re.findall(r'\b\d+\b', found_substring)]))
                 print(f"Matched conjunction on {filename}. IDs: {self.casiz_numbers}")
                 return True
+        if re.search(self.cur_filename_match, filename):
+            self.casiz_numbers = [self.cur_extract_casiz(filename)]
+
+            return True
+
         return False
 
     def attempt_directory_copyright_extraction(self, directory_orig_case):
@@ -257,6 +259,12 @@ class IzImporter(Importer):
         else:
             return False
 
+    def include_by_extension(self, filepath: str) -> bool:
+
+        pattern = re.compile(f'^.*{iz_importer_config.IMAGE_EXTENSION}')
+
+        return bool(pattern.match(filepath))
+
     def check_already_in_image_db(self, full_path):
 
 
@@ -269,7 +277,7 @@ class IzImporter(Importer):
     def build_filename_map(self, full_path):
         orig_case_full_path = full_path
         full_path = full_path.lower()
-        if self.exclude_by_extension(full_path):
+        if not self.include_by_extension(full_path):
             print(f"Will not import, excluded extension: {full_path}")
             self.log_file_status(filename=os.path.basename(full_path),
                                  path=full_path,

@@ -11,10 +11,11 @@ class AttachmentUtils:
         self.db_utils = db_utils
 
     def get_attachmentid_from_filepath(self, orig_filepath):
+        orig_filepath = repr(orig_filepath)
         sql = f"""
         select at.AttachmentID
                from attachment as at
-               where at.OrigFilename='{orig_filepath}'
+               where at.OrigFilename={orig_filepath}
         """
         aid = self.db_utils.get_one_record(sql)
         if aid is not None:

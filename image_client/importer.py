@@ -40,6 +40,8 @@ class Importer:
     def split_filepath(self, filepath):
         cur_filename = os.path.basename(filepath)
         cur_file_ext = cur_filename.split(".")[-1]
+        cur_filename = cur_filename.split(".")[:-1]
+        cur_filename = ".".join(cur_filename)
         return cur_filename, cur_file_ext
 
     def tiff_to_jpg(self, tiff_filepath):
@@ -208,7 +210,7 @@ class Importer:
             upload_me = filepath
 
         self.logger.debug(
-            f"about to import to client:- {redacted}, {upload_me}, {self.collection_name}, {upload_me}")
+            f"about to import to client:- {redacted}, {upload_me}, {self.collection_name}")
 
         url, attach_loc = self.image_client.upload_to_image_server(upload_me,
                                                                    redacted,
