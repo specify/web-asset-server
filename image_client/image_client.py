@@ -89,7 +89,7 @@ class ImageClient:
         local_filename = full_path
         uuid = str(uuid4())
         extension = local_filename.split(".")[-1]
-        attach_loc = uuid + extension
+        attach_loc = uuid + "." + extension
         if original_path is not None:
             upload_path = original_path
         else:
