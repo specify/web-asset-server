@@ -8,18 +8,16 @@ import json
 import os
 from datetime import datetime
 import pytz
-from image_db import TIME_FORMAT_NO_OFFESET
 from client_utilities import update_time_delta
 from client_utilities import build_url
 from client_utilities import generate_token
 from client_utilities import get_timestamp
-
-
-
+from image_client.collection_definitions import COLLECTION_DIRS
+from image_client.image_db import TIME_FORMAT_NO_OFFESET
 
 attach_loc = None
 TEST_JPG = "test.jpg"
-TEST_PATH = "D:\foo\bar/baz/"
+TEST_PATH = "/foo/bar/baz"
 TEST_NOTES = "alskeifhjais78yas8efhaisef87yaihrti478yfhudyhdrsifslfdhiju"
 dt, tz = '2020-01-01 00:00:01 UTC'.rsplit(maxsplit=1)
 
@@ -65,7 +63,8 @@ def test_testkey():
 
     assert r.status_code == 200
 
-def post_test_file(supplementary_data={},uuid_override=None):
+
+def post_test_file(supplementary_data={}, uuid_override=None):
     global attach_loc
     local_filename = TEST_JPG
     if uuid_override is not None:
@@ -77,7 +76,7 @@ def post_test_file(supplementary_data={},uuid_override=None):
     data = {
         'store': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
     merged_data = z = {**data, **supplementary_data}
@@ -89,13 +88,13 @@ def post_test_file(supplementary_data={},uuid_override=None):
     r = requests.post(build_url("fileupload"), files=files, data=merged_data)
     return r
 
+
 @pytest.mark.dependency()
 def test_file_post():
     r = post_test_file()
     assert r.status_code == 200
     r = delete_attach_loc()
     assert r.status_code == 200
-
 
 
 @pytest.mark.dependency()
@@ -108,11 +107,11 @@ def test_file_get():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 200
     with open(image_filename, 'wb') as f:
@@ -121,6 +120,7 @@ def test_file_get():
     os.remove(image_filename)
     r = delete_attach_loc()
     assert r.status_code == 200
+
 
 @pytest.mark.dependency()
 def test_file_get_no_key():
@@ -132,10 +132,10 @@ def test_file_get_no_key():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0]
+        'coll': list(COLLECTION_DIRS.keys())[0]
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 200
     with open(image_filename, 'wb') as f:
@@ -151,11 +151,11 @@ def test_thumbnail_get():
         'filename': attach_loc,
         'type': 'T',
         'scale': 100,
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 200
     with open(thumb_filename, 'wb') as f:
@@ -164,13 +164,12 @@ def test_thumbnail_get():
     os.remove(thumb_filename)
 
 
-
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_get_static_url():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
@@ -181,12 +180,13 @@ def test_get_static_url():
     r = requests.get(url)
     assert r.status_code == 200
 
+
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_get_exif():
     params = {
         'filename': attach_loc,
         'datatype': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
@@ -197,13 +197,11 @@ def test_get_exif():
     assert exif_data[0]['Fields']['Model'] == "iPhone XR"
 
 
-
-
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_delete_file():
     data = {
         'filename': attach_loc,
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
@@ -211,16 +209,17 @@ def test_delete_file():
 
     assert r.status_code == 200
 
+
 @pytest.mark.dependency(depends=['test_delete_file'])
 def test_get_after_delete():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 404
 
@@ -231,15 +230,16 @@ def test_thumbnail_get_after_delete():
         'filename': attach_loc,
         'type': 'T',
         'scale': 100,
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 404
 
-def post_with_metadata(redacted=True,uuid_override=None):
+
+def post_with_metadata(redacted=True, uuid_override=None):
     global attach_loc
     local_filename = TEST_JPG
     if uuid_override is None:
@@ -252,7 +252,7 @@ def post_with_metadata(redacted=True,uuid_override=None):
     data = {
         'store': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc),
         'original_filename': local_filename,
         'original_path': TEST_PATH,
@@ -267,10 +267,11 @@ def post_with_metadata(redacted=True,uuid_override=None):
     r = requests.post(build_url("fileupload"), files=files, data=data)
     return r
 
+
 def delete_attach_loc():
     data = {
         'filename': attach_loc,
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
@@ -278,16 +279,16 @@ def delete_attach_loc():
 
     return r
 
+
 @pytest.mark.dependency(depends=['test_delete_file'])
 def test_file_post_with_metadata():
-
     r = post_with_metadata()
 
     assert r.status_code == 200
 
-
     r = delete_attach_loc()
     assert r.status_code == 200
+
 
 @pytest.mark.dependency()
 def test_get_redacted_image_by_original_filename():
@@ -295,18 +296,16 @@ def test_get_redacted_image_by_original_filename():
     r = post_with_metadata(redacted=True)
     assert r.status_code == 200
 
-
-
     params = {
-        'filename': TEST_JPG,
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'file_string': TEST_JPG,
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'exact': True,
-        'token': generate_token(get_timestamp(), TEST_JPG)
+        'token': generate_token(get_timestamp(), TEST_JPG),
+        'search_type': 'filename'
     }
 
-    r = requests.get(build_url("getImageRecordByOrigFilename"), params=params)
+    r = requests.get(build_url("getImageRecord"), params=params)
     assert r.status_code == 200
-
 
     data = json.loads(r.text)
     assert data[-1]['original_filename'] == TEST_JPG
@@ -318,20 +317,20 @@ def test_get_redacted_image_by_original_filename():
     r = delete_attach_loc()
     assert r.status_code == 200
 
+
 @pytest.mark.dependency()
 def test_get_non_redacted_image_by_original_filename():
     global attach_loc
     r = post_with_metadata(redacted=False)
     assert r.status_code == 200
 
-
-
     params = {
-        'filename': TEST_JPG,
-        'token': generate_token(get_timestamp(), TEST_JPG)
+        'file_string': TEST_JPG,
+        'token': generate_token(get_timestamp(), TEST_JPG),
+        'search_type': 'filename',
     }
 
-    r = requests.get(build_url("getImageRecordByOrigFilename"), params=params)
+    r = requests.get(build_url("getImageRecord"), params=params)
     assert r.status_code == 200
 
     data = json.loads(r.text)
@@ -344,6 +343,7 @@ def test_get_non_redacted_image_by_original_filename():
     r = delete_attach_loc()
     assert r.status_code == 200
 
+
 def test_file_get_redacted_cases():
     # test it with static url
     global attach_loc
@@ -353,21 +353,20 @@ def test_file_get_redacted_cases():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
     }
 
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
     assert r.status_code != 200
 
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
     assert r.status_code == 200
-
 
     r = delete_attach_loc()
     assert r.status_code == 200
@@ -377,27 +376,27 @@ def test_file_get_redacted_cases():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
     }
-    r = requests.get(build_url("fileget"),  params=params)
+    r = requests.get(build_url("fileget"), params=params)
 
     assert r.status_code == 200
     r = delete_attach_loc()
     assert r.status_code == 200
 
+
 def test_name_collision_failure():
     uuid = str(uuid4())
 
-
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 200
-
 
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 409
 
     r = delete_attach_loc()
     assert r.status_code == 200
+
 
 def test_static_redacted():
     global attach_loc
@@ -406,7 +405,7 @@ def test_static_redacted():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(settings.COLLECTION_DIRS.keys())[0],
+        'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
@@ -419,8 +418,8 @@ def test_static_redacted():
     r = delete_attach_loc()
     assert r.status_code == 200
 
+
 def test_store_shortname():
     uuid = "sh"
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 400
-

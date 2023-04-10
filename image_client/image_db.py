@@ -260,28 +260,31 @@ class ImageDb():
         collection_list = []
         for (collection) in cursor:
             collection_list.append(collection)
+    #
+    #  not used 4/10/23 - left for referenece for now
+    #
 
-    def search(self, filename, match_exact_data):
-        params = {
-            'filename': filename,
-            'exact': match_exact_data,
-            'token': self.generate_token(self.get_timestamp(), filename)
-        }
-
-        r = requests.get(self.build_url("getImageRecordByOrigFilename"), params=params)
-        print(f"Search result: {r.status_code}")
-        if (r.status_code == 404):
-            print(f"No records found for {arg}")
-            return False
-        if r.status_code != 200:
-            print(f"Unexpected search result: {r.status_code}; aborting.")
-            return
-        data = json.loads(r.text)
-        print(
-            f"collection, datetime, id, internal_filename, notes, original filename, original path, redacted, universal URL, URL")
-        if len(data) == 0:
-            print("No match.")
-        else:
-            for item in data:
-                print(
-                    f"{item['collection']},{item['datetime']},{item['internal_filename']},{item['notes']},{item['original_filename']},{item['original_path']},{item['redacted']},{item['universal_url']},{item['url']}")
+    # def search(self, filename, match_exact_data):
+    #     params = {
+    #         'filename': filename,
+    #         'exact': match_exact_data,
+    #         'token': self.generate_token(self.get_timestamp(), filename)
+    #     }
+    #
+    #     r = requests.get(self.build_url("getImageRecordByOrigFilename"), params=params)
+    #     print(f"Search result: {r.status_code}")
+    #     if (r.status_code == 404):
+    #         print(f"No records found for {arg}")
+    #         return False
+    #     if r.status_code != 200:
+    #         print(f"Unexpected search result: {r.status_code}; aborting.")
+    #         return
+    #     data = json.loads(r.text)
+    #     print(
+    #         f"collection, datetime, id, internal_filename, notes, original filename, original path, redacted, universal URL, URL")
+    #     if len(data) == 0:
+    #         print("No match.")
+    #     else:
+    #         for item in data:
+    #             print(
+    #                 f"{item['collection']},{item['datetime']},{item['internal_filename']},{item['notes']},{item['original_filename']},{item['original_path']},{item['redacted']},{item['universal_url']},{item['url']}")

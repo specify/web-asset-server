@@ -15,7 +15,7 @@ import shutil
 from os import listdir
 from os.path import isfile, join
 import traceback
-
+import hashlib
 
 
 class ConvertException(Exception):
@@ -43,6 +43,13 @@ class Importer:
         cur_filename = cur_filename.split(".")[:-1]
         cur_filename = ".".join(cur_filename)
         return cur_filename, cur_file_ext
+
+    def get_file_md5(filename):
+        with open(filename, 'rb') as f:
+            md5_hash = hashlib.md5()
+            while chunk := f.read(8192):
+                md5_hash.update(chunk)
+        return md5_hash.hexdigest()
 
     def tiff_to_jpg(self, tiff_filepath):
         basename = os.path.basename(tiff_filepath)
