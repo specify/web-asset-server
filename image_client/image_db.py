@@ -2,8 +2,6 @@ import mysql.connector
 from mysql.connector import errorcode
 import settings
 from datetime import datetime
-import requests
-import json
 import logging
 
 TIME_FORMAT_NO_OFFESET = "%Y-%m-%d %H:%M:%S"
@@ -90,6 +88,18 @@ class ImageDb():
                 self.log("OK")
 
         cursor.close()
+        cursor = self.get_cursor()
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'images' AND column_name = 'orig_md5'")
+        column_exists = cursor.fetchone()[0]
+
+        if not column_exists:
+            # Add the "orig_md5" column to the "images" table
+            cursor.execute("ALTER TABLE images ADD COLUMN orig_md5 CHAR(32)")
+
+        cursor.close()
+
 
     def create_image_record(self,
                             original_filename,
@@ -99,16 +109,30 @@ class ImageDb():
                             original_path,
                             notes,
                             redacted,
-                            datetime_record):
+                            datetime_record,
+                            original_image_md5
+                            ):
 
         cursor = self.get_cursor()
         if original_filename is None:
             original_filename = "NULL"
+        if original_image_md5 is None:
+            original_image_md5 = "NULL"
 
         add_image = (f"""INSERT INTO images
-                        (original_filename, url, universal_url, internal_filename, collection,original_path,notes,redacted,datetime)
-                        values ("{original_filename}", "{url}", NULL, "{internal_filename}", "{collection}", "{original_path}", "{notes}", "{int(redacted)}", "{datetime_record.strftime(TIME_FORMAT_NO_OFFESET)}")""")
-        self.log(f"Inserting image record. SQL: {add_image}")
+                        (original_filename, url, universal_url, internal_filename, collection,original_path,notes,redacted,datetime,orig_md5)
+                        values (
+                        "{original_filename}", 
+                        "{url}", 
+                        NULL, 
+                        "{internal_filename}", 
+                        "{collection}", 
+                        "{original_path}", 
+                        "{notes}", 
+                        "{int(redacted)}", 
+                        "{datetime_record.strftime(TIME_FORMAT_NO_OFFESET)}",
+                        "{original_image_md5}")""")
+        self.log(f"Inserting imageInserting image record. SQL: {add_image}")
         cursor.execute(add_image)
         self.cnx.commit()
         cursor.close()
@@ -127,7 +151,7 @@ class ImageDb():
 
         cursor = self.get_cursor()
 
-        query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
+        query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime, orig_md5
            FROM images 
            {where_clause}"""
 
@@ -135,7 +159,7 @@ class ImageDb():
         record_list = []
         for (
                 id, original_filename, url, universal_url, internal_filename, collection, original_path, notes,
-                redacted, datetime_record) in cursor:
+                redacted, datetime_record, orig_md5) in cursor:
             record_list.append({'id': id,
                                 'original_filename': original_filename,
                                 'url': url,
@@ -145,8 +169,8 @@ class ImageDb():
                                 'original_path': original_path,
                                 'notes': notes,
                                 'redacted': redacted,
-                                # 'datetime': datetime_record, # TIME_STRING="%Y-%m-%d %H:%M:%S"
-                                'datetime': datetime.strptime(datetime_record, TIME_FORMAT)
+                                'datetime': datetime.strptime(datetime_record, TIME_FORMAT),
+                                'orig_md5': orig_md5
                                 })
             print(f"of: {record_list}")
 
@@ -156,7 +180,7 @@ class ImageDb():
     def get_image_record_by_internal_filename(self, internal_filename):
         cursor = self.get_cursor()
 
-        query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
+        query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime, orig_md5
            FROM images 
            WHERE internal_filename = '{internal_filename}'"""
 
@@ -171,7 +195,8 @@ class ImageDb():
              original_path,
              notes,
              redacted,
-             datetime_record) in cursor:
+             datetime_record,
+             orig_md5) in cursor:
             record_list.append({'id': id,
                                 'original_filename': original_filename,
                                 'url': url,
@@ -181,7 +206,8 @@ class ImageDb():
                                 'original_path': original_path,
                                 'notes': notes,
                                 'redacted': redacted,
-                                'datetime': datetime_record.strftime(TIME_FORMAT)
+                                'datetime': datetime_record.strftime(TIME_FORMAT),
+                                'orig_md5': orig_md5
                                 })
             print(f"of: {record_list}")
 
@@ -191,11 +217,11 @@ class ImageDb():
     def get_image_record_by_pattern(self, pattern, column, exact, collection):
         cursor = self.get_cursor()
         if exact:
-            query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
+            query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime, orig_md5
             FROM images 
             WHERE {column} = '{pattern}'"""
         else:
-            query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime
+            query = f"""SELECT id, original_filename, url, universal_url, internal_filename, collection,original_path, notes, redacted, datetime, orig_md5
             FROM images 
             WHERE {column} LIKE '{pattern}'"""
         if collection is not None:
@@ -206,7 +232,7 @@ class ImageDb():
         record_list = []
         for (
                 id, original_filename, url, universal_url, internal_filename, collection, original_path, notes,
-                redacted, datetime_record) in cursor:
+                redacted, datetime_record,orig_md5) in cursor:
             record_list.append({'id': id,
                                 'original_filename': original_filename,
                                 'url': url,
@@ -216,7 +242,8 @@ class ImageDb():
                                 'original_path': original_path,
                                 'notes': notes,
                                 'redacted': redacted,
-                                'datetime': datetime_record
+                                'datetime': datetime_record,
+                                'orig_md5': orig_md5
                                 })
             self.log(f"Found at least one record: {record_list[-1]}")
 
@@ -225,12 +252,16 @@ class ImageDb():
 
     def get_image_record_by_original_path(self, original_path, exact, collection):
         record_list = self.get_image_record_by_pattern(original_path, 'original_path', exact, collection)
-
         return record_list
 
     def get_image_record_by_original_filename(self, original_filename, exact, collection):
         record_list = self.get_image_record_by_pattern(original_filename, 'original_filename', exact, collection)
         return record_list
+
+    def get_image_record_by_original_image_md5(self, md5, collection):
+        record_list = self.get_image_record_by_pattern(md5, 'orig_md5', True, collection)
+        return record_list
+
 
     def delete_image_record(self, internal_filename):
         cursor = self.get_cursor()

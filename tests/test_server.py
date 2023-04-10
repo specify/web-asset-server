@@ -14,6 +14,14 @@ from client_utilities import generate_token
 from client_utilities import get_timestamp
 from image_client.collection_definitions import COLLECTION_DIRS
 from image_client.image_db import TIME_FORMAT_NO_OFFESET
+import hashlib
+
+def get_file_md5(filename):
+    with open(filename, 'rb') as f:
+        md5_hash = hashlib.md5()
+        while chunk := f.read(8192):
+            md5_hash.update(chunk)
+    return md5_hash.hexdigest()
 
 attach_loc = None
 TEST_JPG = "test.jpg"
@@ -64,7 +72,7 @@ def test_testkey():
     assert r.status_code == 200
 
 
-def post_test_file(supplementary_data={}, uuid_override=None):
+def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
     global attach_loc
     local_filename = TEST_JPG
     if uuid_override is not None:
@@ -73,12 +81,17 @@ def post_test_file(supplementary_data={}, uuid_override=None):
         uuid = str(uuid4())
     name, extension = splitext(local_filename)
     attach_loc = uuid + extension
+
+
     data = {
         'store': attach_loc,
         'type': 'image',
         'coll': list(COLLECTION_DIRS.keys())[0],
         'token': generate_token(get_timestamp(), attach_loc)
     }
+    if md5:
+        md5 = get_file_md5(TEST_JPG)
+        data['orig_md5']=md5
     merged_data = z = {**data, **supplementary_data}
 
     files = {
@@ -93,6 +106,28 @@ def post_test_file(supplementary_data={}, uuid_override=None):
 def test_file_post():
     r = post_test_file()
     assert r.status_code == 200
+    r = delete_attach_loc()
+    assert r.status_code == 200
+
+@pytest.mark.dependency()
+def test_md5_round_trip():
+    r = post_test_file(md5=True)
+    md5 = get_file_md5(TEST_JPG)
+
+    assert r.status_code == 200
+    params = {
+        'file_string': md5,
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'token': generate_token(get_timestamp(), md5),
+        'search_type': 'md5'
+    }
+
+    r = requests.get(build_url("getImageRecord"), params=params)
+    assert r.status_code == 200
+
+    data = json.loads(r.text)
+    assert data[-1]['orig_md5'] == md5
+
     r = delete_attach_loc()
     assert r.status_code == 200
 

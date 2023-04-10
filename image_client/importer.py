@@ -1,7 +1,7 @@
 from attachment_utils import AttachmentUtils
 import datetime
 from uuid import uuid4
-import os, re, sys
+import os, re
 from image_client import ImageClient
 from db_utils import DbUtils, InvalidFilenameError, DatabaseInconsistentError
 import collections
@@ -44,6 +44,7 @@ class Importer:
         cur_filename = ".".join(cur_filename)
         return cur_filename, cur_file_ext
 
+    @staticmethod
     def get_file_md5(filename):
         with open(filename, 'rb') as f:
             md5_hash = hashlib.md5()

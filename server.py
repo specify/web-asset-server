@@ -377,6 +377,7 @@ def fileupload():
     original_path = None
     notes = None
     redacted = False
+    orig_md5 = None
     datetime_now = datetime.utcnow()
     if 'original_filename' in request.forms.keys():
         log("original filnname field set")
@@ -391,6 +392,8 @@ def fileupload():
         redacted = strtobool(request.forms['redacted'])
     if 'datetime' in request.forms.keys():
         datetime_now = datetime.strptime(request.forms['datetime'], TIME_FORMAT)
+    if 'orig_md5' in request.forms.keys():
+        orig_md5 = request.forms['orig_md5']
 
     try:
         image_db.create_image_record(original_filename,
@@ -400,7 +403,8 @@ def fileupload():
                                      original_path,
                                      notes,
                                      redacted,
-                                     datetime_now)
+                                     datetime_now,
+                                     orig_md5)
     except Exception as ex:
         print(f"Unexpected error: {ex}")
         abort(500, f'Unexpected error: {ex}')
@@ -448,6 +452,9 @@ def json_datetime_handler(x):
         return x.strftime(TIME_FORMAT)
     raise TypeError("Unknown type")
 
+# file_string can be md5 of the original file, (search_type=md5)
+# the full file path or, (search_type=path)
+# the filename. (search_type=filename) default if param omitted
 @app.route('/getImageRecord')
 @require_token('file_string', always=True)
 def get_image_record():
@@ -459,6 +466,8 @@ def get_image_record():
         record_list = image_db.get_image_record_by_original_filename(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
     elif search_type == 'path':
         record_list = image_db.get_image_record_by_original_path(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
+    elif search_type == 'md5':
+        record_list = image_db.get_image_record_by_original_image_md5(query_string, collection=request.query.get('coll'))
     else:
         abort(400, 'Invalid search type')
 
