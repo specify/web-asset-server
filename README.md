@@ -65,6 +65,18 @@ volumes:
   attachments: # the asset-servers attachment files
 ```
 
+For production use, it's recommended to also add an nginx web server between
+the web asset server and the outside world. Example
+[nginx.conf](https://github.com/specify/specify7/blob/393538b081eb797beb502204cdea9311179361f6/nginx.conf#L17-L26)
+and [docker-compose.yml](https://github.com/specify/specify7/blob/393538b081eb797beb502204cdea9311179361f6/docker-compose.yml#L126-L135).
+
+For development/evaluation, web asset server can be exposed directly. To do so,
+add the following lines to your `docker-compose.yml` right after the `asset-server:` line:
+```yaml
+    ports:
+      - "8080:3306"
+```
+
 ## Installing system dependencies
 
 The dependencies are:
