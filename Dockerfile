@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM arm64v8/ubuntu:18.04 AS run-asset-server
 
 LABEL maintainer="Specify Collections Consortium <github.com/specify>"
 
