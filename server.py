@@ -2,7 +2,7 @@ from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
-from os import path, mkdir, remove
+from os import path, makedirs, remove
 from urllib.parse import quote
 from urllib.request import pathname2url
 from sh import convert
@@ -202,7 +202,7 @@ def resolve_file():
         return path.join(relpath, scaled_name)
 
     if settings.STORAGE_TYPE != 'digitalocean_spaces' and not path.exists(basepath):
-        mkdir(basepath)
+        makedirs(basepath)
 
     orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
     orig_path = path.join(orig_dir, storename)
@@ -373,7 +373,7 @@ def fileupload():
 
     elif settings.STORAGE_TYPE == 'local':
         if not path.exists(basepath):
-            mkdir(basepath)
+            makedirs(basepath)
 
         upload.save(pathname, overwrite=True)
 
