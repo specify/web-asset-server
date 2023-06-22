@@ -77,6 +77,7 @@ class IzImporter(Importer):
         pass
 
     def needs_update(self,casiz_number,filepath):
+        pass
         # self.logger.debug(f"Processing casiz_numbers: {casiz_number}")
         # sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
         # collection_object_id = self.specify_db_connection.get_one_record(sql)
