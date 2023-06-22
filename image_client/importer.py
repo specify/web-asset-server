@@ -3,7 +3,7 @@ import datetime
 from uuid import uuid4
 import os, re
 from image_client import ImageClient
-from db_utils import DbUtils, InvalidFilenameError, DatabaseInconsistentError
+from db_utils import InvalidFilenameError
 import collections
 import filetype
 
@@ -21,8 +21,10 @@ import hashlib
 class ConvertException(Exception):
     pass
 
+
 class TooSmallException(Exception):
     pass
+
 
 class MissingPathException(Exception):
     pass
@@ -193,7 +195,6 @@ class Importer:
 
             jpg_found, output = self.tiff_to_jpg(tif_found)
             self.logger.info(f"Converted to: {jpg_found}")
-
 
             if not os.path.exists(jpg_found):
                 self.logger.error(f"  Conversion failure for {tif_found}; skipping.")

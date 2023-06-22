@@ -3,12 +3,13 @@ import sys
 import iz_importer_config
 
 from importer import Importer
+from directory_tree import DirectoryTree
 
 import os
 import re
 import logging
-from dir_tools import DirTools
-from exif_tools import ExifTools
+# from dir_tools import DirTools
+from metadata_tools import MetadataTools
 import traceback
 
 CASIZ_FILE_LOG = "file_log.tsv"
@@ -31,12 +32,11 @@ class IzImporter(Importer):
 
         self.logger = logging.getLogger('Client.IzImporter')
         self.logger.setLevel(logging.DEBUG)
-        logging.getLogger('Client.DirTools').setLevel(logging.INFO)
 
         self.collection_name = iz_importer_config.COLLECTION_NAME
         super().__init__(iz_importer_config, "Invertebrate Zoology")
 
-        dir_tools = DirTools(self.build_filename_map)
+        # dir_tools = DirTools(self.build_filename_map)
 
         self.casiz_filepath_map = {}
         self.path_copyright_map = {}
@@ -50,34 +50,16 @@ class IzImporter(Importer):
 
         self.cur_casiz_match = iz_importer_config.CASIZ_MATCH
         self.cur_extract_casiz = self.extract_casiz
-
-        for cur_dir in iz_importer_config.IZ_CORE_SCAN_FOLDERS:
-            cur_full_path = os.path.join(cur_dir)
-            print(f"Scanning: {cur_full_path}")
-            dir_tools.process_files_or_directories_recursive(cur_full_path)
+        self.directory_tree_core = DirectoryTree(iz_importer_config.IZ_SCAN_FOLDERS)
+        self.directory_tree_core.process_files(self.build_filename_map)
 
         print("Starting to process loaded core files...")
-        # self.process_loaded_files()
+        self.process_loaded_files()
 
-        # aux label files - simple regex
-        self.cur_conjunction_match = None
-        self.cur_filename_match = iz_importer_config.CASIZ_NUMBER+iz_importer_config.IMAGE_EXTENSION
-        self.cur_directory_match = None
-        self.cur_directory_conjunction_match = None
 
-        self.cur_casiz_match = iz_importer_config.CASIZ_NUMBER
-        self.cur_extract_casiz = self.extract_casiz_single
-        for cur_dir in iz_importer_config.IZ_AUX_SCAN_FOLDERS:
-            cur_full_path = os.path.join(cur_dir)
-            print(f"Scanning: {cur_full_path}")
-            dir_tools.process_files_or_directories_recursive(cur_full_path)
-
-        print("Starting to process loaded label files...")
-        # self.process_loaded_files()
 
     def process_loaded_files(self):
-        print("PROCESSING TEMPORARILY DISABLED FOR TESTING JOE JOE JOE")
-        return
+
         for casiz_number in self.casiz_filepath_map.keys():
             filepaths = self.casiz_filepath_map[casiz_number]
             filepath_list = []
@@ -87,8 +69,22 @@ class IzImporter(Importer):
 
             self.process_casiz_number(casiz_number, filepath_list)
 
+
+    def read_decoder_ring(self,ring_path):
+        pass
+
+    def decoder_ring_applied(self,exif,filepath):
+        pass
+
+    def needs_update(self,casiz_number,filepath):
+        # self.logger.debug(f"Processing casiz_numbers: {casiz_number}")
+        # sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
+        # collection_object_id = self.specify_db_connection.get_one_record(sql)
+
+
+    # Iterates over all the files;
     def process_casiz_number(self, casiz_number, filepath_list):
-        self.logger.debug(f"casiz_numbers: {casiz_number}")
+        self.logger.debug(f"Processing casiz_numbers: {casiz_number}")
         sql = f"select collectionobjectid  from collectionobject where catalognumber={casiz_number}"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
         if collection_object_id is None:
@@ -100,6 +96,7 @@ class IzImporter(Importer):
 
         # now, check if the attachment is already in there (AND case):
         for cur_filepath in filepath_list:
+
             attachment_id = self.attachment_utils.get_attachmentid_from_filepath(cur_filepath)
 
             if attachment_id is not None:
@@ -164,7 +161,7 @@ class IzImporter(Importer):
 
     def attempt_exif_extraction(self, full_path):
         try:
-            return ExifTools(full_path)
+            return MetadataTools(full_path)
         except Exception as e:
             print(f"Exception: {e}")
             traceback.print_exc()
@@ -252,12 +249,12 @@ class IzImporter(Importer):
             return True
         return False
 
-    def exclude_by_extension(self,full_path):
-        extension = full_path.rsplit('.', 1)[-1]
-        if extension in iz_importer_config.EXCLUDE_EXTENSIONS:
-            return True
-        else:
-            return False
+    # def exclude_by_extension(self,full_path):
+    #     extension = full_path.rsplit('.', 1)[-1]
+    #     if extension in iz_importer_config.EXCLUDE_EXTENSIONS:
+    #         return True
+    #     else:
+    #         return False
 
     def include_by_extension(self, filepath: str) -> bool:
 
