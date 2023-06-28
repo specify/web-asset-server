@@ -16,5 +16,5 @@ settings.development.py
 /image_client/server_host_settings.py
 /data
 /env
-*.JPG
-*.TIF
+*.jpg
+*.tif
