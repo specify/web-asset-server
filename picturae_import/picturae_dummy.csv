@@ -1,0 +1,100 @@
+﻿Barcode,Accession,State,County,Full_name,Genus,Species,Determiner,jpeg_address
+123456,456890,California,Humboldt,Arctostaphylos glandulosa,Arctostaphylos,glandulosa,A. Smith,cas123456.jpeg
+123457,456891,California,Siskiyou,Ceanothus thyrsiflorus,Ceanothus,thyrsiflorus,B. Johnson,cas123457.jpeg
+123458,456891,California,Inyo,Dichelostemma capitatum,Dichelostemma,capitatum,C. Williams,cas123458.jpeg
+123459,456891,California,Glenn,Eschscholzia californica,Eschscholzia,californica,D. Jones,cas123459.jpeg
+123460,456891,California,Imperial,Salvia apiana,Salvia,apiana,E. Brown,cas123460.jpeg
+123461,456891,California,Shasta,Lupinus arboreus,Lupinus,arboreus,F. Davis,cas123461.jpeg
+123462,456891,California,Yolo,Sisyrinchium bellum,Sisyrinchium,bellum,G. Miller,cas123462.jpeg
+123463,456891,California,El Dorado,Mimulus aurantiacus,Mimulus,aurantiacus,H. Wilson,cas123463.jpeg
+123464,456891,California,Amador,Clarkia amoena,Clarkia,amoena,I. Anderson,cas123464.jpeg
+123465,456891,California,Napa,Penstemon heterophyllus,Penstemon,heterophyllus,J. Taylor,cas123465.jpeg
+123466,456891,California,San Diego,Eriogonum giganteum,Eriogonum,giganteum,K. Thomas,cas123466.jpeg
+123467,456891,California,Madera,Dudleya farinosa,Dudleya,farinosa,L. Jackson,cas123467.jpeg
+123468,456891,California,Tuolumne,Ribes sanguineum,Ribes,sanguineum,M. White,cas123468.jpeg
+123469,456891,California,San Benito,Asclepias fascicularis,Asclepias,fascicularis,N. Harris,cas123469.jpeg
+123470,456891,California,Merced,Fremontodendron californicum,Fremontodendron,californicum,O. Martin,cas123470.jpeg
+123471,456891,California,Colusa,Mahonia aquifolium,Mahonia,aquifolium,P. Thompson,cas123471.jpeg
+123472,456891,California,Trinity,Hesperoyucca whipplei,Hesperoyucca,whipplei,Q. Garcia,cas123472.jpeg
+123473,456891,California,Calaveras,Aquilegia formosa,Aquilegia,formosa,R. Martinez,cas123473.jpeg
+123474,456891,California,Mariposa,Epilobium canum,Epilobium,canum,S. Robinson,cas123474.jpeg
+123475,456891,California,San Francisco,Trillium ovatum,Trillium,ovatum,T. Clark,cas123475.jpeg
+123476,456891,California,Santa Clara,Baccharis pilularis,Baccharis,pilularis,U. Lewis,cas123476.jpeg
+123477,456891,California,Mono,Gilia capitata,Gilia,capitata,V. Lee,cas123477.jpeg
+123478,456891,California,Kern,Keckiella cordifolia,Keckiella,cordifolia,W. Walker,cas123478.jpeg
+123479,456891,California,Mendocino,Festuca californica,Festuca,californica,X. Hall,cas123479.jpeg
+123480,456891,California,Solano,Iris douglasiana,Iris,douglasiana,Y. Young,cas123480.jpeg
+123481,456891,California,Sacramento,Nemophila menziesii,Nemophila,menziesii,Z. King,cas123481.jpeg
+123482,456891,California,Contra Costa,Aesculus californica,Aesculus,californica,A. Adams,cas123482.jpeg
+123483,456891,California,San Mateo,Lonicera hispidula,Lonicera,hispidula,B. Allen,cas123483.jpeg
+123484,456891,California,Yuba,Calochortus venustus,Calochortus,venustus,C. Baker,cas123484.jpeg
+123485,456891,California,Butte,Mimulus cardinalis,Mimulus,cardinalis,D. Bell,cas123485.jpeg
+123486,456891,California,Santa Barbara,Rhamnus californica,Rhamnus,californica,E. Bennett,cas123486.jpeg
+123487,456891,California,Ventura,Heteromeles arbutifolia,Heteromeles,arbutifolia,F. Brooks,cas123487.jpeg
+123488,456891,California,Alpine,Erigeron glaucus,Erigeron,glaucus,G. Butler,cas123488.jpeg
+123489,456891,California,Stanislaus,Frangula californica,Frangula,californica,H. Carter,cas123489.jpeg
+123490,456891,California,Orange,Zauschneria californica,Zauschneria,californica,I. Collins,cas123490.jpeg
+123491,456891,California,Del Norte,Delphinium cardinale,Delphinium,cardinale,J. Cooper,cas123491.jpeg
+123492,456891,California,Nevada,Ribes aureum,Ribes,aureum,K. Cox,cas123492.jpeg
+123493,456891,California,Santa Cruz,Diplacus aurantiacus,Diplacus,aurantiacus,L. Diaz,cas123493.jpeg
+123494,456891,California,San Joaquin,Arctostaphylos manzanita,Arctostaphylos,manzanita,M. Edwards,cas123494.jpeg
+123495,456891,California,Los Angeles,Salvia mellifera,Salvia,mellifera,N. Evans,cas123495.jpeg
+123496,456891,California,Sonoma,Styrax officinalis,Styrax,officinalis,O. Flores,cas123496.jpeg
+123497,456891,California,Placer,Arbutus menziesii,Arbutus,menziesii,P. Foster,cas123497.jpeg
+123498,456891,California,Riverside,Camissonia bistorta,Camissonia,bistorta,Q. Gonzales,cas123498.jpeg
+123499,456891,California,Monterey,Solidago californica,Solidago,californica,R. Gray,cas123499.jpeg
+123500,456891,California,San Luis Obispo,Sidalcea malviflora,Sidalcea,malviflora,S. Green,cas123500.jpeg
+123501,456891,California,San Bernardino,Salvia spathacea,Salvia,spathacea,T. Griffin,cas123501.jpeg
+123502,456891,California,Fresno,Calystegia macrostegia,Calystegia,macrostegia,U. Hall,cas123502.jpeg
+123503,456891,California,San Francisco,Marah fabaceus,Marah,fabaceus,V. Harris,cas123503.jpeg
+123504,456891,California,Lassen,Asarum caudatum,Asarum,caudatum,W. Hill,cas123504.jpeg
+123505,456891,California,Modoc,Eriophyllum confertiflorum,Eriophyllum,confertiflorum,X. Hughes,cas123505.jpeg
+123506,456891,California,Lake,Rhus integrifolia,Rhus,integrifolia,Y. Jackson,cas123506.jpeg
+123507,456891,California,Marin,Cercis occidentalis,Cercis,occidentalis,Z. James,cas123507.jpeg
+123508,456891,California,Plumas,Triteleia laxa,Triteleia,laxa,A. Jenkins,cas123508.jpeg
+123509,456891,California,Santa Clara,Rubus ursinus,Rubus,ursinus,B. Kelly,cas123509.jpeg
+123510,456891,California,San Diego,Brodiaea laxa,Brodiaea,laxa,C. King,cas123510.jpeg
+123511,456891,California,San Benito,Penstemon spectabilis,Penstemon,spectabilis,D. Lee,cas123511.jpeg
+123512,456891,California,Imperial,Mimulus aurantiacus,Mimulus,aurantiacus,E. Lewis,cas123512.jpeg
+123513,456891,California,Trinity,Arctostaphylos uva-ursi,Arctostaphylos,uva-ursi,F. Long,cas123513.jpeg
+123514,456891,California,Madera,Ceanothus thyrsiflorus,Ceanothus,thyrsiflorus,G. Lopez,cas123514.jpeg
+123515,456891,California,Sacramento,Eschscholzia californica,Eschscholzia,californica,H. Martinez,cas123515.jpeg
+123516,456891,California,Siskiyou,Salvia apiana,Salvia,apiana,I. Miller,cas123516.jpeg
+123517,456891,California,Humboldt,Lupinus arboreus,Lupinus,arboreus,J. Mitchell,cas123517.jpeg
+123518,456891,California,Calaveras,Sisyrinchium bellum,Sisyrinchium,bellum,K. Moore,cas123518.jpeg
+123519,456891,California,Tulare,Mimulus aurantiacus,Mimulus,aurantiacus,L. Morgan,cas123519.jpeg
+123520,456891,California,Kings,Clarkia amoena,Clarkia,amoena,M. Morris,cas123520.jpeg
+123521,456891,California,Butte,Penstemon heterophyllus,Penstemon,heterophyllus,N. Nelson,cas123521.jpeg
+123522,456891,California,Yuba,Eriogonum giganteum,Eriogonum,giganteum,O. Parker,cas123522.jpeg
+123523,456891,California,Napa,Dudleya farinosa,Dudleya,farinosa,P. Perez,cas123523.jpeg
+123524,456891,California,Orange,Ribes sanguineum,Ribes,sanguineum,Q. Perry,cas123524.jpeg
+123525,456891,California,Amador,Asclepias fascicularis,Asclepias,fascicularis,R. Phillips,cas123525.jpeg
+123526,456891,California,San Joaquin,Fremontodendron californicum,Fremontodendron,californicum,S. Powell,cas123526.jpeg
+123527,456891,California,Merced,Mahonia aquifolium,Mahonia,aquifolium,T. Price,cas123527.jpeg
+123528,456891,California,Shasta,Hesperoyucca whipplei,Hesperoyucca,whipplei,U. Ramirez,cas123528.jpeg
+123529,456891,California,El Dorado,Aquilegia formosa,Aquilegia,formosa,V. Reed,cas123529.jpeg
+123530,456891,California,Tuolumne,Epilobium canum,Epilobium,canum,W. Richardson,cas123530.jpeg
+123531,456891,California,Colusa,Trillium ovatum,Trillium,ovatum,X. Rivera,cas123531.jpeg
+123532,456891,California,Mendocino,Baccharis pilularis,Baccharis,pilularis,Y. Roberts,cas123532.jpeg
+123533,456891,California,Solano,Gilia capitata,Gilia,capitata,Z. Robinson,cas123533.jpeg
+123534,456891,California,Mariposa,Keckiella cordifolia,Keckiella,cordifolia,A. Rodriguez,cas123534.jpeg
+123535,456891,California,Glenn,Festuca californica,Festuca,californica,B. Rogers,cas123535.jpeg
+123536,456891,California,Ventura,Iris douglasiana,Iris,douglasiana,C. Ross,cas123536.jpeg
+123537,456891,California,Kern,Nemophila men,Nemophila,men,D. Russell,cas123537.jpeg
+123538,456891,California,Contra Costa,Eriophyllum stachaedifolium,Eriophyllum,stachaedifolium,E. Sanchez,cas123538.jpeg
+123539,456891,California,Placer,Adiantum aleuticum,Adiantum,aleuticum,F. Sanders,cas123539.jpeg
+123540,456891,California,San Mateo,Salvia leucophylla,Salvia,leucophylla,G. Scott,cas123540.jpeg
+123541,456891,California,Santa Cruz,Camissoniopsis cheiranthifolia,Camissoniopsis,cheiranthifolia,H. Simmons,cas123541.jpeg
+123542,456891,California,Alpine,Silene laciniata,Silene,laciniata,I. Smith,cas123542.jpeg
+123543,456891,California,Nevada,Arctostaphylos patula,Arctostaphylos,patula,J. Stewart,cas123543.jpeg
+123544,456891,California,Santa Barbara,Rhamnus ilicifolia,Rhamnus,ilicifolia,K. Taylor,cas123544.jpeg
+123545,456891,California,Riverside,Salvia mellifera,Salvia,mellifera,L. Thomas,cas123545.jpeg
+123546,456891,California,Del Norte,Quercus agrifolia,Quercus,agrifolia,M. Thompson,cas123546.jpeg
+123547,456891,California,Stanislaus,Epilobium canum,Epilobium,canum,N. Torres,cas123547.jpeg
+123548,456891,California,San Luis Obispo,Campanula californica,Campanula,californica,O. Turner,cas123548.jpeg
+123549,456891,California,Fresno,Trichostema lanatum,Trichostema,lanatum,P. Walker,cas123549.jpeg
+123550,456891,California,San Bernardino,Lotus scoparius,Lotus,scoparius,Q. Ward,cas123550.jpeg
+123551,456891,California,Los Angeles,Sambucus mexicana,Sambucus,mexicana,R. Watson,cas123551.jpeg
+123552,456891,California,Sonoma,Sidalcea malviflora,Sidalcea,malviflora,S. White,cas123552.jpeg
+123553,456891,California,Modoc,Chilopsis linearis,Chilopsis,linearis,T. Williams,cas123553.jpeg
+123554,456891,California,Marin,Cirsium occidentale,Cirsium,occidentale,U. Wilson,cas123554.jpeg
