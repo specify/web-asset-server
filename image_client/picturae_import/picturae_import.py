@@ -41,15 +41,13 @@ def file_present(date_override=None, new_date=None):
             if os.path.exists(folder_path):
                 files_present += 1
             else:
-                print("Folder csv does not exist.")
-                files_present += 0
+                raise ValueError("Folder csv does not exist")
 
             if os.path.exists(specimen_path):
                 print("Specimen csv exists!")
                 files_present += 1
             else:
-                print("Specimen csv does not exist.")
-                files_present += 0
+                raise ValueError("Specimen_csv does not exist")
         else:
             raise ValueError(f"subdirectory for {date.today()} not present")
     else:
@@ -63,16 +61,13 @@ def file_present(date_override=None, new_date=None):
             print("Folder csv exists!")
             files_present += 1
         else:
-            files_present += 0
-            print("Folder csv does not exist.")
-            files_present += 0
+            raise ValueError("Folder csv does not exist")
 
         if os.path.exists(specimen_path):
             files_present += 1
             print("Specimen csv exists!")
         else:
-            files_present += 0
-            print("Specimen csv does not exist.")
+            raise ValueError("Specimen csv does not exist")
 
     return files_present
 

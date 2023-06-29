@@ -23,8 +23,15 @@ class TestFilePresent(unittest.TestCase):
     def test_files_confirm(self):
         """test if test folders with input errors produce correct output"""
         self.assertEqual(file_present(date_override=True, new_date="2023-6-28"), 2)
-        self.assertEqual(file_present(date_override=True, new_date="2023-6-27"), 1)
-        self.assertEqual(file_present(date_override=True, new_date="2023-2-18"), 0)
+
+        with self.assertRaises(ValueError) as cm:
+            file_present(date_override=True, new_date="2023-6-27")
+            self.assertEqual(str(cm.exception), "Specimen csv does not exist")
+
+        with self.assertRaises(ValueError) as cm:
+            file_present(date_override=True, new_date="2023-2-27")
+            self.assertEqual(str(cm.exception), "Folder csv does not exist")
+
 
     def raise_error(self):
         """checks if incorrect sub_directory raises error"""
