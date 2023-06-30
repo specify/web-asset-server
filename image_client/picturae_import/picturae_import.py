@@ -59,13 +59,18 @@ def csv_read_folder(folder_string, import_date: str):
         folder_string: denotes whether specimen or folder level data
         import_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
-
     folder_path = 'picturae_csv/' + str(import_date) + '/picturae_' + str(folder_string) + '(' + \
-                   str(import_date) + ').csv'
+                  str(import_date) + ').csv'
 
     folder_csv = pd.read_csv(folder_path)
 
     return folder_csv
+
+
+# def images_present():
+    # """images_present, function to verify if corrent number of images,
+    # corresponding to image paths in picturae csv files"""
+
 
 def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
     """csv_merge: merges the folder_csv and the specimen_csv on barcode
@@ -77,7 +82,7 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
     if (set(fold_csv['specimen_barcode']) == set(spec_csv['specimen_barcode'])) is True:
 
         # removing duplicate columns
-        # (Warning! will want to double-check whether these columns are truly the
+        # (Warning! will want to double-check whether these columns are truly the)
         # same between datasets when more info received
 
         common_columns = list(set(fold_csv.columns).intersection(set(spec_csv.columns)))
@@ -96,25 +101,34 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
     return record_full
 
 
-
-
-
-
-
 # def csv_colnames():
+#  """csv_colnames: function to be used to rename columns to specify standards"""
 
-### under this point column transformations will be done through a series of functions
+# under this point column transformations will be done through a series of functions
+# will reuse/modify some wrangling functions from data standardization
 
 
-### after file is gotten into clean importable form, set import conditions and protocol functions
+# after file is wrangled into clean importable form,
+# and QC protocols to follow before import
+# QC measures needed here ? before proceeding.
 
-### final database query functions, to test if data in data base
+
+# final database query functions, to test if data in database
+# want to know , is image and attachment already in database?
+# is collection object already in database?
+# how do we manage a conflict between records?
 
 def master_fun():
     """runs all functions"""
     # file_present()
-    file_present(import_date="2023-6-28")
+    file_present(import_date='2023-6-28')
+    folder_csv = csv_read_folder(folder_string='folder', import_date='2023-6-28')
+    specimen_csv = csv_read_folder(folder_string='specimen', import_date='2023-6-28')
+    full_csv = csv_merge(folder_csv, specimen_csv)
+
+    return full_csv
+
+# calling master
 
 
 master_fun()
-
