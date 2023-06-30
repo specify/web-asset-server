@@ -1,10 +1,21 @@
 """This file contains unit tests for picturae_import.py"""
+import csv
 from picturae_import import *
 import unittest
-import pytest
+from faker import Faker
+import random
 import os
 import shutil
 from datetime import date, timedelta
+
+
+def test_date_list():
+    old_date = date.today() - timedelta(days=365 * 20)
+
+    today_date = date.today()
+    date_list = [old_date, today_date]
+    return date_list
+
 
 
 class WorkingDirectoryTests(unittest.TestCase):
@@ -36,13 +47,9 @@ class FilePathTests(unittest.TestCase):
     def setUp(self):
 
         print("setup called!")
-        # setting date
-        old_date = date.today() - timedelta(days=365 * 20)
-
-        today_date = date.today()
         # create test directories
 
-        date_list = [str(old_date), str(today_date)]
+        date_list = test_date_list()
 
         for date_string in date_list:
 
@@ -84,7 +91,7 @@ class FilePathTests(unittest.TestCase):
 
     def test_files_override_both(self):
         """tests if test folders work for override= True"""
-        twenty_years = date.today() - timedelta(days=365 * 20)
+        twenty_years = test_date_list()[0]
 
         # writing assert statement
         try:
@@ -93,7 +100,7 @@ class FilePathTests(unittest.TestCase):
             self.fail(f"Exception raised: {str(ex)}")
 
     def test_raise_specimen_override(self):
-        twenty_years = date.today() - timedelta(days=365 * 20)
+        twenty_years = test_date_list()[0]
 
         os.remove('picturae_csv/' + str(twenty_years) + '/picturae_specimen(' +
                   str(twenty_years) + ').csv')
@@ -103,7 +110,7 @@ class FilePathTests(unittest.TestCase):
         self.assertEqual(str(cm.exception), "Specimen csv does not exist")
 
     def test_raise_folder_override(self):
-        twenty_years = date.today() - timedelta(days=365 * 20)
+        twenty_years = test_date_list()[0]
 
         os.remove('picturae_csv/' + str(twenty_years) + '/picturae_folder(' +
                   str(twenty_years) + ').csv')
@@ -119,11 +126,7 @@ class FilePathTests(unittest.TestCase):
 
         print("teardown called!")
 
-        old_date = date.today() - timedelta(days=365 * 20)
-
-        today_date = date.today()
-
-        date_list = [str(old_date), str(today_date)]
+        date_list = test_date_list()
         # create test directories
 
         for date_string in date_list:
@@ -136,11 +139,54 @@ class FilePathTests(unittest.TestCase):
 
 ### class for testing csv_import function
 # under construction
-# class CsvReaderTests(unittest.TestCase):
-#
-#     def setUP():
+class CsvReaderTests(unittest.TestCase):
+    def setUP(self):
+        print("setup called!")
+        # setting records and date list
+        fake = Faker()
+        num_records = 50
+        date_list = test_date_list()
+        for date_string in date_list:
+            # setting string paths
+            folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
+                          str(date_string) + ').csv'
 
-    #def test_file_empty(self):
+            specimen_path = 'picturae_csv/' + str(date_string) + '/picturae_specimen(' + \
+                            str(date_string) + ').csv'
+            path_list = [folder_path, specimen_path]
+
+            os.makedirs(os.path.dirname(folder_path), exist_ok=True)
+            os.makedirs(os.path.dirname(specimen_path), exist_ok=True)
+            # writing csvs
+            for path in path_list:
+                with open(path, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+
+                    writer.writerow(['specimen_barcode', 'Folder_barcode', 'path_jpg'])
+                    for i in range(num_records):
+                        specimen_bar = fake.random_number(digits=6)
+                        folder_barcode = fake.random_number(digits=6)
+                        jpg_path = fake.file_path(depth=random.randint(1, 5), category='image', extension = 'jpg')
+
+                        # writing data to CSV
+                        writer.writerow([specimen_bar, folder_barcode, jpg_path])
+                print(f"Fake dataset {path} with {num_records} records created sucessfuly")
+
+
+       # def test_file_empty(self):
+       def tearDown(self):
+           print("teardown called!")
+           date_list = test_date_list()
+
+           for date_string in date_list:
+
+               folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
+                             str(date_string) + ').csv'
+
+               shutil.rmtree(os.path.dirname(folder_path))
+
+
+
 
 
 

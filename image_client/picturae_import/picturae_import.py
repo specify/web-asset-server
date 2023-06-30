@@ -97,9 +97,6 @@ def file_present(date_override=None, new_date=None):
 #     print("csv files are populated")
 
 
-
-# may be combined into one function
-
 def csv_read_folder(folder_string: str,override=None, new_date=None):
     """reads in folder_csv data for given date
     args:
