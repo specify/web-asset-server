@@ -22,9 +22,12 @@ def to_current_directory():
 
 def file_present(date_override=None, new_date=None):
     """file_present:
-       checks if filepath with correct name in working directory,
-       checks if file is on current date
+       checks if correct filepath in working directory,
+       checks if file is on current date, or input date
+       checks if file folder is present
        args:
+            override: takes boolean to specify whether to override today's date for custom date
+            new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
     """
     to_current_directory()
@@ -103,35 +106,26 @@ def file_present(date_override=None, new_date=None):
 #     print("csv files are populated")
 
 
-def csv_read_folder(override=None, new_date=None):
-    """reads in folder_csv data for given date"""
+
+# may be combined into one function
+def csv_read_folder(folder_string: str,override=None, new_date=None):
+    """reads in folder_csv data for given date
+    args:
+        folder_string: denotes whether specimen or folder level data
+        override: takes boolean to specify whether to override today's date for custom date
+        new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
     folder_date = None
     if override is None:
         folder_date = date.today()
     if override is True:
         folder_date = new_date
 
-    folder_path = 'picturae_csv/' + str(folder_date) + '/picturae_folder(' + \
+    folder_path = 'picturae_csv/' + str(folder_date) + '/picturae_' + str(folder_string) + '(' + \
                    str(folder_date) + ').csv'
 
     folder_csv = pd.read_csv(folder_path)
 
     return folder_csv
-
-
-def csv_read_specimen(override=None, new_date=None):
-    """reads in specimen_csv data fro given date"""
-    folder_date = None
-    if override is None:
-        folder_date = date.today()
-    if override is True:
-        folder_date = new_date
-    specimen_path = 'picturae_csv/' + str(folder_date) + '/picturae_specimen(' + \
-                     str(folder_date) + ').csv'
-
-    specimen_csv = pd.read_csv(specimen_path)
-
-    return specimen_csv
 
 
 ### will merge both csv files into a master csv file

@@ -7,7 +7,7 @@ import shutil
 from datetime import date, timedelta
 
 
-class TestDirectory(unittest.TestCase):
+class WorkingDirectoryTests(unittest.TestCase):
     """TestFilePresent: a series of unit tests on the file_present
        function in picturae_import.py"""
 
@@ -30,7 +30,7 @@ class TestDirectory(unittest.TestCase):
         self.assertEqual(str(cm.exception), f"subdirectory for {date.today()} not present")
 
 
-class TestPaths(unittest.TestCase):
+class FilePathTests(unittest.TestCase):
     """tests paths for file_present function in fixture scope"""
 
     def setUp(self):
@@ -125,6 +125,16 @@ class TestPaths(unittest.TestCase):
                                    str(date_string) + ').csv'
 
             shutil.rmtree(os.path.dirname(expected_folder_path))
+
+
+
+### class for testing csv_import function
+
+# class CsvReaderTests(unittest.TestCase):
+#     def setUP(self):
+#
+
+
 
 
 if __name__ == "__main__":
