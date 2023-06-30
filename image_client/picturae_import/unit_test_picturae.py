@@ -1,11 +1,11 @@
 """This file contains unit tests for picturae_import.py"""
 import csv
-from picturae_import import *
 import unittest
-from faker import Faker
 import random
 import os
 import shutil
+from picturae_import import *
+from faker import Faker
 from datetime import date, timedelta
 
 ## need to find a way to prevent the fake folders using todays date in the setUP,
@@ -16,7 +16,6 @@ def test_date_list():
     today_date = date.today()
     date_list = [old_date, today_date]
     return date_list
-
 
 
 class WorkingDirectoryTests(unittest.TestCase):
@@ -139,8 +138,7 @@ class FilePathTests(unittest.TestCase):
 
 ### class for testing csv_import function
 # under construction
-class CsvReaderTests(unittest.TestCase):
-
+class CsvReadMergeTests(unittest.TestCase):
 
     # thinking of ways to simplify this setup function
     def setUp(self):
@@ -150,6 +148,7 @@ class CsvReaderTests(unittest.TestCase):
         fake = Faker()
         num_records = 50
         date_list = test_date_list()
+        # maybe create up a seperate function for setting up test directories
         for date_string in date_list:
             # setting string paths
             folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
@@ -171,7 +170,10 @@ class CsvReaderTests(unittest.TestCase):
 
                     writer.writerow(['specimen_barcode', 'folder_barcode', 'path_jpg'])
                     for i in range(num_records):
-                        specimen_bar = fake.random_number(digits=6)
+                        # to keep barcodes matching between folder and specimen csvs for merging
+                        ordered_bar = 123456
+                        specimen_bar = ordered_bar + i
+                        # populating rest of columns with random data
                         folder_barcode = fake.random_number(digits=6)
                         jpg_path = fake.file_path(depth=random.randint(1, 5), category='image', extension='jpg')
 
@@ -192,21 +194,53 @@ class CsvReaderTests(unittest.TestCase):
     def test_file_colnumber(self):
         """tests for every argument variation, if correct # of columns"""
         date_list = test_date_list()
-        self.assertEqual(len(csv_read_folder("folder").columns), 3)
-        self.assertEqual(len(csv_read_folder("specimen").columns), 3)
-        self.assertEqual(len(csv_read_folder("folder", override=True, new_date=date_list[0]).columns), 3)
-        self.assertEqual(len(csv_read_folder("specimen", override=True, new_date=date_list[0]).columns), 3)
+        self.assertEqual(len(csv_read_folder('folder').columns), 3)
+        self.assertEqual(len(csv_read_folder('specimen').columns), 3)
+        self.assertEqual(len(csv_read_folder('folder', override=True, new_date=date_list[0]).columns), 3)
+        self.assertEqual(len(csv_read_folder('specimen', override=True, new_date=date_list[0]).columns), 3)
 
     def test_barcode_column_present(self):
         """tests for every argument variation, if barcode column is present
            (test if column names loaded correctly, specimen_barcode being in any csv)"""
         date_list = test_date_list()
-        self.assertEqual('specimen_barcode' in csv_read_folder("folder").columns, True)
-        self.assertEqual('specimen_barcode' in csv_read_folder("specimen").columns, True)
+        self.assertEqual('specimen_barcode' in csv_read_folder('folder').columns, True)
+        self.assertEqual('specimen_barcode' in csv_read_folder('specimen').columns, True)
         self.assertEqual('specimen_barcode' in
-                         csv_read_folder("folder", override=True, new_date=date_list[0]).columns, True)
+                         csv_read_folder('folder', override=True, new_date=date_list[0]).columns, True)
         self.assertEqual('specimen_barcode' in
-                         csv_read_folder("specimen", override=True, new_date=date_list[0]).columns, True)
+                         csv_read_folder('specimen', override=True, new_date=date_list[0]).columns, True)
+
+    ### these tests are for the csv merge function
+    def test_merge_num_columns(self):
+        csv_specimen = csv_read_folder('specimen')
+        csv_folder = csv_read_folder('folder')
+        # -2 as merge function drops duplicate columns automatically
+        self.assertEqual(len(csv_merge(csv_specimen, csv_folder).columns),
+                         len(csv_specimen.columns) + len(csv_folder.columns) - 3)
+
+
+    def test_index_length_matches(self):
+        csv_folder = csv_read_folder('folder')
+        csv_specimen = csv_read_folder('specimen')
+        # test merge index before and after
+        self.assertEqual(len(csv_merge(csv_folder, csv_specimen)),
+                         len(csv_folder))
+
+    def test_unequalbarcode_raise(self):
+        csv_folder = csv_read_folder('folder')
+        csv_specimen = csv_read_folder('specimen')
+        csv_specimen['specimen_barcode'] = csv_specimen['specimen_barcode'] + 1
+        with self.assertRaises(ValueError) as cm:
+            csv_merge(csv_folder, csv_specimen)
+
+        self.assertEqual(str(cm.exception), "Barcode Columns do not match!" )
+
+    def test_output_isnot_empty(self):
+        csv_folder = csv_read_folder('folder')
+        csv_specimen = csv_read_folder('specimen')
+        # testing output
+        self.assertFalse(csv_merge(csv_folder, csv_specimen).empty)
+
 
     def tearDown(self):
         """deletes destination directories of dummy datasets"""
@@ -225,3 +259,4 @@ class CsvReaderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
