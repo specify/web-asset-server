@@ -30,7 +30,6 @@ def file_present(date_override=None, new_date=None):
             new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
     to_current_directory()
-    files_present = 0
     folder_date = None
 
     if date_override is None:
@@ -39,11 +38,7 @@ def file_present(date_override=None, new_date=None):
     if date_override is True:
         folder_date = new_date
 
-    # print(str("picturae_csv/") + str(folder_date))
-
     dir_sub = os.path.isdir(str("picturae_csv/") + str(folder_date))
-
-    # print(dir_sub)
 
     if dir_sub is True:
         folder_path = 'picturae_csv/' + str(folder_date) + '/picturae_folder(' + \
@@ -53,25 +48,22 @@ def file_present(date_override=None, new_date=None):
                         str(folder_date) + ').csv'
 
         if os.path.exists(folder_path):
-            files_present += 1
+            print("Folder csv exists!")
         else:
             raise ValueError("Folder csv does not exist")
 
         if os.path.exists(specimen_path):
             print("Specimen csv exists!")
-            files_present += 1
         else:
             raise ValueError("Specimen csv does not exist")
     else:
         raise ValueError(f"subdirectory for {date.today()} not present")
 
-    return files_present
-
 # change filename path manually for now
 
 
 # def file_empty(date_override=None, new_date=None):
-#     """will test if csv files contains any rows or not"""
+#     will test if csv files contains any rows or not"""
 #
 #     if date_override is None:
 #         folder_date = date.today()
