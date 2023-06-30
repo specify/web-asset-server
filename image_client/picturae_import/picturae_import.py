@@ -59,43 +59,6 @@ def file_present(date_override=None, new_date=None):
     else:
         raise ValueError(f"subdirectory for {date.today()} not present")
 
-# change filename path manually for now
-
-
-# def file_empty(date_override=None, new_date=None):
-#     will test if csv files contains any rows or not"""
-#
-#     if date_override is None:
-#         folder_date = date.today()
-#
-#     elif date_override is True:
-#         folder_date = new_date
-#
-#     path = (str("picturae_csv/") + str(folder_date))
-#
-#     folder_path = pd.read(path + '/picturae_folder(' + str(folder_date) + ').csv')
-#
-#     specimen_path = pd.read(path + '/specimen_folder(' + str(folder_date) + ').csv')
-#
-#     # creating empty boolean for folder csv
-#     folder_csv = pd.read_csv(folder_path)
-#
-#     folder_empty = folder_csv.empty
-#
-#     # creating empty boolean for specimen csv
-#
-#     specimen_csv = pd.read_csv(specimen_path)
-#
-#     specimen_empty = specimen_csv.empty
-#     # Raises for empty dataframe
-#     if folder_empty is True:
-#         raise ValueError("Folder csv contains no data!")
-#
-#     if specimen_empty is True:
-#         raise ValueError("Specimen csv contains no data!")
-#
-#     print("csv files are populated")
-
 
 def csv_read_folder(folder_string: str,override=None, new_date=None):
     """reads in folder_csv data for given date
@@ -116,9 +79,48 @@ def csv_read_folder(folder_string: str,override=None, new_date=None):
 
     return folder_csv
 
+def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
+    """csv_merge: merges the folder_csv and the specimen_csv on barcode
+       args:
+            fold_csv: folder level csv to be input as argument for merging
+            spec_csv: specimen level csv to be input as argument for merging """
 
-### will merge both csv files into a master csv file
-# def csv_merge():
+    # checking if columns to merge contain same data
+    if (set(fold_csv['specimen_barcode']) == set(spec_csv['specimen_barcode'])) is True:
+
+        # removing duplicate columns
+        # (Warning! will want to double-check whether these columns are truly the
+        # same between datasets when more info received
+
+        common_columns = list(set(fold_csv.columns).intersection(set(spec_csv.columns)))
+
+        common_columns.remove('specimen_barcode')
+
+        spec_csv = spec_csv.drop(common_columns, axis=1)
+
+        # completing merge on barcode
+        record_full = pd.merge(fold_csv, spec_csv,
+                               on='specimen_barcode', how='inner')
+
+    else:
+        raise ValueError("Barcode Columns do not match!")
+
+    return record_full
+
+
+
+
+
+
+
+# def csv_colnames():
+
+### under this point column transformations will be done through a series of functions
+
+
+### after file is gotten into clean importable form, set import conditions and protocol functions
+
+### final database query functions, to test if data in data base
 
 def master_fun():
     """runs all functions"""
