@@ -29,7 +29,6 @@ def file_present(date_override=None, new_date=None):
             override: takes boolean to specify whether to override today's date for custom date
             new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
-    """
     to_current_directory()
     files_present = 0
     folder_date = None
@@ -108,6 +107,7 @@ def file_present(date_override=None, new_date=None):
 
 
 # may be combined into one function
+
 def csv_read_folder(folder_string: str,override=None, new_date=None):
     """reads in folder_csv data for given date
     args:
