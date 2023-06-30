@@ -20,7 +20,7 @@ def to_current_directory():
     os.chdir(directory)
 
 
-def file_present(date_override=None, new_date=None):
+def file_present(import_date):
     """file_present:
        checks if correct filepath in working directory,
        checks if file is on current date, or input date
@@ -30,22 +30,15 @@ def file_present(date_override=None, new_date=None):
             new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
     to_current_directory()
-    folder_date = None
 
-    if date_override is None:
-        folder_date = date.today()
-
-    if date_override is True:
-        folder_date = new_date
-
-    dir_sub = os.path.isdir(str("picturae_csv/") + str(folder_date))
+    dir_sub = os.path.isdir(str("picturae_csv/") + str(import_date))
 
     if dir_sub is True:
-        folder_path = 'picturae_csv/' + str(folder_date) + '/picturae_folder(' + \
-                      str(folder_date) + ').csv'
+        folder_path = 'picturae_csv/' + str(import_date) + '/picturae_folder(' + \
+                      str(import_date) + ').csv'
 
-        specimen_path = 'picturae_csv/' + str(folder_date) + '/picturae_specimen(' + \
-                        str(folder_date) + ').csv'
+        specimen_path = 'picturae_csv/' + str(import_date) + '/picturae_specimen(' + \
+                        str(import_date) + ').csv'
 
         if os.path.exists(folder_path):
             print("Folder csv exists!")
@@ -60,20 +53,15 @@ def file_present(date_override=None, new_date=None):
         raise ValueError(f"subdirectory for {date.today()} not present")
 
 
-def csv_read_folder(folder_string: str,override=None, new_date=None):
+def csv_read_folder(folder_string, import_date: str):
     """reads in folder_csv data for given date
     args:
         folder_string: denotes whether specimen or folder level data
-        override: takes boolean to specify whether to override today's date for custom date
-        new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
-    folder_date = None
-    if override is None:
-        folder_date = date.today()
-    if override is True:
-        folder_date = new_date
+        import_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
 
-    folder_path = 'picturae_csv/' + str(folder_date) + '/picturae_' + str(folder_string) + '(' + \
-                   str(folder_date) + ').csv'
+
+    folder_path = 'picturae_csv/' + str(import_date) + '/picturae_' + str(folder_string) + '(' + \
+                   str(import_date) + ').csv'
 
     folder_csv = pd.read_csv(folder_path)
 
@@ -125,7 +113,7 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
 def master_fun():
     """runs all functions"""
     # file_present()
-    file_present(date_override=True, new_date="2023-6-28")
+    file_present(import_date="2023-6-28")
 
 
 master_fun()
