@@ -8,7 +8,8 @@ import os
 import shutil
 from datetime import date, timedelta
 
-
+## need to find a way to prevent the fake folders using todays date in the setUP,
+## from overwriting the contents of real folders
 def test_date_list():
     old_date = date.today() - timedelta(days=365 * 20)
 
@@ -132,7 +133,6 @@ class FilePathTests(unittest.TestCase):
         for date_string in date_list:
             expected_folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
                                    str(date_string) + ').csv'
-
             shutil.rmtree(os.path.dirname(expected_folder_path))
 
 
@@ -140,7 +140,11 @@ class FilePathTests(unittest.TestCase):
 ### class for testing csv_import function
 # under construction
 class CsvReaderTests(unittest.TestCase):
-    def setUP(self):
+
+
+    # thinking of ways to simplify this setup function
+    def setUp(self):
+        """creates fake datasets with dummy columns to test import csv"""
         print("setup called!")
         # setting records and date list
         fake = Faker()
@@ -157,39 +161,66 @@ class CsvReaderTests(unittest.TestCase):
 
             os.makedirs(os.path.dirname(folder_path), exist_ok=True)
             os.makedirs(os.path.dirname(specimen_path), exist_ok=True)
+
+            open(folder_path, 'a').close()
+            open(specimen_path, 'a').close()
             # writing csvs
             for path in path_list:
                 with open(path, 'w', newline='') as csvfile:
                     writer = csv.writer(csvfile)
 
-                    writer.writerow(['specimen_barcode', 'Folder_barcode', 'path_jpg'])
+                    writer.writerow(['specimen_barcode', 'folder_barcode', 'path_jpg'])
                     for i in range(num_records):
                         specimen_bar = fake.random_number(digits=6)
                         folder_barcode = fake.random_number(digits=6)
-                        jpg_path = fake.file_path(depth=random.randint(1, 5), category='image', extension = 'jpg')
+                        jpg_path = fake.file_path(depth=random.randint(1, 5), category='image', extension='jpg')
 
                         # writing data to CSV
                         writer.writerow([specimen_bar, folder_barcode, jpg_path])
                 print(f"Fake dataset {path} with {num_records} records created sucessfuly")
 
 
-       # def test_file_empty(self):
-       def tearDown(self):
-           print("teardown called!")
-           date_list = test_date_list()
-
-           for date_string in date_list:
-
-               folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
-                             str(date_string) + ').csv'
-
-               shutil.rmtree(os.path.dirname(folder_path))
+    def test_file_empty(self):
+        """tests for every argument variation if dataset returns as empty"""
+        date_list = test_date_list()
+        self.assertEqual(csv_read_folder("folder").empty, False)
+        self.assertEqual(csv_read_folder("specimen").empty, False)
+        self.assertEqual(csv_read_folder("folder", override=True, new_date=date_list[0]).empty, False)
+        self.assertEqual(csv_read_folder("specimen", override=True, new_date=date_list[0]).empty, False)
 
 
+    def test_file_colnumber(self):
+        """tests for every argument variation, if correct # of columns"""
+        date_list = test_date_list()
+        self.assertEqual(len(csv_read_folder("folder").columns), 3)
+        self.assertEqual(len(csv_read_folder("specimen").columns), 3)
+        self.assertEqual(len(csv_read_folder("folder", override=True, new_date=date_list[0]).columns), 3)
+        self.assertEqual(len(csv_read_folder("specimen", override=True, new_date=date_list[0]).columns), 3)
 
+    def test_barcode_column_present(self):
+        """tests for every argument variation, if barcode column is present
+           (test if column names loaded correctly, specimen_barcode being in any csv)"""
+        date_list = test_date_list()
+        self.assertEqual('specimen_barcode' in csv_read_folder("folder").columns, True)
+        self.assertEqual('specimen_barcode' in csv_read_folder("specimen").columns, True)
+        self.assertEqual('specimen_barcode' in
+                         csv_read_folder("folder", override=True, new_date=date_list[0]).columns, True)
+        self.assertEqual('specimen_barcode' in
+                         csv_read_folder("specimen", override=True, new_date=date_list[0]).columns, True)
 
+    def tearDown(self):
+        """deletes destination directories of dummy datasets"""
+        print("teardown called!")
+        date_list = test_date_list()
 
+        for date_string in date_list:
 
+            folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
+                          str(date_string) + ').csv'
+
+            print(os.path.dirname(folder_path))
+
+            shutil.rmtree(os.path.dirname(folder_path))
 
 
 if __name__ == "__main__":
