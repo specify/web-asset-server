@@ -102,8 +102,15 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
 
 
 # def csv_colnames():
-#  """csv_colnames: function to be used to rename columns to specify standards"""
-
+#     """csv_colnames: function to be used to rename columns to specify standards"""
+#     new_col_names = list('Barcode', 'folder_barcode', 'image_path', 'Collector Number',
+#                          'Collector First Name1', 'Collector Middle1', 'Collector Last Name1',
+#                          'GENUS1', 'SPECIES1', 'RankID', 'Author')
+#
+#     old_col_names = list('specimen_barcode', 'folder_barcode', 'path_jpg',
+#                          'collector_number', 'collector_first_name1', 'collector_middle_name1',
+#                          'collector_last_name1', 'Genus', 'Species', 'Taxon ID', 'Author')
+#
 # under this point column transformations will be done through a series of functions
 # will reuse/modify some wrangling functions from data standardization
 
