@@ -3,6 +3,9 @@ import csv
 import unittest
 import random
 import shutil
+
+import pandas as pd
+
 from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
@@ -233,42 +236,53 @@ class CsvReadMergeTests(unittest.TestCase):
 
         print(os.path.dirname(folder_path))
 
-        shutil.rmtree(os.path.dirname(folder_path))images
+        shutil.rmtree(os.path.dirname(folder_path))
 
 
 
 class ColNamesTest(unittest.TestCase):
-
-# still need setup and teardown functions
 # need to confirm final column names when
 # destination tables for data decided upon
+
+    def setUp(self):
+        numb_range = list(range(1, 101))
+        column_names = ['specimen_barcode', 'folder_barcode', 'path_jpg',
+                        'collector_number', 'collector_first_name1', 'collector_middle_name1',
+                        'collector_last_name1', 'Genus', 'Species', 'Taxon ID', 'Author']
+        new_df = {column_names[i]: numb_range for i in range(11)}
+
+        self.new_df = pd.DataFrame(new_df)
 
     def test_if_codes(self):
         """test_if_codes: test if columns that contain codes
            like Barcode, folder barcode and jpeg_path present
         """
+        csv_test = self.new_df
         csv_columns = csv_test.columns
         column_names = ['Barcode', 'folder_barcode', 'image_path']
         self.assertTrue(all(column in csv_columns for column in column_names))
+
     def test_if_collector(self):
         """test_if_collector: tests whether certain essential
            collector columns present such as collector number, First Name,
            Middle Name, Last Name
         """
+        csv_test = self.new_df
         csv_columns = csv_test.columns
         column_names = ['Collector Number', 'Collector First Name1',
                         'Collector Middle1', 'Collector Last Name1']
         self.assertTrue(all(column in csv_columns for column in column_names))
 
-
     def test_if_taxon(self):
         """test_if_taxon: makes sure some key taxon related columns,
            are present with correct names in present dataset
         """
+        csv_test = self.new_df
         csv_columns = csv_test.columns
         column_names = ['GENUS1', 'SPECIES1',
                         'RankID', 'Author']
         self.assertTrue(all(column in csv_columns for column in column_names))
+
 
 
 if __name__ == "__main__":
