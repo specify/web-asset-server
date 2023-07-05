@@ -54,7 +54,7 @@ class FilePathTests(unittest.TestCase):
         """setUP: unittest setup function creates empty csvs,
                   folders for given test path"""
 
-        print("setup called!")
+        # print("setup called!")
         # create test directories
 
         date_string = test_date()
@@ -105,7 +105,7 @@ class FilePathTests(unittest.TestCase):
         """destroys paths for Setup function,
            returning working directory to prior state"""
 
-        print("teardown called!")
+        # print("teardown called!")
 
         date_string = test_date()
         # create test directories
@@ -128,7 +128,7 @@ class CsvReadMergeTests(unittest.TestCase):
           that have a small subset of representive real column names,
           so that test merges and uploads can be performed.
           """
-        print("setup called!")
+        # print("setup called!")
         # setting num records and test date
         fake = Faker()
         num_records = 50
@@ -214,7 +214,6 @@ class CsvReadMergeTests(unittest.TestCase):
         csv_specimen['specimen_barcode'] = csv_specimen['specimen_barcode'] + 1
         with self.assertRaises(ValueError) as cm:
             csv_merge(csv_folder, csv_specimen)
-
         self.assertEqual(str(cm.exception), "Barcode Columns do not match!")
 
     def test_output_isnot_empty(self):
@@ -228,7 +227,7 @@ class CsvReadMergeTests(unittest.TestCase):
 
     def tearDown(self):
         """deletes destination directories of dummy datasets"""
-        print("teardown called!")
+        # print("teardown called!")
         date_string = test_date()
 
         folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
@@ -239,51 +238,75 @@ class CsvReadMergeTests(unittest.TestCase):
         shutil.rmtree(os.path.dirname(folder_path))
 
 
+# class ColNamesTest(unittest.TestCase):
+# # need to confirm final column names when
+# # destination tables for data decided upon
+#
+#     def setUp(self):
+#         numb_range = list(range(1, 101))
+#         column_names = ['specimen_barcode', 'folder_barcode', 'path_jpg',
+#                         'collector_number', 'collector_first_name1', 'collector_middle_name1',
+#                         'collector_last_name1', 'Genus', 'Species', 'Taxon ID', 'Author']
+#         new_df = {column_names[i]: numb_range for i in range(11)}
+#
+#         self.new_df = pd.DataFrame(new_df)
+#
+#     def test_if_codes(self):
+#         """test_if_codes: test if columns that contain codes
+#            like Barcode, folder barcode and jpeg_path present
+#         """
+#         csv_test = self.new_df
+#         csv_columns = csv_test.columns
+#         column_names = ['Barcode', 'folder_barcode', 'image_path']
+#         self.assertTrue(all(column in csv_columns for column in column_names))
+#
+#     def test_if_collector(self):
+#         """test_if_collector: tests whether certain essential
+#            collector columns present such as collector number, First Name,
+#            Middle Name, Last Name
+#         """
+#         csv_test = self.new_df
+#         csv_columns = csv_test.columns
+#         column_names = ['Collector Number', 'Collector First Name1',
+#                         'Collector Middle1', 'Collector Last Name1']
+#         self.assertTrue(all(column in csv_columns for column in column_names))
+#
+#     def test_if_taxon(self):
+#         """test_if_taxon: makes sure some key taxon related columns,
+#            are present with correct names in present dataset
+#         """
+#         csv_test = self.new_df
+#         csv_columns = csv_test.columns
+#         column_names = ['GENUS1', 'SPECIES1',
+#                         'RankID', 'Author']
+#         self.assertTrue(all(column in csv_columns for column in column_names))
 
-class ColNamesTest(unittest.TestCase):
-# need to confirm final column names when
-# destination tables for data decided upon
-
+class DatabaseChecks(unittest.TestCase):
     def setUp(self):
-        numb_range = list(range(1, 101))
-        column_names = ['specimen_barcode', 'folder_barcode', 'path_jpg',
-                        'collector_number', 'collector_first_name1', 'collector_middle_name1',
-                        'collector_last_name1', 'Genus', 'Species', 'Taxon ID', 'Author']
-        new_df = {column_names[i]: numb_range for i in range(11)}
+        """creates fake dataset with dummy columns,
+          that have a small subset of representive real column names,
+          """
+        data = {'Barcode': ['580092.jpg', '58719323.jpg', '8708.jpg'],
+                'image_path': ['picture_folder/cas123456.jpg',
+                               'picture_folder/cas68719323.jpg',
+                               'picture_folder/cas123457.jpg'],
+                'folder_barcode': ['2310_2', '2310_2', '2312_2']}
 
-        self.new_df = pd.DataFrame(new_df)
+        self.fake_df = pd.DataFrame(data)
 
-    def test_if_codes(self):
-        """test_if_codes: test if columns that contain codes
-           like Barcode, folder barcode and jpeg_path present
-        """
-        csv_test = self.new_df
-        csv_columns = csv_test.columns
-        column_names = ['Barcode', 'folder_barcode', 'image_path']
-        self.assertTrue(all(column in csv_columns for column in column_names))
+    def test_column_present(self):
+        test_df = barcode_has_record(self.fake_df)
+        self.assertEqual(len(test_df.columns), 4)
 
-    def test_if_collector(self):
-        """test_if_collector: tests whether certain essential
-           collector columns present such as collector number, First Name,
-           Middle Name, Last Name
-        """
-        csv_test = self.new_df
-        csv_columns = csv_test.columns
-        column_names = ['Collector Number', 'Collector First Name1',
-                        'Collector Middle1', 'Collector Last Name1']
-        self.assertTrue(all(column in csv_columns for column in column_names))
+    def test_row_length(self):
+        test_df = self.fake_df
+        barcode_df = barcode_has_record(self.fake_df)
+        self.assertEqual(len(test_df), len(barcode_df))
 
-    def test_if_taxon(self):
-        """test_if_taxon: makes sure some key taxon related columns,
-           are present with correct names in present dataset
-        """
-        csv_test = self.new_df
-        csv_columns = csv_test.columns
-        column_names = ['GENUS1', 'SPECIES1',
-                        'RankID', 'Author']
-        self.assertTrue(all(column in csv_columns for column in column_names))
-
-
+    def test_check_false_barcode(self):
+        test_df = barcode_has_record(self.fake_df)
+        test_list = list(test_df['indatabase'])
+        self.assertEqual(test_list, [True, False, True])
 
 if __name__ == "__main__":
     unittest.main()

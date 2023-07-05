@@ -1,7 +1,7 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
 import os
 from datetime import date
-
+from data_utils import *
 import pandas as pd
 
 
@@ -101,7 +101,11 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
     return record_full
 
 
-# def csv_colnames():
+def csv_colnames(df: pd.DataFrame):
+    df = df.rename(columns={'specimen_barcode': 'Barcode'})
+
+    return df
+
 #     """csv_colnames: function to be used to rename columns to specify standards"""
 #     new_col_names = list('Barcode', 'folder_barcode', 'image_path', 'Collector Number',
 #                          'Collector First Name1', 'Collector Middle1', 'Collector Last Name1',
@@ -115,6 +119,12 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
 # will reuse/modify some wrangling functions from data standardization
 
 
+# def col_clean():
+#    """will reformat and clean dataframe until ready for upload.
+#       **Still need format end-goal
+#       """
+
+
 # after file is wrangled into clean importable form,
 # and QC protocols to follow before import
 # QC measures needed here ? before proceeding.
@@ -125,6 +135,35 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
 # is collection object already in database?
 # how do we manage a conflict between records?
 
+
+# replace database reference to more current table
+def barcode_has_record(df: pd.DataFrame):
+    """checks whether barcode is present in database already
+        args:
+            dataframe object with barcode information"""
+    df['Barcode'] = df['Barcode'].apply(remove_non_numerics)
+    df['Barcode'] = df['Barcode'].astype(str)
+    import_barcode_list = list(df['Barcode'])
+    query_string = "SELECT Barcode FROM casbotany.botportal " \
+                   "WHERE Barcode IN ({});".format(', '.join(str(item) for item in import_barcode_list))
+    database_samples = data_exporter(query_string=query_string, fromsql=True,
+                                     local_path="test_barcodes/barcode_db.csv")
+    database_samples['Barcode'] = database_samples['Barcode'].astype(str)
+    database_samples = database_samples['Barcode'].tolist()
+
+    df['indatabase'] = None
+    for index, barcode in enumerate(import_barcode_list):
+        if barcode in database_samples:
+            df.at[index, 'indatabase'] = True
+        else:
+            df.at[index, 'indatabase'] = False
+
+    return df
+
+
+# def_incomplete_record(df):
+
+
 def master_fun():
     """runs all functions"""
     # file_present()
@@ -132,6 +171,8 @@ def master_fun():
     folder_csv = csv_read_folder(folder_string='folder', import_date='2023-6-28')
     specimen_csv = csv_read_folder(folder_string='specimen', import_date='2023-6-28')
     full_csv = csv_merge(folder_csv, specimen_csv)
+    full_csv = csv_colnames(full_csv)
+    barcode_has_record(full_csv)
 
     return full_csv
 
