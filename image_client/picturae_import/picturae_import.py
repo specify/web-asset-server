@@ -115,24 +115,35 @@ def csv_colnames(df: pd.DataFrame):
 
     df = df.dropna(axis=1, how='all')
 
-    new_col_names = ['CatalogNumber', 'image_path', 'collector_number',
-                     'collector_first_name1', 'collector_middle_name1', 'collector_last_name1',
-                     'collector_first_name2', 'collector_middle_name2',
-                     'collector_last_name2',
-                     'Genus', 'Species', 'Qualifier', 'Hybrid', 'RankID', 'Author']
+    # some of these are just placeholders for now
 
-    old_col_names = ['specimen_barcode', 'path_jpg',
-                     'collector_number', 'collector_first_name 1', 'collector_middle_name 1',
-                     'collector_last_name 1', 'collector_first_name 2', 'collector_middle_name 2',
-                     'collector_last_name 2', 'Genus', 'Species', 'Qualifier', 'Hybrid', 'Taxon ID', 'Author']
+    col_dict = {'specimen_barcode': 'CatalogNumber',
+                'path_jpg': 'image_path',
+                'collector_number': 'collector_number',
+                'collector_first_name 1': 'collector_first_name1',
+                'collector_middle_name 1': 'collector_middle_name1',
+                'collector_last_name 1': 'collector_last_name 1',
+                'collector_first_name 2': 'collector_first_name2',
+                'collector_middle_name 2': 'collector_middle_name2',
+                'collector_last_name 2': 'collector_last_name2',
+                'Genus': 'Genus',
+                'Species': 'Species',
+                'Qualifier': 'Qualifier',
+                'Hybrid': 'Hybrid',
+                'Taxon ID': 'RankID',
+                'Author': 'Author'}
 
-    df = df.rename(columns=dict(zip(old_col_names, new_col_names)))
+    df = df.rename(columns=col_dict)
 
     print(df)
 
     return df
 
 # def mapping_AuthorID(df: pd.DataFrame):
+
+# def mapping_LocalityID(df: pd.Dataframe):
+
+# def mapping_TaxonID(df: pd.Dataframe):
 
 
 # under this point column transformations will be done through a series of functions
