@@ -158,3 +158,7 @@ def to_decimal_degrees(coord: str, num_digits: int):
 
     return round(num_coord, num_digits)
 
+
+def zero_out_barcode(number):
+    """changes barcode to specify barcode with leading zeroes, function made for lapply"""
+    return str(number).zfill(9)

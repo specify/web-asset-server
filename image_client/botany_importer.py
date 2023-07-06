@@ -25,10 +25,10 @@ from dir_tools import DirTools
 class BotanyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.BotanyImporter')
-        super().__init__(botany_importer_config,"Botany")
+        super().__init__(botany_importer_config, "Botany")
 
         # limit is for debugging
-        dir_tools = DirTools(self.build_filename_map,limit=None)
+        dir_tools = DirTools(self.build_filename_map, limit=None)
         self.barcode_map = {}
 
         self.logger.debug("Botany import mode")
