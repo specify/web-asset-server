@@ -117,7 +117,6 @@ class FilePathTests(unittest.TestCase):
 
 
 # class for testing csv_import function
-# under construction
 class CsvReadMergeTests(unittest.TestCase):
     """this class contains methods which test outputs of the
        csv_read_folder function , and csv_merge functions from
@@ -162,7 +161,7 @@ class CsvReadMergeTests(unittest.TestCase):
 
                     # writing data to CSV
                     writer.writerow([specimen_bar, folder_barcode, jpg_path])
-            print(f"Fake dataset {path} with {num_records} records created sucessfuly")
+            print(f"Fake dataset {path} with {num_records} records created successfully")
 
     def test_file_empty(self):
         """tests for every argument variation if dataset returns as empty"""
@@ -327,6 +326,7 @@ class DatabaseChecks(unittest.TestCase):
         test_df = barcode_has_record(self.fake_df)
         test_list = list(test_df['indatabase'])
         self.assertEqual(test_list, [True, False, True])
+
 
 if __name__ == "__main__":
     unittest.main()

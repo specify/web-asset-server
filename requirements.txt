@@ -23,8 +23,6 @@ six==1.16.0
 toml==0.10.2
 urllib3==1.26.8
 yarg==0.1.9
-
-
 mysql-connector-python~=8.0.31
 Pillow~=9.2.0
 anytree~=2.9.0
@@ -38,7 +36,7 @@ zlib~=1.2.13
 pip~=22.3.1
 panel~=0.14.3
 wheel~=0.38.4
-openssl~=1.1.1u
+openssl~=1.1.1
 cryptography~=39.0.1
 docutils~=0.18.1
 sphinx~=5.0.2
