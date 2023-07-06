@@ -102,19 +102,39 @@ def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
 
 
 def csv_colnames(df: pd.DataFrame):
-    df = df.rename(columns={'specimen_barcode': 'Barcode'})
+    """csv_colnames: function to be used to rename columns to specify standards"""
+    # remove columns !! review when real dataset received
+
+    col_names = df.columns
+
+    print(col_names)
+    cols_drop = ['application_batch', 'csv_batch', 'object_type', 'filed_as_family',
+                 'barcode_info', 'Notes', 'Feedback']
+    # dropping empty columns
+    df = df.drop(columns=cols_drop)
+
+    df = df.dropna(axis=1, how='all')
+
+    new_col_names = ['CatalogNumber', 'image_path', 'collector_number',
+                     'collector_first_name1', 'collector_middle_name1', 'collector_last_name1',
+                     'collector_first_name2', 'collector_middle_name2',
+                     'collector_last_name2',
+                     'Genus', 'Species', 'Qualifier', 'Hybrid', 'RankID', 'Author']
+
+    old_col_names = ['specimen_barcode', 'path_jpg',
+                     'collector_number', 'collector_first_name 1', 'collector_middle_name 1',
+                     'collector_last_name 1', 'collector_first_name 2', 'collector_middle_name 2',
+                     'collector_last_name 2', 'Genus', 'Species', 'Qualifier', 'Hybrid', 'Taxon ID', 'Author']
+
+    df = df.rename(columns=dict(zip(old_col_names, new_col_names)))
+
+    print(df)
 
     return df
 
-#     """csv_colnames: function to be used to rename columns to specify standards"""
-#     new_col_names = list('Barcode', 'folder_barcode', 'image_path', 'Collector Number',
-#                          'Collector First Name1', 'Collector Middle1', 'Collector Last Name1',
-#                          'GENUS1', 'SPECIES1', 'RankID', 'Author')
-#
-#     old_col_names = list('specimen_barcode', 'folder_barcode', 'path_jpg',
-#                          'collector_number', 'collector_first_name1', 'collector_middle_name1',
-#                          'collector_last_name1', 'Genus', 'Species', 'Taxon ID', 'Author')
-#
+# def mapping_AuthorID(df: pd.DataFrame):
+
+
 # under this point column transformations will be done through a series of functions
 # will reuse/modify some wrangling functions from data standardization
 
@@ -140,17 +160,18 @@ def csv_colnames(df: pd.DataFrame):
 def barcode_has_record(df: pd.DataFrame):
     """checks whether barcode is present in database already
         args:
-            dataframe object with barcode information"""
-    df['Barcode'] = df['Barcode'].apply(remove_non_numerics)
-    df['Barcode'] = df['Barcode'].astype(str)
-    import_barcode_list = list(df['Barcode'])
-    query_string = "SELECT Barcode FROM casbotany.botportal " \
-                   "WHERE Barcode IN ({});".format(', '.join(str(item) for item in import_barcode_list))
+            dataframe object with indatabase True, False boolean"""
+    df['CatalogNumber'] = df['CatalogNumber'].apply(remove_non_numerics)
+    df['CatalogNumber'] = df['CatalogNumber'].astype(str)
+    import_barcode_list = list(df['CatalogNumber'])
+    print(import_barcode_list)
+    query_string = "SELECT CatalogNumber FROM casbotany.collectionobject " \
+                   "WHERE CatalogNumber IN ({});".format(', '.join(str(item) for item in import_barcode_list))
     database_samples = data_exporter(query_string=query_string, fromsql=True,
                                      local_path="test_barcodes/barcode_db.csv")
-    database_samples['Barcode'] = database_samples['Barcode'].astype(str)
-    database_samples = database_samples['Barcode'].tolist()
-
+    database_samples['CatalogNumber'] = database_samples['CatalogNumber'].astype(str)
+    database_samples = database_samples['CatalogNumber'].tolist()
+    print(database_samples)
     df['indatabase'] = None
     for index, barcode in enumerate(import_barcode_list):
         if barcode in database_samples:
@@ -161,7 +182,9 @@ def barcode_has_record(df: pd.DataFrame):
     return df
 
 
-# def_incomplete_record(df):
+
+# def upload_skeleton_record(df: pd.DataFrame):
+    ###
 
 
 def master_fun():
@@ -173,7 +196,6 @@ def master_fun():
     full_csv = csv_merge(folder_csv, specimen_csv)
     full_csv = csv_colnames(full_csv)
     barcode_has_record(full_csv)
-
     return full_csv
 
 # calling master
