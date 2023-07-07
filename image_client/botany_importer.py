@@ -10,7 +10,6 @@ import logging
 import filetype
 from dir_tools import DirTools
 
-
 # I:\botany\PLANT FAMILIES
 #
 # I:\botany\TYPE IMAGES
