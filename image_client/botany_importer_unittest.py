@@ -27,19 +27,15 @@ class BotanyImporterTests(unittest.TestCase):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         self.log_capture = LogCapture()
-        # create real image path
-        test_images_dir = self.generate_test_directory()
-        self.image_path_real = os.path.join(test_images_dir, "CAS0123456.JPG")
-        image = Image.new("RGB", (100, 100), (255, 0, 0))
-        image.save(self.image_path_real)
+        # create real image path and incorrect image path
+        path_list = ["CAS0123456.JPG", "CASABCDEFG.JPG"]
+        for index, path in path_list:
+            test_images_dir = self.generate_test_directory()
+            self.image_path_real = os.path.join(test_images_dir, path)
+            image = Image.new("RGB", (100, 100), (255, 0, 0))
+            image.save(self.image_path_real)
 
-        # create incorrect image path for testing
-        test_images_dir = self.generate_test_directory()
-        self.image_path_false = os.path.join(test_images_dir, "CASABCDEFG.JPG")
-        image = Image.new("RGB", (100, 100), (255, 0, 0))
-        image.save(self.image_path_false)
-
-    def test_build_filename_map(self):
+    def test_build_filename_map_barcodeerror(self):
         test_images_dir = self.generate_test_directory()
         file_name = "CASABCDEFG.JPG"
         error_path = os.path.join(test_images_dir, file_name.lower())
@@ -53,7 +49,27 @@ class BotanyImporterTests(unittest.TestCase):
             self.assertEqual(log_records[0].getMessage(),
                 f"Rejected; no match: {base_path}")
 
+    def test_build_filename_mappingappend(self):
+        test_images_dir = self.generate_test_directory()
+        file_name = "CAS0123456.JPG"
+        barcode = "123456"
+        real_path = os.path.join(test_images_dir, file_name.lower())
+        base_path = os.path.basename(real_path)
 
+        with LogCapture() as log_capture:
+            self.botany_importer.build_filename_map(full_path=real_path)
+
+            log_records = log_capture.records
+
+            self.assertEqual(len(log_records), 1)
+            self.assertEqual(log_records[0].levelname, "DEBUG")
+            self.assertEqual(
+                log_records[0].getMessage(),
+                f"Adding filename to mappings set: {base_path}   barcode: {barcode}"
+            )
+
+        # update this code
+        self.assertEqual(self.botany_importer.barcode_map[barcode], real_path)
 
     #def test_process_barcode(self):
        # self.botany_importer.process_barcode()
