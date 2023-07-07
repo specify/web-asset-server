@@ -75,7 +75,7 @@ class BotanyPurger():
             collecting_event_id = remove_record[6]
             collection_object_id = remove_record[0]
             barcode = remove_record[3]
-            self.logger.debug(f"Purging bardocde: {barcode}")
+            self.logger.debug(f"Purging barcode: {barcode}")
             self.logger.debug(f"Removing collecting event ID: {collecting_event_id}")
 
             self.logger.debug(f"Find and remove attachments from collection object {collection_object_id}")

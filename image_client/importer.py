@@ -303,7 +303,7 @@ class Importer:
             except subprocess.TimeoutExpired:
                 self.logger.error(f"Timeout converting {cur_filepath}")
             except ConvertException:
-                self.logger.error(f"  Conversion failure for {cur_filepath}; skipping.")
+                self.logger.error(f"Conversion failure for {cur_filepath}; skipping.")
             except Exception as e:
                 self.logger.error(
                     f"Upload failure to image server for file: \n\t{cur_filepath}")

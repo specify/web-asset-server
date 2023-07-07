@@ -2,12 +2,10 @@ import botany_importer_config
 
 from importer import Importer
 import time_utils
-
 from uuid import uuid4
 import os
 import re
 import logging
-import filetype
 from dir_tools import DirTools
 
 # I:\botany\PLANT FAMILIES
@@ -22,6 +20,8 @@ from dir_tools import DirTools
 # CAS0410512_a
 
 class BotanyImporter(Importer):
+
+
     def __init__(self):
         self.logger = logging.getLogger('Client.BotanyImporter')
         super().__init__(botany_importer_config, "Botany")
@@ -60,6 +60,7 @@ class BotanyImporter(Importer):
         self.logger.debug(f"Barcode: {barcode}")
         sql = f"select collectionobjectid  from collectionobject where catalognumber={barcode}"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
+        print(collection_object_id)
         force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
