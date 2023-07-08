@@ -53,30 +53,34 @@ class BotanyImporter(Importer):
                 filename_list.append(cur_filepath)
             self.process_barcode(barcode, filename_list)
 
-    def process_barcode(self, barcode, filepath_list):
+    def process_barcode(self, barcode, filepath_list, if_test=False):
         if barcode is None:
             self.logger.debug(f"No barcode; skipping")
             return
         self.logger.debug(f"Barcode: {barcode}")
         sql = f"select collectionobjectid  from collectionobject where catalognumber={barcode}"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
-        print(collection_object_id)
         force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
-            self.create_skeleton(barcode)
-            force_redacted = True
+            if if_test is False:
+                self.create_skeleton(barcode)
+                force_redacted = True
             self.logger.warning(f"Skeletons temporarily disabled in botany")
             return
         #  we can have multiple filepaths per barcode in the case of barcode-a, barcode-b etc.
         # not done for modern samples, but historically this exists.
+        # when removed the unittest
         filepath_list = self.clean_duplicate_basenames(filepath_list)
         filepath_list = self.remove_imagedb_imported_filenames_from_list(filepath_list)
 
-        self.import_to_imagedb_and_specify(filepath_list,
-                                           collection_object_id,
-                                           95728,
-                                           force_redacted=force_redacted)
+        if if_test is False:
+            self.import_to_imagedb_and_specify(filepath_list,
+                                               collection_object_id,
+                                               95728,
+                                               force_redacted=force_redacted)
+
+
 
     def build_filename_map(self, full_path):
         full_path = full_path.lower()
@@ -98,7 +102,6 @@ class BotanyImporter(Importer):
         self.logger.debug(f"Adding filename to mappings set: {filename}   barcode: {barcode}")
         if barcode not in self.barcode_map:
             self.barcode_map[barcode] = [full_path]
-        else:
             self.barcode_map[barcode].append(full_path)
 
     def create_skeleton(self, barcode):
