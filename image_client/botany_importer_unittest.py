@@ -3,6 +3,8 @@ import os
 import re
 import logging
 import filetype
+from unittest.mock import Mock
+from mock import patch
 from botany_importer import BotanyImporter
 import unittest
 import logging
@@ -29,7 +31,7 @@ class BotanyImporterTests(unittest.TestCase):
         self.logger.setLevel(logging.DEBUG)
         self.log_capture = LogCapture()
         # create real image path and incorrect image path
-        path_list = ["CAS0123456.JPG", "CASABCDEFG.JPG", "CAS999999998.JPG"]
+        path_list = ["CAS0123456.JPG", "CASABCDEFG.JPG", "CAS999999991.JPG"]
         test_images_dir = self.generate_test_directory()
         for picture in path_list:
             self.image_path_real = os.path.join(test_images_dir, picture)
@@ -89,13 +91,11 @@ class BotanyImporterTests(unittest.TestCase):
         # asserting the barcode map is appended with a new element
         self.assertEqual(self.botany_importer.barcode_map[barcode][0], real_path)
 
-
     def test_process_barcode_none(self):
         """when barcode is input as None,
            does the correct loger message return"""
         with LogCapture() as log_capture:
-            self.botany_importer.process_barcode(barcode=None, filepath_list=[],
-                                                 if_test=True)
+            self.botany_importer.process_barcode(barcode=None, filepath_list=[])
             log_records = log_capture.records
             # assert correct num records
             self.assertEqual(len(log_records), 1)
@@ -105,52 +105,49 @@ class BotanyImporterTests(unittest.TestCase):
             self.assertEqual(
                 log_records[0].getMessage(), f"No barcode; skipping")
 
-    def test_process_barcode_missing_collection_object(self):
+    @patch('botany_importer.BotanyImporter.create_skeleton', return_value='None')
+    @patch('botany_importer.Importer.import_to_imagedb_and_specify', return_value='None')
+    def test_process_barcode_missing_collection_object(self, test_skeleton, test_img_db):
         """tests whether the correct logger message of creating skeleton,
             is returned when a barcode not in database in tested"""
         # Create an instance of the BotanyImporter class
         test_dir = self.generate_test_directory()
-        file_name = "CAS999999998.JPG"
-        barcode = "999999998"
+        file_name = "CAS999999991.JPG"
+        barcode = "999999991"
         full_path = os.path.join(test_dir.lower(), file_name.lower())
+
         with LogCapture() as log_capture:
-            self.botany_importer.process_barcode(barcode=barcode, filepath_list=[full_path],
-                                                 if_test=True)
+            self.botany_importer.process_barcode(barcode=barcode, filepath_list=[full_path])
             log_records = log_capture.records
+            # assert correct num records
             self.assertEqual(len(log_records), 4)
 
             self.assertEqual(log_records[2].levelname, "DEBUG")
 
-            print(log_records)
+            self.assertEqual(log_records[2].getMessage(),
+                             f"No record found for catalog number {barcode}, creating skeleton.")
 
-            self.assertEqual(log_records[2].getMessage(), f"No record found for catalog number {barcode}, "
-                                                          f"creating skeleton.")
+    @patch('botany_importer.BotanyImporter.create_skeleton', return_value=None)
+    @patch('botany_importer.Importer.import_to_imagedb_and_specify', return_value=None)
+    def test_remove_filenames_list(self, test_skeleton, test_img_db):
+        """tests whether the file_list is cleaned of created records"""
+        instance = BotanyImporter()
+        test_dir = self.generate_test_directory()
+        file_name = "CAS0688729.JPG"
+        barcode = "688729"
+        full_path = os.path.join(test_dir.lower(), file_name.lower())
+        # creating instance of filepath_list
+        filepath_list = [full_path]
+        test_list = [full_path]
 
-    # def test_process_barcode_clean_file_list(self):
-    #     """tests whether the file_list is cleaned of created records"""
-    #     instance = BotanyImporter()
-    #     test_dir = self.generate_test_directory()
-    #     file_name = "CAS0688729.JPG"
-    #     barcode = "688729"
-    #     full_path = os.path.join(test_dir.lower(), file_name.lower())
-    #     # creating instance of filepath_list
-    #     initial_filepath_list = [full_path]
-    #
-    #     file_path_list = initial_filepath_list.copy()
-    #
-    #     instance.process_barcode(barcode=barcode, filepath_list=file_path_list, is_test=True)
-    #
-    #     final_filepath_list = file_path_list
-    #
-    #     self.assertEqual(len(final_filepath_list), 0)
-    #
-    #     self.assertNotEqual(initial_filepath_list, final_filepath_list)
-    #
-    #
-    #
+        new_list = instance.remove_imagedb_imported_filenames_from_list(filepath_list)
+        self.assertEqual(len(new_list), 0)
+
+        self.assertNotEqual(new_list, test_list)
+
 
     # def test_process_loaded:
-
+    #
     # def test_process_barcode(self):
     # self.botany_importer.process_barcode()
 
@@ -160,7 +157,7 @@ class BotanyImporterTests(unittest.TestCase):
 
         os.remove(os.path.join(test_dir, "CASABCDEFG.JPG"))
         os.remove(os.path.join(test_dir, "CAS0123456.JPG"))
-        os.remove(os.path.join(test_dir, "CAS999999998.JPG"))
+        os.remove(os.path.join(test_dir, "CAS999999991.JPG"))
 
         # removing logger capture
         self.log_capture.uninstall()
