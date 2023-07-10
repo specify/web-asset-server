@@ -53,7 +53,7 @@ class BotanyImporter(Importer):
                 filename_list.append(cur_filepath)
             self.process_barcode(barcode, filename_list)
 
-    def process_barcode(self, barcode, filepath_list, if_test=False):
+    def process_barcode(self, barcode, filepath_list):
         if barcode is None:
             self.logger.debug(f"No barcode; skipping")
             return
@@ -63,9 +63,8 @@ class BotanyImporter(Importer):
         force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
-            if if_test is False:
-                self.create_skeleton(barcode)
-                force_redacted = True
+            self.create_skeleton(barcode)
+            force_redacted = True
             self.logger.warning(f"Skeletons temporarily disabled in botany")
             return
         #  we can have multiple filepaths per barcode in the case of barcode-a, barcode-b etc.
@@ -74,11 +73,10 @@ class BotanyImporter(Importer):
         filepath_list = self.clean_duplicate_basenames(filepath_list)
         filepath_list = self.remove_imagedb_imported_filenames_from_list(filepath_list)
 
-        if if_test is False:
-            self.import_to_imagedb_and_specify(filepath_list,
-                                               collection_object_id,
-                                               95728,
-                                               force_redacted=force_redacted)
+        self.import_to_imagedb_and_specify(filepath_list,
+                                           collection_object_id,
+                                           95728,
+                                           force_redacted=force_redacted)
 
 
 
