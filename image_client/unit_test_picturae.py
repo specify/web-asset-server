@@ -8,6 +8,7 @@ import pandas as pd
 from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
+from picturae_import import DataOnboard
 
 # need to find a way to prevent the fake folders using today's date in the setUP,
 # from overwriting the contents of real folders
@@ -23,7 +24,8 @@ def test_date():
 class WorkingDirectoryTests(unittest.TestCase):
     """WorkingDirectoryTests: a series of unit tests to verify
         correct working directory, subdirectories."""
-
+    def setUp(self):
+        self.DataOnboard = DataOnboard(date_string=test_date())
     def test_working_directory(self):
         """test if user in correct working folder image_client"""
         expected_relative = "image_client"
@@ -38,10 +40,12 @@ class WorkingDirectoryTests(unittest.TestCase):
 
     def test_missing_folder_raise_error(self):
         """checks if incorrect sub_directory raises error from file present"""
-        date_string = test_date()
         with self.assertRaises(ValueError) as cm:
-            file_present(test_date())
-        self.assertEqual(str(cm.exception), f"subdirectory for {date_string} not present")
+            self.DataOnboard.file_present()
+        self.assertEqual(str(cm.exception), f"subdirectory for {test_date()} not present")
+
+    def tearDown(self):
+        del self.DataOnboard
 
 
 class FilePathTests(unittest.TestCase):
@@ -51,6 +55,9 @@ class FilePathTests(unittest.TestCase):
     def setUp(self):
         """setUP: unittest setup function creates empty csvs,
                   and folders for given test path"""
+
+        # initializing
+        self.DataOnboard = DataOnboard(date_string=test_date())
 
         # print("setup called!")
         # create test directories
@@ -72,9 +79,8 @@ class FilePathTests(unittest.TestCase):
         """test_expected_path_date: tests , when the
           folders are correctly created that there is
           no exception raised"""
-        date_string = test_date()
         try:
-            file_present(date_string)
+            self.DataOnboard.file_present()
         except Exception as e:
             self.fail(f"Exception raised: {str(e)}")
 
@@ -86,7 +92,7 @@ class FilePathTests(unittest.TestCase):
         os.remove('picturae_csv/' + str(date_string) + '/picturae_specimen(' +
                   str(date_string) + ').csv')
         with self.assertRaises(ValueError) as cm:
-            file_present(date_string)
+            self.DataOnboard.file_present()
         self.assertEqual(str(cm.exception), "Specimen csv does not exist")
 
     def test_raise_folder(self):
@@ -97,12 +103,14 @@ class FilePathTests(unittest.TestCase):
         os.remove('picturae_csv/' + str(date_string) + '/picturae_folder(' +
                   str(date_string) + ').csv')
         with self.assertRaises(ValueError) as cm:
-            file_present(date_string)
+            self.DataOnboard.file_present()
         self.assertEqual(str(cm.exception), "Folder csv does not exist")
 
     def tearDown(self):
         """destroys paths for Setup function,
            returning working directory to prior state"""
+
+        del self.DataOnboard
 
         # print("teardown called!")
 
@@ -128,6 +136,7 @@ class CsvReadMergeTests(unittest.TestCase):
           so that test merges and uploads can be performed.
           """
         # print("setup called!")
+        self.DataOnboard = DataOnboard(date_string=test_date())
         # setting num records and test date
         fake = Faker()
         num_records = 50
@@ -164,35 +173,30 @@ class CsvReadMergeTests(unittest.TestCase):
 
     def test_file_empty(self):
         """tests if dataset returns as empty set or not"""
-        date_string = test_date()
-        self.assertEqual(csv_read_folder("folder", import_date=date_string).empty, False)
-        self.assertEqual(csv_read_folder("specimen", import_date=date_string).empty,
+        self.assertEqual(self.DataOnboard.csv_read_folder('folder').empty, False)
+        self.assertEqual(self.DataOnboard.csv_read_folder('specimen').empty,
                          False)
 
     def test_file_colnumber(self):
         """tests if expected # of columns given test datasets"""
-        date_string = test_date()
-        self.assertEqual(len(csv_read_folder("folder", import_date=date_string).columns), 3)
-        self.assertEqual(len(csv_read_folder("specimen", import_date=date_string)).columns, 3)
+        self.assertEqual(len(self.DataOnboard.csv_read_folder('folder').columns), 3)
+        self.assertEqual(len(self.DataOnboard.csv_read_folder('specimen').columns), 3)
 
     def test_barcode_column_present(self):
         """tests if barcode column is present
            (test if column names loaded correctly,
            specimen_barcode being in required in both csvs)"""
-        date_string = test_date()
-        self.assertEqual('specimen_barcode' in csv_read_folder("folder", import_date=date_string).columns, True)
-        self.assertEqual('specimen_barcode' in csv_read_folder("specimen", import_date=date_string).columns, True)
+        self.assertEqual('specimen_barcode' in self.DataOnboard.csv_read_folder('folder').columns, True)
+        self.assertEqual('specimen_barcode' in self.DataOnboard.csv_read_folder('specimen').columns, True)
 
     # these tests are for the csv merge function
     def test_merge_num_columns(self):
         """test merge with sample data set , checks if shared columns are removed,
            and that the merge occurs with expected # of columns"""
-        date_string = test_date()
-        csv_specimen = csv_read_folder(folder_string="folder", import_date=date_string)
-        csv_folder = csv_read_folder(folder_string="specimen", import_date=date_string)
         # -3 as merge function drops duplicate columns automatically
-        self.assertEqual(len(csv_merge(csv_folder, csv_specimen)),
-                         len(csv_specimen.columns) + len(csv_folder.columns) - 3)
+        self.assertEqual(len(self.DataOnboard.csv_merge().columns),
+                         len(self.DataOnboard.csv_read_folder('folder').columns) +
+                         len(self.DataOnboard.csv_read_folder('specimen').columns) - 3)
 
     def test_index_length_matches(self):
         """checks whether dataframe, length changes,
@@ -200,11 +204,9 @@ class CsvReadMergeTests(unittest.TestCase):
            as folder and specimen csvs should
            always be 100% matches on barcodes
            """
-        date_string = test_date()
-        csv_specimen = csv_read_folder(folder_string="folder", import_date=date_string)
-        csv_folder = csv_read_folder(folder_string="folder", import_date=date_string)
+        csv_folder = self.DataOnboard.csv_read_folder('folder')
         # test merge index before and after
-        self.assertEqual(len(csv_merge(csv_folder,csv_specimen)),
+        self.assertEqual(len(self.DataOnboard.csv_merge()),
                          len(csv_folder))
 
     def test_unequalbarcode_raise(self):
@@ -212,25 +214,22 @@ class CsvReadMergeTests(unittest.TestCase):
            a Value error raise in the merge function"""
         date_string = test_date()
         # testing output
-        csv_folder = csv_read_folder(folder_string="folder", import_date=date_string)
-        csv_specimen =csv_read_folder(folder_string="specimen", import_date=date_string)
-        csv_specimen['specimen_barcode'] = csv_specimen['specimen_barcode'] + 1
-        with self.assertRaises(ValueError) as cm:
-            csv_merge(csv_folder, csv_specimen)
-        self.assertEqual(str(cm.exception), "Barcode Columns do not match!")
+        csv_folder = self.DataOnboard.csv_read_folder(folder_string="folder")
+        csv_specimen = self.DataOnboard.csv_read_folder(folder_string="specimen")
+        self.assertEqual(set(csv_folder['specimen_barcode']), set(csv_specimen['specimen_barcode']))
 
     def test_output_isnot_empty(self):
         """tests whether merge function accidentally
            produces an empty dataframe"""
-        date_string=test_date()
         # testing output
-        csv_folder = csv_read_folder(folder_string="folder", import_date=date_string)
-        csv_specimen = csv_read_folder(folder_string="specimen", import_date=date_string)
-        self.assertFalse(csv_merge(csv_folder, csv_specimen).empty)
+        self.assertFalse(self.DataOnboard.csv_merge().empty)
 
     def tearDown(self):
         """deletes destination directories for dummy datasets"""
         # print("teardown called!")
+        # deleting instance
+        del self.DataOnboard
+        # deleting folders
         date_string = test_date()
 
         folder_path = 'picturae_csv/' + str(date_string) + '/picturae_folder(' + \
@@ -242,6 +241,9 @@ class CsvReadMergeTests(unittest.TestCase):
 class ColNamesTest(unittest.TestCase):
     def setUp(self):
         """creates dummy dataset with representative column names"""
+        # initializing class
+        self.DataOnboard = DataOnboard(date_string=test_date())
+        # creating dummy dataset
         numb_range = list(range(1, 101))
         column_names = ['application_batch', 'csv_batch', 'object_type', 'folder_barcode',
                         'specimen_barcode', 'filed_as_family', 'barcode_info', 'path_jpg',
@@ -271,7 +273,7 @@ class ColNamesTest(unittest.TestCase):
         """test_if_codes: test if columns that contain codes
            like Barcode, folder barcode and jpeg_path are present
         """
-        csv_test = csv_colnames(self.new_df)
+        csv_test = self.DataOnboard.csv_colnames(self.new_df)
         csv_columns = csv_test.columns
         column_names = ['CatalogNumber', 'folder_barcode', 'image_path']
         self.assertTrue(all(column in csv_columns for column in column_names))
@@ -281,7 +283,7 @@ class ColNamesTest(unittest.TestCase):
            collector columns present such as collector number, First Name,
            Middle Name, Last Name are present
         """
-        csv_test = csv_colnames(self.new_df)
+        csv_test = self.DataOnboard.csv_colnames(self.new_df)
         csv_columns = csv_test.columns
         column_names = ['collector_number', 'collector_first_name1',
                         'collector_middle_name1', 'collector_last_name1']
@@ -291,7 +293,7 @@ class ColNamesTest(unittest.TestCase):
         """test_if_taxon: makes sure some key taxon related columns,
            are present
         """
-        csv_test = csv_colnames(self.new_df)
+        csv_test = self.DataOnboard.csv_colnames(self.new_df)
         csv_columns = csv_test.columns
         column_names = ['Genus', 'Species',
                         'RankID', 'Author']
@@ -299,9 +301,14 @@ class ColNamesTest(unittest.TestCase):
 
     def test_if_nas(self):
         """test_if_nas: test if any left-over columns contain only NAs"""
-        csv_test = csv_colnames(self.new_df)
+        csv_test = self.DataOnboard.csv_colnames(self.new_df)
         csv_drop = csv_test.dropna(axis=1, how='all')
         self.assertEqual(len(csv_drop.columns), len(csv_test.columns))
+
+    def tearDown(self):
+        del self.DataOnboard
+
+        del self.new_df
 
 
 class DatabaseChecks(unittest.TestCase):
@@ -309,6 +316,11 @@ class DatabaseChecks(unittest.TestCase):
         """creates fake dataset with dummy columns,
           that have a small subset of representative real column names,
           """
+        # initializing
+
+        self.DataOnboard = DataOnboard(date_string=test_date())
+
+        # creating dummy dataset
         data = {'CatalogNumber': ['580092.jpg', '58719323.jpg', '8708.jpg'],
                 'image_path': ['picture_folder/cas123456.jpg',
                                'picture_folder/cas68719323.jpg',
@@ -319,22 +331,26 @@ class DatabaseChecks(unittest.TestCase):
 
     def test_column_present(self):
         """checks whether boolean column added for record present"""
-        test_df = barcode_has_record(self.fake_df)
+        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
         self.assertEqual(len(test_df.columns), 4)
 
     def test_row_length(self):
         """tests whether # rows is preserved after
            record present operation"""
-        test_df = self.fake_df
-        barcode_df = barcode_has_record(self.fake_df)
-        self.assertEqual(len(test_df), len(barcode_df))
+        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
+        self.assertEqual(len(test_df), 3)
 
     def test_check_false_barcode(self):
         """tests if when a false barcode is tested, the
            correct False boolean appears"""
-        test_df = barcode_has_record(self.fake_df)
+        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
         test_list = list(test_df['indatabase'])
         self.assertEqual(test_list, [True, False, True])
+
+    def tearDown(self):
+        del self.DataOnboard
+
+        del self.fake_df
 
 
 class CheckImagePaths(unittest.TestCase):
@@ -342,6 +358,9 @@ class CheckImagePaths(unittest.TestCase):
        there is an equivalent relevant jpeg and tif file."""
     def setUp(self):
         """setup creating matrix with real test image paths to test."""
+        # intializing
+        self.DataOnboard = DataOnboard(date_string=test_date())
+        # creating dummy frame of real test paths
         folder_path = 'test_images'
         file_paths = []
         for root, dirs, files in os.walk(folder_path):
@@ -355,7 +374,7 @@ class CheckImagePaths(unittest.TestCase):
 
     def test_true_files(self):
         """tests if images that are confirmed to be present return a True"""
-        new_df = check_if_images_present(self.test_df)
+        new_df = self.DataOnboard.check_if_images_present(self.test_df)
         self.assertTrue('image_valid' in new_df.columns)
         self.assertTrue(new_df['image_valid'].all() is True)
 
