@@ -4,6 +4,8 @@ from datetime import date
 from data_utils import *
 import pandas as pd
 from importer import Importer
+from botany_importer import BotanyImporter
+from db_utils import DbUtils
 
 
 def to_current_directory():
@@ -70,7 +72,6 @@ def csv_read_folder(folder_string, import_date: str):
 # def images_present():
     # """images_present, function to verify if corrent number of images,
     # corresponding to image paths in picturae csv files"""
-
 
 def csv_merge(fold_csv: pd.DataFrame, spec_csv: pd.DataFrame):
     """csv_merge: merges the folder_csv and the specimen_csv on barcode
@@ -189,12 +190,15 @@ def barcode_has_record(df: pd.DataFrame):
             df.at[index, 'indatabase'] = True
         else:
             df.at[index, 'indatabase'] = False
+    return df
 
 
-def check_if_images_present(df: pd.DataFrame):
-    df['image_valid'] = df['image_path'].apply(Importer.check_for_valid_image())
+# def check_attachment(df: pd.DataFrame):
 
 
+# under construction
+# def check_if_images_present(df: pd.DataFrame):
+#     df['image_valid'] = df['image_path'].apply(Importer.check_for_valid_image())
 
 
 # def create_csv_skeleton():
@@ -205,14 +209,31 @@ def check_if_images_present(df: pd.DataFrame):
 
 def master_fun():
     """runs all functions"""
-    # file_present()
+    # creating instances
+    create_instances()
+    # seeing if file present
     file_present(import_date='2023-6-28')
+    # uploading folder csv
     folder_csv = csv_read_folder(folder_string='folder', import_date='2023-6-28')
+    # uploading specimen csv
     specimen_csv = csv_read_folder(folder_string='specimen', import_date='2023-6-28')
+    # merging csvs
     full_csv = csv_merge(folder_csv, specimen_csv)
+    # renaming columns
     full_csv = csv_colnames(full_csv)
-    csv_record = barcode_has_record(full_csv)
+    # checking if barcode in database
+    full_csv = barcode_has_record(full_csv)
+    # checking if image in database
+
+    # checking if csv barcodes have valid images present
     image_present = check_if_images_present(full_csv)
+    # raise error if no image or record already present
+    # cleaning (need more complete csv before I can decide on cleaning functions)
+    # mapping columns to db_columns
+    # creating skeleton record
+    # verifying record
+    # finished !
+
     return full_csv
 
 
