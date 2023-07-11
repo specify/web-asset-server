@@ -3,9 +3,7 @@ import os
 from datetime import date
 from data_utils import *
 import pandas as pd
-from importer import *
 from importer import Importer
-from botany_importer import BotanyImporter
 
 
 def to_current_directory():
@@ -174,9 +172,9 @@ def barcode_has_record(df: pd.DataFrame):
     """checks whether barcode is present in database already
         args:
             dataframe object with indatabase True, False boolean"""
-    df.full_record['CatalogNumber'] = df.full_record['CatalogNumber'].apply(remove_non_numerics)
-    df.full_record['CatalogNumber'] = df.full_record['CatalogNumber'].astype(str)
-    import_barcode_list = list(df.full_record['CatalogNumber'])
+    df['CatalogNumber'] = df['CatalogNumber'].apply(remove_non_numerics)
+    df['CatalogNumber'] = df['CatalogNumber'].astype(str)
+    import_barcode_list = list(df['CatalogNumber'])
     print(import_barcode_list)
     query_string = "SELECT CatalogNumber FROM casbotany.collectionobject " \
                    "WHERE CatalogNumber IN ({});".format(', '.join(str(item) for item in import_barcode_list))
@@ -185,16 +183,16 @@ def barcode_has_record(df: pd.DataFrame):
     database_samples['CatalogNumber'] = database_samples['CatalogNumber'].astype(str)
     database_samples = database_samples['CatalogNumber'].tolist()
     print(database_samples)
-    df.full_record['indatabase'] = None
+    df['indatabase'] = None
     for index, barcode in enumerate(import_barcode_list):
         if barcode in database_samples:
-            df.full_record.at[index, 'indatabase'] = True
+            df.at[index, 'indatabase'] = True
         else:
-            df.full_record.at[index, 'indatabase'] = False
+            df.at[index, 'indatabase'] = False
 
 
-def check_if_images_present(self):
-    self.full_record['image_valid'] = self.full_record['image_path'].apply(Importer.check_for_valid_image())
+def check_if_images_present(df: pd.DataFrame):
+    df['image_valid'] = df['image_path'].apply(Importer.check_for_valid_image())
 
 
 

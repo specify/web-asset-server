@@ -3,14 +3,13 @@ import csv
 import unittest
 import random
 import shutil
-import glob
 import numpy as np
 import pandas as pd
 from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
 
-# need to find a way to prevent the fake folders using todays date in the setUP,
+# need to find a way to prevent the fake folders using today's date in the setUP,
 # from overwriting the contents of real folders
 
 def test_date():
@@ -26,7 +25,7 @@ class WorkingDirectoryTests(unittest.TestCase):
         correct working directory, subdirectories."""
 
     def test_working_directory(self):
-        """test if user in correct working folder picturae import"""
+        """test if user in correct working folder image_client"""
         expected_relative = "image_client"
         current_dir = os.getcwd()
         _, last_directory = os.path.split(current_dir)
@@ -42,7 +41,7 @@ class WorkingDirectoryTests(unittest.TestCase):
         date_string = test_date()
         with self.assertRaises(ValueError) as cm:
             file_present(test_date())
-        self.assertEqual(str(cm.exception), f"subdirectory for {test_date()} not present")
+        self.assertEqual(str(cm.exception), f"subdirectory for {date_string} not present")
 
 
 class FilePathTests(unittest.TestCase):
@@ -51,7 +50,7 @@ class FilePathTests(unittest.TestCase):
 
     def setUp(self):
         """setUP: unittest setup function creates empty csvs,
-                  folders for given test path"""
+                  and folders for given test path"""
 
         # print("setup called!")
         # create test directories
@@ -70,8 +69,9 @@ class FilePathTests(unittest.TestCase):
         open(expected_specimen_path, 'a').close()
 
     def test_expected_path_date(self):
-        """test_expected_path_date: makes temporary folders,
-           and csvs with test_date, to test function"""
+        """test_expected_path_date: tests , when the
+          folders are correctly created that there is
+          no exception raised"""
         date_string = test_date()
         try:
             file_present(date_string)
@@ -80,7 +80,7 @@ class FilePathTests(unittest.TestCase):
 
     def test_raise_specimen(self):
         """test_raise_specimen: tests whether correct value
-           error is raised for missing specimen csv"""
+           error is raised for missing specimen_csv"""
         date_string = test_date()
         # removing test path specimen
         os.remove('picturae_csv/' + str(date_string) + '/picturae_specimen(' +
@@ -91,7 +91,7 @@ class FilePathTests(unittest.TestCase):
 
     def test_raise_folder(self):
         """test_raise_folder: tests whether correct value error
-           is raised for missing folder csv"""
+           is raised for missing folder_csv"""
         date_string = test_date()
         # removing test path folder
         os.remove('picturae_csv/' + str(date_string) + '/picturae_folder(' +
@@ -163,29 +163,30 @@ class CsvReadMergeTests(unittest.TestCase):
             print(f"Fake dataset {path} with {num_records} records created successfully")
 
     def test_file_empty(self):
-        """tests for every argument variation if dataset returns as empty"""
+        """tests if dataset returns as empty set or not"""
         date_string = test_date()
         self.assertEqual(csv_read_folder("folder", import_date=date_string).empty, False)
         self.assertEqual(csv_read_folder("specimen", import_date=date_string).empty,
                          False)
 
     def test_file_colnumber(self):
-        """tests for every argument variation, if correct # of columns"""
+        """tests if expected # of columns given test datasets"""
         date_string = test_date()
         self.assertEqual(len(csv_read_folder("folder", import_date=date_string).columns), 3)
         self.assertEqual(len(csv_read_folder("specimen", import_date=date_string)).columns, 3)
 
     def test_barcode_column_present(self):
-        """tests for every argument variation, if barcode column is present
-           (test if column names loaded correctly, specimen_barcode being in any csv)"""
+        """tests if barcode column is present
+           (test if column names loaded correctly,
+           specimen_barcode being in required in both csvs)"""
         date_string = test_date()
         self.assertEqual('specimen_barcode' in csv_read_folder("folder", import_date=date_string).columns, True)
-        self.assertEqual('specimen_barcode' in csv_read_folder("folder", import_date=date_string).columns, True)
+        self.assertEqual('specimen_barcode' in csv_read_folder("specimen", import_date=date_string).columns, True)
 
     # these tests are for the csv merge function
     def test_merge_num_columns(self):
-        """test merge with sample data set , to check if shared columns are removed,
-           and that the merge occurs with expected columns"""
+        """test merge with sample data set , checks if shared columns are removed,
+           and that the merge occurs with expected # of columns"""
         date_string = test_date()
         csv_specimen = csv_read_folder(folder_string="folder", import_date=date_string)
         csv_folder = csv_read_folder(folder_string="specimen", import_date=date_string)
@@ -195,6 +196,7 @@ class CsvReadMergeTests(unittest.TestCase):
 
     def test_index_length_matches(self):
         """checks whether dataframe, length changes,
+           which would hint at barcode mismatch problem,
            as folder and specimen csvs should
            always be 100% matches on barcodes
            """
@@ -206,7 +208,7 @@ class CsvReadMergeTests(unittest.TestCase):
                          len(csv_folder))
 
     def test_unequalbarcode_raise(self):
-        """checks whether inserted errors in barcode raise
+        """checks whether inserted errors in barcode column raise
            a Value error raise in the merge function"""
         date_string = test_date()
         # testing output
@@ -218,8 +220,8 @@ class CsvReadMergeTests(unittest.TestCase):
         self.assertEqual(str(cm.exception), "Barcode Columns do not match!")
 
     def test_output_isnot_empty(self):
-        """tests whether merge function
-           produces empty dataframe"""
+        """tests whether merge function accidentally
+           produces an empty dataframe"""
         date_string=test_date()
         # testing output
         csv_folder = csv_read_folder(folder_string="folder", import_date=date_string)
@@ -227,7 +229,7 @@ class CsvReadMergeTests(unittest.TestCase):
         self.assertFalse(csv_merge(csv_folder, csv_specimen).empty)
 
     def tearDown(self):
-        """deletes destination directories of dummy datasets"""
+        """deletes destination directories for dummy datasets"""
         # print("teardown called!")
         date_string = test_date()
 
@@ -239,6 +241,7 @@ class CsvReadMergeTests(unittest.TestCase):
 
 class ColNamesTest(unittest.TestCase):
     def setUp(self):
+        """creates dummy dataset with representative column names"""
         numb_range = list(range(1, 101))
         column_names = ['application_batch', 'csv_batch', 'object_type', 'folder_barcode',
                         'specimen_barcode', 'filed_as_family', 'barcode_info', 'path_jpg',
@@ -266,7 +269,7 @@ class ColNamesTest(unittest.TestCase):
 
     def test_if_codes(self):
         """test_if_codes: test if columns that contain codes
-           like Barcode, folder barcode and jpeg_path present
+           like Barcode, folder barcode and jpeg_path are present
         """
         csv_test = csv_colnames(self.new_df)
         csv_columns = csv_test.columns
@@ -276,7 +279,7 @@ class ColNamesTest(unittest.TestCase):
     def test_if_collector(self):
         """test_if_collector: tests whether certain essential
            collector columns present such as collector number, First Name,
-           Middle Name, Last Name
+           Middle Name, Last Name are present
         """
         csv_test = csv_colnames(self.new_df)
         csv_columns = csv_test.columns
@@ -286,7 +289,7 @@ class ColNamesTest(unittest.TestCase):
 
     def test_if_taxon(self):
         """test_if_taxon: makes sure some key taxon related columns,
-           are present with correct names in present dataset
+           are present
         """
         csv_test = csv_colnames(self.new_df)
         csv_columns = csv_test.columns
@@ -304,7 +307,7 @@ class ColNamesTest(unittest.TestCase):
 class DatabaseChecks(unittest.TestCase):
     def setUp(self):
         """creates fake dataset with dummy columns,
-          that have a small subset of representive real column names,
+          that have a small subset of representative real column names,
           """
         data = {'CatalogNumber': ['580092.jpg', '58719323.jpg', '8708.jpg'],
                 'image_path': ['picture_folder/cas123456.jpg',
@@ -315,22 +318,30 @@ class DatabaseChecks(unittest.TestCase):
         self.fake_df = pd.DataFrame(data)
 
     def test_column_present(self):
+        """checks whether boolean column added for record present"""
         test_df = barcode_has_record(self.fake_df)
         self.assertEqual(len(test_df.columns), 4)
 
     def test_row_length(self):
+        """tests whether # rows is preserved after
+           record present operation"""
         test_df = self.fake_df
         barcode_df = barcode_has_record(self.fake_df)
         self.assertEqual(len(test_df), len(barcode_df))
 
     def test_check_false_barcode(self):
+        """tests if when a false barcode is tested, the
+           correct False boolean appears"""
         test_df = barcode_has_record(self.fake_df)
         test_list = list(test_df['indatabase'])
         self.assertEqual(test_list, [True, False, True])
 
 
 class CheckImagePaths(unittest.TestCase):
+    """this class is for testing if for every barcode,
+       there is an equivalent relevant jpeg and tif file."""
     def setUp(self):
+        """setup creating matrix with real test image paths to test."""
         folder_path = 'test_images'
         file_paths = []
         for root, dirs, files in os.walk(folder_path):
@@ -343,6 +354,7 @@ class CheckImagePaths(unittest.TestCase):
         self.test_df = path_df
 
     def test_true_files(self):
+        """tests if images that are confirmed to be present return a True"""
         new_df = check_if_images_present(self.test_df)
         self.assertTrue('image_valid' in new_df.columns)
         self.assertTrue(new_df['image_valid'].all() is True)
