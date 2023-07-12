@@ -23,7 +23,10 @@ def set_direct():
             none
             """
     # get current directory
-    current_directory = os.getcwd()
+    #current_directory = os.getcwd()
+    # this is absolute path for running chron from bin
+    current_directory = "/Users/mdelaroca/Documents/sandbox_db/" \
+                        "specify-sandbox/web-asset-server"
     # set current directory
     os.chdir(current_directory)
 

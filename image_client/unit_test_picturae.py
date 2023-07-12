@@ -171,11 +171,12 @@ class CsvReadMergeTests(unittest.TestCase):
                     writer.writerow([specimen_bar, folder_barcode, jpg_path])
             print(f"Fake dataset {path} with {num_records} records created successfully")
 
+            self.DataOnboard.record_full = pd.DataFrame
+
     def test_file_empty(self):
         """tests if dataset returns as empty set or not"""
         self.assertEqual(self.DataOnboard.csv_read_folder('folder').empty, False)
-        self.assertEqual(self.DataOnboard.csv_read_folder('specimen').empty,
-                         False)
+        self.assertEqual(self.DataOnboard.csv_read_folder('specimen').empty, False)
 
     def test_file_colnumber(self):
         """tests if expected # of columns given test datasets"""
@@ -194,7 +195,8 @@ class CsvReadMergeTests(unittest.TestCase):
         """test merge with sample data set , checks if shared columns are removed,
            and that the merge occurs with expected # of columns"""
         # -3 as merge function drops duplicate columns automatically
-        self.assertEqual(len(self.DataOnboard.csv_merge().columns),
+        self.DataOnboard.csv_merge()
+        self.assertEqual(len(self.DataOnboard.record_full.columns),
                          len(self.DataOnboard.csv_read_folder('folder').columns) +
                          len(self.DataOnboard.csv_read_folder('specimen').columns) - 3)
 
@@ -204,15 +206,15 @@ class CsvReadMergeTests(unittest.TestCase):
            as folder and specimen csvs should
            always be 100% matches on barcodes
            """
+        self.DataOnboard.csv_merge()
         csv_folder = self.DataOnboard.csv_read_folder('folder')
         # test merge index before and after
-        self.assertEqual(len(self.DataOnboard.csv_merge()),
+        self.assertEqual(len(self.DataOnboard.record_full),
                          len(csv_folder))
 
     def test_unequalbarcode_raise(self):
         """checks whether inserted errors in barcode column raise
            a Value error raise in the merge function"""
-        date_string = test_date()
         # testing output
         csv_folder = self.DataOnboard.csv_read_folder(folder_string="folder")
         csv_specimen = self.DataOnboard.csv_read_folder(folder_string="specimen")
@@ -221,13 +223,15 @@ class CsvReadMergeTests(unittest.TestCase):
     def test_output_isnot_empty(self):
         """tests whether merge function accidentally
            produces an empty dataframe"""
+        self.DataOnboard.csv_merge()
         # testing output
-        self.assertFalse(self.DataOnboard.csv_merge().empty)
+        self.assertFalse(self.DataOnboard.record_full.empty)
 
     def tearDown(self):
         """deletes destination directories for dummy datasets"""
         # print("teardown called!")
         # deleting instance
+        del self.DataOnboard.record_full
         del self.DataOnboard
         # deleting folders
         date_string = test_date()
@@ -267,14 +271,16 @@ class ColNamesTest(unittest.TestCase):
         new_df['Notes'] = np.NAN
         new_df['Feedback'] = np.NAN
 
-        self.new_df = pd.DataFrame(new_df)
+        self.DataOnboard.record_full = pd.DataFrame(new_df)
+
+        print(self.DataOnboard.record_full)
 
     def test_if_codes(self):
         """test_if_codes: test if columns that contain codes
            like Barcode, folder barcode and jpeg_path are present
         """
-        csv_test = self.DataOnboard.csv_colnames(self.new_df)
-        csv_columns = csv_test.columns
+        self.DataOnboard.csv_colnames()
+        csv_columns = self.DataOnboard.record_full.columns
         column_names = ['CatalogNumber', 'folder_barcode', 'image_path']
         self.assertTrue(all(column in csv_columns for column in column_names))
 
@@ -283,8 +289,8 @@ class ColNamesTest(unittest.TestCase):
            collector columns present such as collector number, First Name,
            Middle Name, Last Name are present
         """
-        csv_test = self.DataOnboard.csv_colnames(self.new_df)
-        csv_columns = csv_test.columns
+        self.DataOnboard.csv_colnames()
+        csv_columns = self.DataOnboard.record_full.columns
         column_names = ['collector_number', 'collector_first_name1',
                         'collector_middle_name1', 'collector_last_name1']
         self.assertTrue(all(column in csv_columns for column in column_names))
@@ -293,22 +299,23 @@ class ColNamesTest(unittest.TestCase):
         """test_if_taxon: makes sure some key taxon related columns,
            are present
         """
-        csv_test = self.DataOnboard.csv_colnames(self.new_df)
-        csv_columns = csv_test.columns
+        self.DataOnboard.csv_colnames()
+        csv_columns = self.DataOnboard.record_full.columns
         column_names = ['Genus', 'Species',
                         'RankID', 'Author']
         self.assertTrue(all(column in csv_columns for column in column_names))
 
     def test_if_nas(self):
         """test_if_nas: test if any left-over columns contain only NAs"""
-        csv_test = self.DataOnboard.csv_colnames(self.new_df)
-        csv_drop = csv_test.dropna(axis=1, how='all')
-        self.assertEqual(len(csv_drop.columns), len(csv_test.columns))
+        self.DataOnboard.csv_colnames()
+        self.record_full = self.DataOnboard.record_full.dropna(axis=1, how='all')
+        self.assertEqual(len(self.record_full.columns), len(self.record_full.columns))
 
     def tearDown(self):
+        del self.DataOnboard.record_full
+
         del self.DataOnboard
 
-        del self.new_df
 
 
 class DatabaseChecks(unittest.TestCase):
@@ -327,36 +334,36 @@ class DatabaseChecks(unittest.TestCase):
                                'picturae_folder/cas8708.jpg'],
                 'folder_barcode': ['2310_2', '2310_2', '2312_2']}
 
-        self.fake_df = pd.DataFrame(data)
+        self.DataOnboard.record_full = pd.DataFrame(data)
+        print(self.DataOnboard.record_full)
 
     def test_column_present(self):
         """checks whether boolean column added for record present"""
-        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
-        self.assertEqual(len(test_df.columns), 4)
+        self.DataOnboard.barcode_has_record()
+        self.assertEqual(len(self.DataOnboard.record_full.columns), 4)
 
     def test_row_length(self):
         """tests whether # rows is preserved after
            record present operation"""
-        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
-        self.assertEqual(len(test_df), 3)
+        self.DataOnboard.barcode_has_record()
+        self.assertEqual(len(self.DataOnboard.record_full), 3)
 
     def test_check_barcode_present(self):
         """tests if when a false barcode is tested, the
            correct False boolean appears"""
-        test_df = self.DataOnboard.barcode_has_record(self.fake_df)
-        test_list = list(test_df['barcode_present'])
+        self.DataOnboard.barcode_has_record()
+        test_list = list(self.DataOnboard.record_full['barcode_present'])
         self.assertEqual(test_list, [True, False, True])
 
     def test_if_barcode_match(self):
-        new_data = self.fake_df
-        match_frame = self.DataOnboard.check_barcode_match(new_data)
-        test_list = list(match_frame['is_barcode_match'])
+        self.DataOnboard.check_barcode_match()
+        test_list = list(self.DataOnboard.record_full['is_barcode_match'])
         self.assertEqual([False, True, True], test_list)
 
     def tearDown(self):
-        del self.DataOnboard
+        del self.DataOnboard.record_full
 
-        del self.fake_df
+        del self.DataOnboard
 
 
 class CheckImagePaths(unittest.TestCase):
@@ -376,17 +383,17 @@ class CheckImagePaths(unittest.TestCase):
                     file_paths.append(file_path)
 
         path_df = pd.DataFrame({'image_path': file_paths})
-        print(path_df)
-        self.test_df = path_df
+        self.DataOnboard.record_full = path_df
 
     def test_true_files(self):
         """tests if images that are confirmed to be present return a True"""
-        new_df = self.DataOnboard.check_if_images_present(self.test_df)
-        print(new_df)
-        self.assertTrue('image_valid' in new_df.columns)
-        self.assertTrue(all(new_df['image_valid']))
+        self.DataOnboard.check_if_images_present()
+        self.assertTrue('image_valid' in self.DataOnboard.record_full.columns)
+        self.assertTrue(all(self.DataOnboard.record_full['image_valid']))
 
     def tearDown(self):
+        del self.DataOnboard.record_full
+
         del self.DataOnboard
 
 
