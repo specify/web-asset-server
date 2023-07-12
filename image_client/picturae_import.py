@@ -1,18 +1,22 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
+import picturae_config
 import os
 from datetime import date
 from data_utils import *
 import pandas as pd
 from importer import Importer
-from botany_importer import BotanyImporter
 from db_utils import DbUtils
+from specify_db import SpecifyDb
+from botany_importer import BotanyImporter
+import logging
 
 
-
-class DataOnboard:
+class DataOnboard(Importer):
     def __init__(self, date_string):
+        super().__init__(picturae_config, "Botany")
         self.date_use = date_string
-
+        self.logger = logging.getLogger('DataOnboard')
+        # initialize classes
 
     def to_current_directory(self):
         """to_current_directory: changes current directory to .py file location
@@ -143,106 +147,135 @@ class DataOnboard:
         return df
 
 
-# def mapping_AuthorID(df: pd.DataFrame):
+    # def mapping_AuthorID(df: pd.DataFrame):
 
-# def mapping_LocalityID(df: pd.Dataframe):
+    # def mapping_LocalityID(df: pd.Dataframe):
 
-# def mapping_TaxonID(df: pd.Dataframe):
-
-
-# under this point column transformations will be done through a series of functions
-# will reuse/modify some wrangling functions from data standardization
+    # def mapping_TaxonID(df: pd.Dataframe):
 
 
-# def col_clean():
-#    """will reformat and clean dataframe until ready for upload.
-#       **Still need format end-goal
-#       """
+    # under this point column transformations will be done through a series of functions
+    # will reuse/modify some wrangling functions from data standardization
 
 
-# after file is wrangled into clean importable form,
-# and QC protocols to follow before import
-# QC measures needed here ? before proceeding.
+    # def col_clean():
+    #    """will reformat and clean dataframe until ready for upload.
+    #       **Still need format end-goal
+    #       """
 
 
-# final database query functions, to test if data in database
-# want to know , is image and attachment already in database?
-# is collection object already in database?
-# how do we manage a conflict between records?
+    # after file is wrangled into clean importable form,
+    # and QC protocols to follow before import
+    # QC measures needed here ? before proceeding.
 
-
-# replace database reference to more current table
     def barcode_has_record(self, df: pd.DataFrame):
-        """checks whether barcode is present in database already
-            args:
-                dataframe object with indatabase True, False boolean"""
         df['CatalogNumber'] = df['CatalogNumber'].apply(remove_non_numerics)
         df['CatalogNumber'] = df['CatalogNumber'].astype(str)
-        import_barcode_list = list(df['CatalogNumber'])
-        print(import_barcode_list)
-        query_string = "SELECT CatalogNumber FROM casbotany.collectionobject " \
-                       "WHERE CatalogNumber IN ({});".format(', '.join(str(item) for item in import_barcode_list))
-        database_samples = data_exporter(query_string=query_string, fromsql=True,
-                                         local_path="test_barcodes/barcode_db.csv")
-        database_samples['CatalogNumber'] = database_samples['CatalogNumber'].astype(str)
-        database_samples = database_samples['CatalogNumber'].tolist()
-        print(database_samples)
-        df['indatabase'] = None
-        for index, barcode in enumerate(import_barcode_list):
-            if barcode in database_samples:
-                df.at[index, 'indatabase'] = True
+        df['barcode_present'] = None
+        for index, row in df.iterrows():
+            barcode = os.path.basename(row['CatalogNumber'])
+            barcode = barcode.zfill(9)
+            sql = f"select CatalogNumber from casbotany.collectionobject " \
+                  f"where CatalogNumber = {barcode}"
+            db_barcode = self.specify_db_connection.get_one_record(sql)
+            if db_barcode is None:
+                row['barcode_present'] = False
             else:
-                df.at[index, 'indatabase'] = False
+                row['barcode_present'] = True
         return df
+
+
+    def image_has_record(self, df: pd.DataFrame):
+
+        df['image_present'] = None
+        for index, row in df.iterrows():
+            file_name = os.path.basename(row['image_path'])
+            file_name = file_name.lower()
+            sql = f"select origFilename from casbotany.attachment " \
+                  f"where origFilename = {file_name}"
+            db_name = self.specify_db_connection.get_one_record(sql)
+            if db_name is None:
+                row['image_present'] = True
+            else:
+                row['image_present'] = False
+        return df
+
 
 # def check_attachment(df: pd.DataFrame):
 
 # under construction
+    # although this could be done on a row be row basis,
+    # it is faster to make booleans now, and filter later in the process function
+
+    def check_barcode_match(self, df: pd.DataFrame):
+        """checks if filepath barcode matches catalog number barcode"""
+        df['file_path_digits'] = df['image_path'].apply(
+            lambda path: self.get_first_digits_from_filepath(path, field_size=9)
+        )
+        print(df['file_path_digits'])
+        df['is_barcode_match'] = df.apply(lambda row: row['file_path_digits'] ==
+                                          row['CatalogNumber'].zfill(9), axis=1)
+        df = df.drop(columns='file_path_digits')
+        return df
+
+
     def check_if_images_present(self, df: pd.DataFrame):
-        df['image_valid'] = df['image_path'].apply(Importer.check_for_valid_image())
+        """checks that each image exists, creating boolean column for later use"""
+        df['image_valid'] = df['image_path'].apply(self.check_for_valid_image)
+        return df
 
+    # think of finding way to make this function logic not so repetitive
+    def create_file_list(self, df: pd.DataFrame):
+        """loops through each row in csv to create skeleton record
+            creates a list of imagepaths and barcodes for upload"""
+        barcode_list =[]
+        image_list = []
+        for index, row in df.iterrows():
+            if row['image_valid'] is False:
+                raise ValueError(f"image {row['image_path']} is not valid ")
+
+            if row['is_barcode_match'] is False:
+                raise ValueError(f"image barcode {row['image_path']} does not match "
+                                 f"{row['CatalogNumber']}")
+
+            if row['barcode_present'] is True & row['image_present'] is True:
+                raise ValueError(f"record {row['CatalogNumber']} and image {row['image_path']} "
+                                 f"already in database")
+
+            if row['barcode_present'] is True & row['image_present'] is False:
+                image_list.append(row['image_path'])
+
+            if row['barcode_present'] is False & row['image_present'] is True:
+                barcode_list.append(row['CatalogNumber'])
+
+            else:
+                image_list.append(row['image_path'])
+                barcode_list.append(row['CatalogNumber'])
+
+        return image_list, barcode_list
+
+
+
+
+
+
+    # def create_csv_skeleton():
     def run_all_methods(self):
+        # setting directory
         self.to_current_directory()
+        # verifying file presence
         self.file_present()
+        # merging csv files
         full_frame = self.csv_merge()
+        # renaming columns
         full_frame = self.csv_colnames(full_frame)
+        # checking if barcode record present in database
         full_frame = self.barcode_has_record(full_frame)
+        # checking if attachment record present in database
+        # checking if barcode has valid image file
+        full_frame = self.check_if_images_present(full_frame)
+        full_frame = self.check_barcode_match(full_frame)
+        # creating skeleton
+        # uploading images from staging folder
+        # finished
 
-# def create_csv_skeleton():
-
-# def upload_skeleton_record(df: pd.DataFrame):
-    ###
-
-
-# def master_fun():
-#     """runs all functions"""
-#     # creating instances
-#     # seeing if file present
-#     file_present(import_date='2023-6-28')
-#     # uploading folder csv
-#     folder_csv = csv_read_folder(folder_string='folder', import_date='2023-6-28')
-#     # uploading specimen csv
-#     specimen_csv = csv_read_folder(folder_string='specimen', import_date='2023-6-28')
-#     # merging csvs
-#     full_csv = csv_merge(folder_csv, specimen_csv)
-#     # renaming columns
-#     full_csv = csv_colnames(full_csv)
-#     # checking if barcode in database
-#     full_csv = barcode_has_record(full_csv)
-#     # checking if image in database
-#
-#     # checking if csv barcodes have valid images present
-#     image_present = check_if_images_present(full_csv)
-#     # raise error if no image or record already present
-#     # cleaning (need more complete csv before I can decide on cleaning functions)
-#     # mapping columns to db_columns
-#     # creating skeleton record
-#     # verifying record
-#     # finished !
-#
-#     return full_csv
-#
-#
-# # calling master
-#
-# master_fun()

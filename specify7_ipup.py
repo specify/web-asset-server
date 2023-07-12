@@ -60,6 +60,8 @@ def master_run():
 
     ip_replace('image_client/server_host_settings.py')
 
+    ip_replace('image_client/picturae_config.py')
+
 
 # running master function
 master_run()

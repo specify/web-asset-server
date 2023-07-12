@@ -320,11 +320,11 @@ class DatabaseChecks(unittest.TestCase):
 
         self.DataOnboard = DataOnboard(date_string=test_date())
 
-        # creating dummy dataset
-        data = {'CatalogNumber': ['580092.jpg', '58719323.jpg', '8708.jpg'],
-                'image_path': ['picture_folder/cas123456.jpg',
-                               'picture_folder/cas68719323.jpg',
-                               'picture_folder/cas123457.jpg'],
+        # creating dummy dataset, one mistake inserted on purpose
+        data = {'CatalogNumber': ['580092', '58719322', '8708'],
+                'image_path': ['picturae_folder/cas580091.jpg',
+                               'picturae_folder/cas58719322.jpg',
+                               'picturae_folder/cas8708.jpg'],
                 'folder_barcode': ['2310_2', '2310_2', '2312_2']}
 
         self.fake_df = pd.DataFrame(data)
@@ -340,12 +340,18 @@ class DatabaseChecks(unittest.TestCase):
         test_df = self.DataOnboard.barcode_has_record(self.fake_df)
         self.assertEqual(len(test_df), 3)
 
-    def test_check_false_barcode(self):
+    def test_check_barcode_present(self):
         """tests if when a false barcode is tested, the
            correct False boolean appears"""
         test_df = self.DataOnboard.barcode_has_record(self.fake_df)
-        test_list = list(test_df['indatabase'])
+        test_list = list(test_df['barcode_present'])
         self.assertEqual(test_list, [True, False, True])
+
+    def test_if_barcode_match(self):
+        new_data = self.fake_df
+        match_frame = self.DataOnboard.check_barcode_match(new_data)
+        test_list = list(match_frame['is_barcode_match'])
+        self.assertEqual([False, True, True], test_list)
 
     def tearDown(self):
         del self.DataOnboard
@@ -365,8 +371,9 @@ class CheckImagePaths(unittest.TestCase):
         file_paths = []
         for root, dirs, files in os.walk(folder_path):
             for file in files:
-                file_path = os.path.join(root, file)
-                file_paths.append(file_path)
+                if file.endswith(('JPG', 'TIF')):
+                    file_path = os.path.join(root, file)
+                    file_paths.append(file_path)
 
         path_df = pd.DataFrame({'image_path': file_paths})
         print(path_df)
@@ -375,12 +382,12 @@ class CheckImagePaths(unittest.TestCase):
     def test_true_files(self):
         """tests if images that are confirmed to be present return a True"""
         new_df = self.DataOnboard.check_if_images_present(self.test_df)
+        print(new_df)
         self.assertTrue('image_valid' in new_df.columns)
-        self.assertTrue(new_df['image_valid'].all() is True)
+        self.assertTrue(all(new_df['image_valid']))
 
-
-
-
+    def tearDown(self):
+        del self.DataOnboard
 
 
 if __name__ == "__main__":

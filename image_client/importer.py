@@ -140,6 +140,7 @@ class Importer:
         attachment_id = self.attachment_utils.get_attachment_id(attachment_guid)
         self.connect_existing_attachment_to_collection_object_id(attachment_id, collection_object_id, agent_id)
 
+    # This may be replaceable by a simple re.sub + zfill
     def get_first_digits_from_filepath(self, filepath, field_size=9):
         basename = os.path.basename(filepath)
         ints = re.findall(r'\d+', basename)
