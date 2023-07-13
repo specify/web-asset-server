@@ -23,6 +23,7 @@ class DataOnboard(Importer):
         self.logger = logging.getLogger('DataOnboard')
         self.barcode_list = []
         self.image_list = []
+        self.collector_list = []
         self.record_full = pd.DataFrame
 
         # initializing all data fields
@@ -38,7 +39,6 @@ class DataOnboard(Importer):
         self.GeographyID = None
         self.locality_id = None
 
-    @staticmethod
     def to_current_directory(self):
         """to_current_directory: changes current directory to .py file location
             args:
@@ -230,7 +230,7 @@ class DataOnboard(Importer):
     # think of finding way to make this function logic not so repetitive
     def create_file_list(self):
         """creates a list of imagepaths and barcodes for upload,
-        after checking conditions established in earlier functions"""
+        after checking conditions established to prevent overwriting data functions"""
 
         for index, row in self.record_full.iterrows():
             if row['image_valid'] is False:
@@ -268,8 +268,10 @@ class DataOnboard(Importer):
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
-
     def populate_fields(self, row):
+        """this populates all the
+           initialized data fields per row for input into database
+        """
         self.barcode = row['CatalogNumber'].zfill(9)
         self.verbatim_date = row['verbatim_date']
         self.start_date = row['start_date']
@@ -287,119 +289,158 @@ class DataOnboard(Importer):
         sql = f"select LocalityID from casbotany.locality where Locality='{row['locality']}'"
         self.locality_id = self.specify_db_connection.get_one_record(sql)
 
-    def create_locality_record(self, row):
-        """used to assign columns to database tables using sql"""
-        self.logger.info(f"Creating skeleton for csv barcode {row['CatalogNumber']}")
+        sql = f"select CollectingEventID from casbotany.collectingevent where guid='{self.collecting_event_guid}'"
 
-        # assigning row ids
-        if self.locality_id is None:
-            # locality_id = some number
+        self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
+
+
+    def create_collector_list(self, row):
+        """creates a list of collectors that will be checked and added to agent/collector tables"""
+        self.collector_list = []
+        for i in range(5):
+            if row[f'collector_first_name{i}'] & row[f'collector_last_name{i}']:
+                collector_dict = {'collector_first_name': row[f'collector_first_name{i}'],
+                                  f'collector_middle_name1{i}': row[f'collector_middle_name{i}'],
+                                  f'collector_last_name{i}': row[f'collector_last_name{i}']}
+                self.collector_list.append(collector_dict)
+
+
+    def create_table_record(self, col_list, val_list, tab_name):
+            # removing brackets, making sure comma is not inside of quotations
+            column_list = ', '.join(col_list)
+            value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
+
             cursor = self.specify_db_connection.get_cursor()
-            sql = (f'''INSERT INTO casbotany.locality (
-                       LocalityID,
-                       TimestampCreated,
-                       TimestampModified,
-                       Version,
-                       GUID,
-                       LocalityName,
-                       DisciplineID,
-                       GeographyID
-                       )
-                       VALUES (
-                        
-                       '{time_utils.get_pst_time_now_string()}',
-                       '{time_utils.get_pst_time_now_string()}',
-                        1,
-                       '{self.locality_guid}',
-                       '{row['locality']}',
-                        3,
-                       '{self.GeographyID}' 
-                       )''')
+            sql = (f'''INSERT INTO casbotany.{tab_name} ( {column_list}
+                        )
+                        VALUES ( {value_list})''')
+            self.logger.info(f'running query: {sql}')
             self.logger.debug(sql)
             cursor.execute(sql)
             self.specify_db_connection.commit()
 
 
-def create_collectingevent(self, row):
-        # will add accession number
-        cursor = self.specify_db_connection.get_cursor()
-        sql =(f'''INSERT INTO casbotany.collectingevent (
-                  TimestampCreated,
-                  TimestampModified,
-                  Version,
-                  GUID,
-                  DisciplineID,
-                  StationFieldNumber,
-                  VerbatimDate,
-                  StartDate,
-                  EndDate,
-                  LocalityID
-                  )
-                  VALUES (
-                 '{time_utils.get_pst_time_now_string()}',
-                 '{time_utils.get_pst_time_now_string()}',
-                  0,
-                 '{self.collecting_event_guid}',
-                  3,
-                 '{self.collector_number}',
-                 '{self.verbatim_date}',
-                 '{self.start_date}',
-                 '{self.end_date}',
-                 '{self.locality_id}'
-                  )''')
-        self.logger.debug(sql)
-        cursor.execute(sql)
-        self.specify_db_connection.commit()
 
-        # collection object create
+    def create_locality_record(self, row):
+        """used to assign columns to database tables using sql"""
+        self.logger.info(f"Creating skeleton for csv barcode {row['CatalogNumber']}")
+
+        column_list = ['LocalityID',
+                       'TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'GUID',
+                       'LocalityName',
+                       'DisciplineID',
+                       'GeographyID']
+
+        value_list =[f"{self.LocalityID}",
+                     f"{time_utils.get_pst_time_now_string()}",
+                     f"{time_utils.get_pst_time_now_string()}",
+                     1,
+                     f"{self.locality_guid}",
+                     f"{row['locality']}",
+                     3,
+                     f"{self.GeographyID}"]
+
+        # assigning row ids
+        if self.locality_id is None:
+            self.create_table_record(col_list=column_list,
+                                     val_list=value_list, tab_name='locality')
 
 
-def create_collection_object(self, row):
-        sql = f"select CollectingEventID from casbotany.collectingevent where guid='{collecting_event_guid}'"
-        collecting_event_id = self.specify_db_connection.get_one_record(sql)
+    def create_collector_id(self, row):
+        """creating new collector ids if not already in Database"""
 
-        cursor = self.specify_db_connection.get_cursor()
+        column_list = ['LocalityID',
+                       'TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'GUID',
+                       'LocalityName',
+                       'DisciplineID',
+                       'GeographyID']
 
-        sql = (f'''INSERT INTO casbotany.collectionobject (
-                  TimestampCreated,
-                  TimestampModified,
-                  CollectingEventID,
-                  Version,
-                  CollectionMemberID,
-                  CatalogNumber,
-                  CatalogedDatePrecision,
-                  GUID,
-                  CollectionID,
-                  Date1Precision,
-                  InventoryDatePrecision    
-                  )
-        
-                  )
-                  VALUES (
-                  '{time_utils.get_pst_time_now_string()}',
-                  '{time_utils.get_pst_time_now_string()}'),
-                  '{collecting_event_id}',
-                  0,
-                  4,
-                  '{self.barcode}',
-                  1,
-                  '{uuid4()}',
-                  4,
-                  1,
-                  1  )
-                   ''')
+        value_list =[f"{self.LocalityID}",
+                     f"{time_utils.get_pst_time_now_string()}",
+                     f"{time_utils.get_pst_time_now_string()}",
+                     1,
+                     f"{self.locality_guid}",
+                     f"{row['locality']}",
+                     3,
+                     f"{self.GeographyID}"]
 
-        self.logger.debug(sql)
-        cursor.execute(sql)
-        self.specify_db_connection.commit()
+        # assigning row ids
+        if self.locality_id is None:
+            self.create_table_record(col_list=column_list,
+                                     val_list=value_list, tab_name='locality')
 
 
-def determiner_create(self, row):
-    pass
+    def create_collectingevent(self):
+            # will add accession number
+            table ='collectingevent'
+            column_list = ['TimestampCreated',
+                           'TimestampModified',
+                           'Version',
+                           'GUID',
+                           'DisciplineID',
+                           'StationFieldNumber',
+                           'VerbatimDate',
+                           'StartDate',
+                           'EndDate',
+                           'LocalityID']
 
-#if determiner is None:
-# cursor = self.specify_db_connection.get_cursor()
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          0,
+                          f"{self.collecting_event_guid}",
+                          3,
+                          f"{self.collector_number}",
+                          f"{self.verbatim_date}",
+                          f"{self.start_date}",
+                          f"{self.end_date}",
+                          f"{self.locality_id}"]
 
+            self.create_table_record(tab_name=table, col_list=column_list, val_list=value_list)
+
+    def create_collection_object(self):
+
+            # will new collecting event ids need to be created ?
+
+            table_name = 'collectionobject'
+
+            column_list = ['TimestampCreated',
+                           'TimestampModified',
+                           'CollectingEventID',
+                           'Version',
+                           'CollectionMemberID',
+                           'CatalogNumber',
+                           'CatalogedDatePrecision',
+                           'GUID',
+                           'CollectionID',
+                           'Date1Precision',
+                           'InventoryDatePrecision']
+
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          f"{self.collecting_event_id}",
+                          0,
+                          4,
+                          f"{self.barcode}",
+                          1,
+                          f"{uuid4()}",
+                          4,
+                          1,
+                          1]
+
+            self.create_table_record(table=table_name, col_list=column_list, val_list=value_list)
+
+
+
+    # creating image attachments
+
+
+    # uploading images
 
     # def csv_barcode_process:
 
