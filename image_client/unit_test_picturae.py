@@ -9,6 +9,8 @@ from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
 from picturae_import import DataOnboard
+from importer import Importer
+from mock import patch
 
 # need to find a way to prevent the fake folders using today's date in the setUP,
 # from overwriting the contents of real folders
@@ -396,6 +398,28 @@ class CheckImagePaths(unittest.TestCase):
 
         del self.DataOnboard
 
+class test_sql_insert(unittest.TestCase):
+    def setUp(self):
+        self.DataOnboard = DataOnboard(test_date())
+
+
+    def test_sql_concat(self):
+        # creating function parameters
+        table_select = 'agent'
+        column_list = ['AgentType', 'FirstName', 'MiddleInitial']
+        value_list = [1, 'Fake', 'Name']
+
+        column_list = ', '.join(column_list)
+        value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in value_list)
+
+        sql = (f'''INSERT INTO casbotany.{table_select} ({column_list}) VALUES({value_list})''')
+        print(sql)
+        # assert statement
+        expected_output = f'''INSERT INTO casbotany.agent (AgentType, FirstName, MiddleInitial) VALUES(1, 'Fake', 'Name')'''
+        self.assertEqual(sql, expected_output)
+
+    def tearDown(self):
+        del self.DataOnboard
 
 if __name__ == "__main__":
     unittest.main()
