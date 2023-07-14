@@ -10,6 +10,7 @@ import pandas as pd
 from importer import Importer
 from db_utils import DbUtils
 import logging
+import subprocess
 
 
 class DataOnboard(Importer):
@@ -25,19 +26,14 @@ class DataOnboard(Importer):
         self.image_list = []
         self.collector_list = []
         self.record_full = pd.DataFrame
-
-        # initializing all data fields
-        self.barcode = None
-        self.verbatim_date = None
-        self.start_date = None
-        self.end_date = None
-        self.collector_number = None
-        self.locality = None
-        self.collecting_event_guid = None
-        self.locality_guid = None
-        self.geography_string = None
-        self.GeographyID = None
-        self.locality_id = None
+        # intializing parameters for database upload
+        init_list = ['barcode', 'verbatim_date', 'start_date', 'end_date',
+                     'collector_number', 'locality', 'collecting_event_guid',
+                     'locality_guid', 'agent_guid', 'geography_string',
+                     'GeographyID', 'locality_id', 'full_name', 'tax_name',
+                     'locality']
+        for param in init_list:
+            setattr(self, param, None)
 
     def to_current_directory(self):
         """to_current_directory: changes current directory to .py file location
@@ -162,7 +158,6 @@ class DataOnboard(Importer):
                     'Verbatim Date': 'verbatim_date',
                     'Start Date': 'start_date',
                     'End Date': 'end_date'
-
                      }
 
         self.record_full = self.record_full.rename(columns=col_dict)
@@ -222,7 +217,6 @@ class DataOnboard(Importer):
 
         self.record_full = self.record_full.drop(columns='file_path_digits')
 
-
     def check_if_images_present(self):
         """checks that each image exists, creating boolean column for later use"""
         self.record_full['image_valid'] = self.record_full['image_path'].apply(self.check_for_valid_image)
@@ -233,23 +227,23 @@ class DataOnboard(Importer):
         after checking conditions established to prevent overwriting data functions"""
 
         for index, row in self.record_full.iterrows():
-            if row['image_valid'] is False:
+            if not row['image_valid']:
                 raise ValueError(f"image {row['image_path']} is not valid ")
 
-            if row['is_barcode_match'] is False:
+            if not row['is_barcode_match']:
                 raise ValueError(f"image barcode {row['image_path']} does not match "
                                  f"{row['CatalogNumber']}")
 
-            if row['barcode_present'] is True & row['image_present'] is True:
+            if row['barcode_present'] and row['image_present']:
                 raise ValueError(f"record {row['CatalogNumber']} and image {row['image_path']} "
                                  f"already in database")
 
-            if row['barcode_present'] is True & row['image_present'] is False:
+            if row['barcode_present'] and not row['image_present']:
                 self.logger.debug(f"record {row['CatalogNumber']} "
                                   f"already in database, appending image")
                 self.image_list.append(row['image_path'])
 
-            if row['barcode_present'] is False & row['image_present'] is True:
+            if not row['barcode_present'] and row['image_present']:
                 self.logger.debug(f"image {row['image_path']} "
                                   f"already in database, appending record")
                 self.barcode_list.append(row['CatalogNumber'])
@@ -268,6 +262,60 @@ class DataOnboard(Importer):
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
+
+    def create_table_record(self, col_list, val_list, tab_name):
+        """creates a record on given database table, with column list and value list,
+                args:
+                    col_list: list of database table columns to fill
+                    val_list: list of values to input into each table
+                    tab_name: name of the table you wish to insert data into
+        """
+        # removing brackets, making sure comma is not inside of quotations
+        column_list = ', '.join(col_list)
+        value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
+
+        cursor = self.specify_db_connection.get_cursor()
+        sql = (f'''INSERT INTO casbotany.{tab_name} ( {column_list}
+                    )
+                    VALUES( {value_list})''')
+        self.logger.info(f'running query: {sql}')
+        self.logger.debug(sql)
+        cursor.execute(sql)
+        self.specify_db_connection.commit()
+
+    # will change row references to numeric index.
+    def create_agent_list(self, row):
+        """creates a list of collectors that will be checked and added to agent/collector tables"""
+        self.collector_list = []
+        for i in range(1, 6):
+            if row[f'collector_first_name{i}'] & row[f'collector_last_name{i}']:
+                sql = f'''SELECT AgentID FROM agent WHERE FirstName = {row[f'collector_first_name{i}']} 
+                         AND LastName = {row[f'collector_last_name{i}']}'''
+                AgentID = self.specify_db_connection.get_one_record(sql)
+                if AgentID is not None:
+                    collector_dict = {'collector_first_name': row[f'collector_first_name{i}'],
+                                      f'collector_middle_name': row[f'collector_middle_name{i}'],
+                                      f'collector_last_name': row[f'collector_last_name{i}']}
+                    self.collector_list.append(collector_dict)
+
+    def concat_taxon(self, row):
+        """parses taxon columns to include in taxon table
+        """
+        self.full_name = ""
+        if row['Hybrid'] is False:
+            columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
+        else:
+            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank', 'Hybrid Epithet']
+
+        for column in columns:
+            if row[column]:
+                self.full_name += f" {row[column]}"
+
+        # creating taxon name
+        taxon_strings = self.full_name.split()
+        self.tax_name = taxon_strings[-1]
+
+
     def populate_fields(self, row):
         """this populates all the
            initialized data fields per row for input into database
@@ -280,7 +328,12 @@ class DataOnboard(Importer):
         self.locality = row['locality']
         self.collecting_event_guid = uuid4()
         self.locality_guid = uuid4()
+        self.agent_guid = uuid4()
         self.geography_string = str(row['county']) + ", " + str(row['state']) + ", " + str(row['country'])
+
+        # taxon info
+        # creating agent list
+        self.create_agent_list(row)
 
         # Locality create
         sql = f"SELECT GeographyID FROM geography where `FullName` = {self.geography_string};"
@@ -294,36 +347,8 @@ class DataOnboard(Importer):
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
 
-    def create_collector_list(self, row):
-        """creates a list of collectors that will be checked and added to agent/collector tables"""
-        self.collector_list = []
-        for i in range(5):
-            if row[f'collector_first_name{i}'] & row[f'collector_last_name{i}']:
-                collector_dict = {'collector_first_name': row[f'collector_first_name{i}'],
-                                  f'collector_middle_name1{i}': row[f'collector_middle_name{i}'],
-                                  f'collector_last_name{i}': row[f'collector_last_name{i}']}
-                self.collector_list.append(collector_dict)
-
-
-    def create_table_record(self, col_list, val_list, tab_name):
-            # removing brackets, making sure comma is not inside of quotations
-            column_list = ', '.join(col_list)
-            value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
-
-            cursor = self.specify_db_connection.get_cursor()
-            sql = (f'''INSERT INTO casbotany.{tab_name} ( {column_list}
-                        )
-                        VALUES ( {value_list})''')
-            self.logger.info(f'running query: {sql}')
-            self.logger.debug(sql)
-            cursor.execute(sql)
-            self.specify_db_connection.commit()
-
-
-
-    def create_locality_record(self, row):
+    def create_locality_record(self):
         """used to assign columns to database tables using sql"""
-        self.logger.info(f"Creating skeleton for csv barcode {row['CatalogNumber']}")
 
         column_list = ['LocalityID',
                        'TimestampCreated',
@@ -339,7 +364,7 @@ class DataOnboard(Importer):
                      f"{time_utils.get_pst_time_now_string()}",
                      1,
                      f"{self.locality_guid}",
-                     f"{row['locality']}",
+                     f"{self.locality}",
                      3,
                      f"{self.GeographyID}"]
 
@@ -348,116 +373,186 @@ class DataOnboard(Importer):
             self.create_table_record(col_list=column_list,
                                      val_list=value_list, tab_name='locality')
 
+    def create_agent_id(self):
+        """creating new agent ids for missing agents"""
+        for name_dict in self.collector_list:
+            column_list = ['AgentID',
+                           'TimestampCreated',
+                           'TimestampModified',
+                           'Version',
+                           'AgentType',
+                           'DateOfBirthPrecision',
+                           'DateOfDeathPrecision',
+                           'FirstName',
+                           'LastName',
+                           'MiddleInitial',
+                           'DivisionID',
+                           'GUID']
 
-    def create_collector_id(self, row):
-        """creating new collector ids if not already in Database"""
+            value_list =[f"{self.AgentID}",
+                         f"{time_utils.get_pst_time_now_string()}",
+                         f"{time_utils.get_pst_time_now_string()}",
+                         1,
+                         1,
+                         1,
+                         1,
+                         f"{name_dict['collector_first_name']}",
+                         f"{name_dict['collector_last_name']}",
+                         f"{name_dict['collector_middle_name']}",
+                         3,
+                         f"{self.agent_guid}"
+                         ]
 
-        column_list = ['LocalityID',
-                       'TimestampCreated',
-                       'TimestampModified',
-                       'Version',
-                       'GUID',
-                       'LocalityName',
-                       'DisciplineID',
-                       'GeographyID']
-
-        value_list =[f"{self.LocalityID}",
-                     f"{time_utils.get_pst_time_now_string()}",
-                     f"{time_utils.get_pst_time_now_string()}",
-                     1,
-                     f"{self.locality_guid}",
-                     f"{row['locality']}",
-                     3,
-                     f"{self.GeographyID}"]
-
-        # assigning row ids
-        if self.locality_id is None:
             self.create_table_record(col_list=column_list,
                                      val_list=value_list, tab_name='locality')
 
+
+    # is this needed?, does a collectorID need to be added for each sample?
 
     def create_collectingevent(self):
-            # will add accession number
-            table ='collectingevent'
-            column_list = ['TimestampCreated',
-                           'TimestampModified',
-                           'Version',
-                           'GUID',
-                           'DisciplineID',
-                           'StationFieldNumber',
-                           'VerbatimDate',
-                           'StartDate',
-                           'EndDate',
-                           'LocalityID']
+        """creates a record on the collecting event table"""
+        table ='collectingevent'
 
-            value_list = [f"{time_utils.get_pst_time_now_string()}",
-                          f"{time_utils.get_pst_time_now_string()}",
-                          0,
-                          f"{self.collecting_event_guid}",
-                          3,
-                          f"{self.collector_number}",
-                          f"{self.verbatim_date}",
-                          f"{self.start_date}",
-                          f"{self.end_date}",
-                          f"{self.locality_id}"]
+        column_list = ['TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'GUID',
+                       'DisciplineID',
+                       'StationFieldNumber',
+                       'VerbatimDate',
+                       'StartDate',
+                       'EndDate',
+                       'LocalityID']
 
-            self.create_table_record(tab_name=table, col_list=column_list, val_list=value_list)
+        value_list = [f"{time_utils.get_pst_time_now_string()}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      0,
+                      f"{self.collecting_event_guid}",
+                      3,
+                      f"{self.collector_number}",
+                      f"{self.verbatim_date}",
+                      f"{self.start_date}",
+                      f"{self.end_date}",
+                      f"{self.locality_id}"]
+
+        self.create_table_record(tab_name=table, col_list=column_list, val_list=value_list)
+
+
+    def create_taxon(self):
+        pass
 
     def create_collection_object(self):
+        """creates a record on the collection object table"""
+        # will new collecting event ids need to be created ?
 
-            # will new collecting event ids need to be created ?
+        table_name = 'collectionobject'
 
-            table_name = 'collectionobject'
+        column_list = ['TimestampCreated',
+                       'TimestampModified',
+                       'CollectingEventID',
+                       'Version',
+                       'CollectionMemberID',
+                       'CatalogNumber',
+                       'CatalogedDatePrecision',
+                       'GUID',
+                       'CollectionID',
+                       'Date1Precision',
+                       'InventoryDatePrecision']
 
-            column_list = ['TimestampCreated',
-                           'TimestampModified',
-                           'CollectingEventID',
-                           'Version',
-                           'CollectionMemberID',
-                           'CatalogNumber',
-                           'CatalogedDatePrecision',
-                           'GUID',
-                           'CollectionID',
-                           'Date1Precision',
-                           'InventoryDatePrecision']
+        value_list = [f"{time_utils.get_pst_time_now_string()}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      f"{self.collecting_event_id}",
+                      0,
+                      4,
+                      f"{self.barcode}",
+                      1,
+                      f"{uuid4()}",
+                      4,
+                      1,
+                      1]
 
-            value_list = [f"{time_utils.get_pst_time_now_string()}",
-                          f"{time_utils.get_pst_time_now_string()}",
-                          f"{self.collecting_event_id}",
-                          0,
-                          4,
-                          f"{self.barcode}",
-                          1,
-                          f"{uuid4()}",
-                          4,
-                          1,
-                          1]
+        self.create_table_record(table=table_name, col_list=column_list, val_list=value_list)
 
-            self.create_table_record(table=table_name, col_list=column_list, val_list=value_list)
+    def upload_records(self):
+        self.record_full = self.record_full[self.record_full['barcode'].isin(self.barcode_list)]
+        for row in self.record_full:
+            self.create_agent_list(row)
+            self.concat_taxon(row)
+            self.populate_fields(row)
+
+            if self.locality_id is None:
+                self.create_locality_record(row)
+
+            if len(self.collector_list) > 0:
+                self.create_agent_id()
+
+            if self.collecting_event_id is None:
+                self.create_collectingevent()
+            self.create_collection_object()
 
 
+    def hide_unwanted_files(self):
+        """"function to hide files inside of images folder,
+            to filter out images not in images_list"""
+        sla = os.path.sep
+        folder_path = f'picturae_img/test_images_{datetime.date()}{sla}'
+        for file_name in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file_name)
+            if file_name not in self.image_list:
+                new_file_name = f".hidden_{file_name}"
+                new_file_path = os.path.join(folder_path, new_file_name)
+                os.rename(file_path, new_file_path)
 
-    # creating image attachments
+    def unhide_files(self):
+        """function to undo file hiding"""
+        sla = os.path.sep
+        folder_path = f'picturae_img/test_images_{datetime.date()}{sla}'
+        prefix = ".hidden_"  # The prefix added during hiding
+        for file_name in os.listdir(folder_path):
+            if file_name.startswith(prefix):
+                old_file_name = file_name[len(prefix):]
+                old_file_path = os.path.join(folder_path, old_file_name)
+                new_file_path = os.path.join(folder_path, file_name)
+                os.rename(new_file_path, old_file_path)
 
+    def upload_attachments(self):
+        """this function calls client tools,
+        in order to add attachments in image list"""
 
-    # uploading images
+        self.hide_unwanted_files()
 
-    # def csv_barcode_process:
+        subprocess.run(['python', 'client_tools.py'])
 
-    # def run_all_methods(self):
-    #     # setting directory
-    #     self.to_current_directory()
-    #     # verifying file presence
-    #     self.file_present()
-    #     # merging csv files
-    #     full_frame = self.csv_merge()
-    #     # renaming columns
-    #     full_frame = self.csv_colnames()
-    #     # checking if barcode record present in database
-    #     full_frame = self.barcode_has_record()
-    #     # checking if attachment record present in database
-    #     # checking if barcode has valid image file
-    #     full_frame = self.check_if_images_present()
-    #     full_frame = self.check_barcode_match()
-    #     # creating skeleton
-    #     # finished
+        self.unhide_files()
+
+    def run_all_methods(self):
+        # setting directory
+        self.to_current_directory()
+        # verifying file presence
+        self.file_present()
+        # merging csv files
+        full_frame = self.csv_merge()
+        # renaming columns
+        full_frame = self.csv_colnames()
+
+        # checking if barcode record present in database
+        full_frame = self.barcode_has_record()
+
+        # checking if barcode has valid image file
+        full_frame = self.check_if_images_present()
+
+        # checking if barcode has valid file name for barcode
+        full_frame = self.check_barcode_match()
+
+        # creating file list after conditions
+        self.create_file_list()
+
+        # uploading csv records
+        self.upload_records()
+
+        # uploading attachments
+        self.upload_attachments()
+
+        self.logger.info("finished with file upload process reply y/n to undo")
+
+        # add in undo process to delete added records from database.

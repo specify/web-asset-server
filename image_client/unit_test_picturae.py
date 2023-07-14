@@ -421,5 +421,36 @@ class test_sql_insert(unittest.TestCase):
     def tearDown(self):
         del self.DataOnboard
 
+
+
+class TestAgentList(unittest.TestCase):
+    def setUp(self):
+        self.DataOnboard = DataOnboard(date_string=test_date())
+
+        data = {'collector_first_name1': ['Bob'],
+                'collector_last_name1': ['Smith'],
+                'collector_middle_name1': ['J'],
+                'collector_first_name2': ['Jose'],
+                'collector_last_name2': ['E'],
+                'collector_middle_name2': ['Gonzalez']}
+        self.test_data = pd.DataFrame(data)
+
+    def test_agent_list(self):
+        for row in self.test_data:
+            self.DataOnboard.create_agent_list(row)
+
+        first_dict = self.collector_list[0]
+        second_dict = self.collect_list[1]
+        self.assertEqual(first_dict['collector_first_name'], 'Bob')
+        self.assertEqual(first_dict['collector_last_name'], 'Smith')
+        self.assertEqual(second_dict['collector_first_name'], 'Jose')
+        self.assertEqual(second_dict['collector_middle_name'], 'E')
+
+    def tearDown(self):
+        del self.DataOnboard
+        del self.test_data
+
+
+
 if __name__ == "__main__":
     unittest.main()
