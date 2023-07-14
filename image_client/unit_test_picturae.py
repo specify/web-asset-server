@@ -356,6 +356,7 @@ class DatabaseChecks(unittest.TestCase):
         self.DataOnboard.barcode_has_record()
         test_list = list(self.DataOnboard.record_full['barcode_present'])
         self.assertEqual(test_list, [True, False, True])
+        print(self.DataOnboard.record_full)
 
     def test_if_barcode_match(self):
         self.DataOnboard.check_barcode_match()
@@ -427,28 +428,40 @@ class TestAgentList(unittest.TestCase):
     def setUp(self):
         self.DataOnboard = DataOnboard(date_string=test_date())
 
+        # jose Gonzalez is a real agent,
+        # to make sure true matches are not added to list.
         data = {'collector_first_name1': ['Bob'],
-                'collector_last_name1': ['Smith'],
+                'collector_last_name1': ['Fakeson'],
                 'collector_middle_name1': ['J'],
-                'collector_first_name2': ['Jose'],
-                'collector_last_name2': ['E'],
-                'collector_middle_name2': ['Gonzalez']}
-        self.test_data = pd.DataFrame(data)
+                'collector_first_name2': ['Enrique'],
+                'collector_last_name2': ['de la fake'],
+                'collector_middle_name2': ['X'],
+                'collector_first_name3': ['Jose'],
+                'collector_last_name3': ['Gonzalez'],
+                'collector_middle_name3': ['S'],
+                }
+
+        self.DataOnboard.record_full = pd.DataFrame(data)
+
+        self.DataOnboard.collector_list = []
+
+        print(self.DataOnboard.record_full)
+
 
     def test_agent_list(self):
-        for row in self.test_data:
+        for index, row in self.DataOnboard.record_full.iterrows():
             self.DataOnboard.create_agent_list(row)
+        first_dict = self.DataOnboard.collector_list[0]
+        second_dict = self.DataOnboard.collector_list[1]
 
-        first_dict = self.collector_list[0]
-        second_dict = self.collect_list[1]
         self.assertEqual(first_dict['collector_first_name'], 'Bob')
-        self.assertEqual(first_dict['collector_last_name'], 'Smith')
-        self.assertEqual(second_dict['collector_first_name'], 'Jose')
-        self.assertEqual(second_dict['collector_middle_name'], 'E')
+        self.assertEqual(first_dict['collector_last_name'], 'Fakeson')
+        self.assertEqual(second_dict['collector_first_name'], 'Enrique')
+        self.assertEqual(second_dict['collector_middle_name'], 'X')
+        self.assertEqual(len(self.DataOnboard.collector_list), 2)
 
     def tearDown(self):
         del self.DataOnboard
-        del self.test_data
 
 
 

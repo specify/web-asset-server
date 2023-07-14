@@ -6,11 +6,11 @@ import time_utils
 from uuid import uuid4
 from datetime import date
 from data_utils import *
-import pandas as pd
 from importer import Importer
 from db_utils import DbUtils
 import logging
 import subprocess
+import pandas as pd
 
 
 class DataOnboard(Importer):
@@ -25,7 +25,7 @@ class DataOnboard(Importer):
         self.barcode_list = []
         self.image_list = []
         self.collector_list = []
-        self.record_full = pd.DataFrame
+        self.record_full = pd.DataFrame()
         # intializing parameters for database upload
         init_list = ['barcode', 'verbatim_date', 'start_date', 'end_date',
                      'collector_number', 'locality', 'collecting_event_guid',
@@ -158,7 +158,7 @@ class DataOnboard(Importer):
                     'Verbatim Date': 'verbatim_date',
                     'Start Date': 'start_date',
                     'End Date': 'end_date'
-                     }
+                    }
 
         self.record_full = self.record_full.rename(columns=col_dict)
 
@@ -283,22 +283,31 @@ class DataOnboard(Importer):
         cursor.execute(sql)
         self.specify_db_connection.commit()
 
-    # will change row references to numeric index.
+    # will change row references to numeric index
     def create_agent_list(self, row):
         """creates a list of collectors that will be checked and added to agent/collector tables"""
         self.collector_list = []
+        column_names = list(self.record_full.columns)
         for i in range(1, 6):
-            if row[f'collector_first_name{i}'] & row[f'collector_last_name{i}']:
-                sql = f'''SELECT AgentID FROM agent WHERE FirstName = {row[f'collector_first_name{i}']} 
-                         AND LastName = {row[f'collector_last_name{i}']}'''
-                AgentID = self.specify_db_connection.get_one_record(sql)
-                if AgentID is not None:
-                    collector_dict = {'collector_first_name': row[f'collector_first_name{i}'],
-                                      f'collector_middle_name': row[f'collector_middle_name{i}'],
-                                      f'collector_last_name': row[f'collector_last_name{i}']}
+            try:
+                first = column_names.index(f'collector_first_name{i}')
+                middle = column_names.index(f'collector_middle_name{i}')
+                last = column_names.index(f'collector_last_name{i}')
+            except ValueError:
+                break
+            if row[first] and row[last]:
+                sql = f'''SELECT AgentID FROM agent WHERE FirstName = "{row[first]}"
+                         AND LastName = "{row[last]}"'''
+                agent_id = self.specify_db_connection.get_one_record(sql)
+                print(agent_id)
+                if agent_id is None:
+                    collector_dict = {f'collector_first_name': row[first],
+                                      f'collector_middle_name': row[middle],
+                                      f'collector_last_name': row[last]}
                     self.collector_list.append(collector_dict)
 
-    def concat_taxon(self, row):
+
+    def taxon_concat(self, row):
         """parses taxon columns to include in taxon table
         """
         self.full_name = ""
@@ -308,8 +317,9 @@ class DataOnboard(Importer):
             columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank', 'Hybrid Epithet']
 
         for column in columns:
+            index = self.record_full.columns.get_loc(column)
             if row[column]:
-                self.full_name += f" {row[column]}"
+                self.full_name += f" {row[index]}"
 
         # creating taxon name
         taxon_strings = self.full_name.split()
@@ -475,13 +485,13 @@ class DataOnboard(Importer):
 
     def upload_records(self):
         self.record_full = self.record_full[self.record_full['barcode'].isin(self.barcode_list)]
-        for row in self.record_full:
+        for index, row in self.record_full.iterrows():
             self.create_agent_list(row)
-            self.concat_taxon(row)
+            self.taxon_concat(row)
             self.populate_fields(row)
 
             if self.locality_id is None:
-                self.create_locality_record(row)
+                self.create_locality_record()
 
             if len(self.collector_list) > 0:
                 self.create_agent_id()
