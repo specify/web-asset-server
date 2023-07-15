@@ -74,9 +74,7 @@ class DbUtils:
             pass
             # self.logger.debug(f"Already connected db {self.database_host}...")
 
-
-
-
+    # delarocamcas changed to buffered = True, so will work inside forloops
     def get_one_record(self, sql):
         self.connect()
         cursor = self.cnx.cursor(buffered=True)
@@ -109,7 +107,7 @@ class DbUtils:
         self.connect()
         return self.cnx.cursor()
 
-    def execute(self,sql):
+    def execute(self, sql):
         cursor = self.get_cursor()
         self.logger.debug(f"SQL: {sql}")
         cursor.execute(sql)

@@ -230,20 +230,20 @@ class DataOnboard(Importer):
             if not row['image_valid']:
                 raise ValueError(f"image {row['image_path']} is not valid ")
 
-            if not row['is_barcode_match']:
+            elif not row['is_barcode_match']:
                 raise ValueError(f"image barcode {row['image_path']} does not match "
                                  f"{row['CatalogNumber']}")
 
-            if row['barcode_present'] and row['image_present']:
+            elif row['barcode_present'] and row['image_present']:
                 raise ValueError(f"record {row['CatalogNumber']} and image {row['image_path']} "
                                  f"already in database")
 
-            if row['barcode_present'] and not row['image_present']:
+            elif row['barcode_present'] and not row['image_present']:
                 self.logger.debug(f"record {row['CatalogNumber']} "
                                   f"already in database, appending image")
                 self.image_list.append(row['image_path'])
 
-            if not row['barcode_present'] and row['image_present']:
+            elif not row['barcode_present'] and row['image_present']:
                 self.logger.debug(f"image {row['image_path']} "
                                   f"already in database, appending record")
                 self.barcode_list.append(row['CatalogNumber'])
@@ -306,21 +306,31 @@ class DataOnboard(Importer):
                                       f'collector_last_name': row[last]}
                     self.collector_list.append(collector_dict)
 
-
+    # check after getting real dataset
     def taxon_concat(self, row):
-        """parses taxon columns to include in taxon table
+        """parses taxon columns to check taxon database
         """
+        hyb_index = self.record_full.columns.get_loc('Hybrid')
+        rank_index = self.record_full.columns.get_loc('Rank 1')
+        hyb_level = self.record_full.columns.get_loc('Hybrid Level')
         self.full_name = ""
-        if row['Hybrid'] is False:
+        if row[hyb_index] is False:
             columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
+            if row[rank_index] == 'Species':
+                columns = ['Genus', 'Species', 'Rank 2', 'Epithet 2']
         else:
-            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank', 'Hybrid Epithet']
+            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Level', 'Hybrid Epithet']
+            if row[hyb_level] == 'Species':
+                columns = ['Hybrid Genus', 'Hybrid Species']
 
         for column in columns:
             index = self.record_full.columns.get_loc(column)
-            if row[column]:
+            if row[index]:
                 self.full_name += f" {row[index]}"
 
+        # stripping leading and trailing space.
+        self.full_name = self.full_name.lstrip()
+        self.full_name = self.full_name.rstrip()
         # creating taxon name
         taxon_strings = self.full_name.split()
         self.tax_name = taxon_strings[-1]
@@ -330,29 +340,39 @@ class DataOnboard(Importer):
         """this populates all the
            initialized data fields per row for input into database
         """
-        self.barcode = row['CatalogNumber'].zfill(9)
-        self.verbatim_date = row['verbatim_date']
-        self.start_date = row['start_date']
-        self.end_date = row['end_date']
-        self.collector_number = row['collector_number']
-        self.locality = row['locality']
+        column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
+                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country']
+        index_list = []
+        for column in column_list:
+            barcode_index = self.record_full.columns.get_loc(column)
+            index_list.append(barcode_index)
+
+        self.barcode = row[index_list[0]].zfill(9)
+        self.verbatim_date = row[index_list[1]]
+        self.start_date = row[index_list[2]]
+        self.end_date = row[index_list[3]]
+        self.collector_number = row[index_list[4]]
+        self.locality = row[index_list[5]]
         self.collecting_event_guid = uuid4()
         self.locality_guid = uuid4()
         self.agent_guid = uuid4()
-        self.geography_string = str(row['county']) + ", " + str(row['state']) + ", " + str(row['country'])
+        self.geography_string = str(row[index_list[6]]) + ", " + \
+                                str(row[index_list[7]]) + ", " + str(row[index_list[8]])
+
+        print(self.geography_string)
 
         # taxon info
         # creating agent list
         self.create_agent_list(row)
 
         # Locality create
-        sql = f"SELECT GeographyID FROM geography where `FullName` = {self.geography_string};"
+        sql = f'''SELECT GeographyID FROM geography where `FullName` = "{self.geography_string}";'''
         self.GeographyID = self.specify_db_connection.get_one_record(sql)
 
-        sql = f"select LocalityID from casbotany.locality where Locality='{row['locality']}'"
+        sql = f'''select LocalityID from casbotany.locality where `LocalityName`="{self.locality}"'''
         self.locality_id = self.specify_db_connection.get_one_record(sql)
 
-        sql = f"select CollectingEventID from casbotany.collectingevent where guid='{self.collecting_event_guid}'"
+        sql = f'''select CollectingEventID from casbotany.collectingevent where guid="{self.collecting_event_guid}"'''
 
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
@@ -501,11 +521,11 @@ class DataOnboard(Importer):
             self.create_collection_object()
 
 
-    def hide_unwanted_files(self):
+    def hide_unwanted_files(self, date):
         """"function to hide files inside of images folder,
             to filter out images not in images_list"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{datetime.date()}{sla}'
+        folder_path = f'picturae_img/test_images_{date}{sla}'
         for file_name in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file_name)
             if file_name not in self.image_list:
@@ -513,10 +533,10 @@ class DataOnboard(Importer):
                 new_file_path = os.path.join(folder_path, new_file_name)
                 os.rename(file_path, new_file_path)
 
-    def unhide_files(self):
+    def unhide_files(self, date):
         """function to undo file hiding"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{datetime.date()}{sla}'
+        folder_path = f'picturae_img/test_images_{date}{sla}'
         prefix = ".hidden_"  # The prefix added during hiding
         for file_name in os.listdir(folder_path):
             if file_name.startswith(prefix):
@@ -529,11 +549,11 @@ class DataOnboard(Importer):
         """this function calls client tools,
         in order to add attachments in image list"""
 
-        self.hide_unwanted_files()
+        self.hide_unwanted_files(date=self.date_use)
 
         subprocess.run(['python', 'client_tools.py'])
 
-        self.unhide_files()
+        self.unhide_files(date=self.date_use)
 
     def run_all_methods(self):
         # setting directory

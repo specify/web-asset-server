@@ -1,5 +1,6 @@
 """This file contains unit tests for picturae_import.py"""
 import csv
+import datetime
 import unittest
 import random
 import shutil
@@ -11,6 +12,7 @@ from datetime import date, timedelta
 from picturae_import import DataOnboard
 from importer import Importer
 from mock import patch
+from PIL import Image
 
 # need to find a way to prevent the fake folders using today's date in the setUP,
 # from overwriting the contents of real folders
@@ -275,7 +277,6 @@ class ColNamesTest(unittest.TestCase):
 
         self.DataOnboard.record_full = pd.DataFrame(new_df)
 
-        print(self.DataOnboard.record_full)
 
     def test_if_codes(self):
         """test_if_codes: test if columns that contain codes
@@ -314,7 +315,6 @@ class ColNamesTest(unittest.TestCase):
         self.assertEqual(len(self.record_full.columns), len(self.record_full.columns))
 
     def tearDown(self):
-        del self.DataOnboard.record_full
 
         del self.DataOnboard
 
@@ -364,7 +364,6 @@ class DatabaseChecks(unittest.TestCase):
         self.assertEqual([False, True, True], test_list)
 
     def tearDown(self):
-        del self.DataOnboard.record_full
 
         del self.DataOnboard
 
@@ -395,7 +394,6 @@ class CheckImagePaths(unittest.TestCase):
         self.assertTrue(all(self.DataOnboard.record_full['image_valid']))
 
     def tearDown(self):
-        del self.DataOnboard.record_full
 
         del self.DataOnboard
 
@@ -463,6 +461,113 @@ class TestAgentList(unittest.TestCase):
     def tearDown(self):
         del self.DataOnboard
 
+
+class ConcatTaxonTests(unittest.TestCase):
+    def setUp(self):
+        self.DataOnboard = DataOnboard(date_string=test_date())
+
+        # jose Gonzalez is a real agent,
+        # to make sure true matches are not added to list.
+        data = {'Genus': ['Fakeulos', np.nan],
+                'Species': ['fakeulanus', np.nan],
+                'Rank 1': ['Species', np.nan],
+                'Epithet 1': ['fakeulanus', np.nan],
+                'Rank 2': ['var.', np.nan],
+                'Epithet 2': ['fakus', np.nan],
+                'Hybrid': [False, True],
+                'Hybrid Genus': [np.nan, 'Toyotae'],
+                'Hybrid Species': [np.nan, 'Preusus'],
+                'Hybrid Epithet': [np.nan, 'Preusus'],
+                'Hybrid Level': [np.nan, 'Species']
+                }
+
+        self.DataOnboard.record_full = pd.DataFrame(data)
+
+        self.DataOnboard.tax_name = ""
+
+        self.DataOnboard.full_name = ""
+
+
+    def test_taxon_concat_string(self):
+        temp_taxon_list = []
+        for index, row in self.DataOnboard.record_full.iterrows():
+            self.DataOnboard.taxon_concat(row)
+            temp_taxon_list.append(self.DataOnboard.full_name)
+
+        self.assertEqual(temp_taxon_list[0], 'Fakeulos fakeulanus var. fakus')
+        self.assertEqual(temp_taxon_list[1], 'Toyotae Preusus')
+        self.assertEqual(len(temp_taxon_list), 2)
+
+    def tearDown(self):
+        del self.DataOnboard
+
+
+class TestPopulateFields(unittest.TestCase):
+    def setUp(self):
+        self.DataOnboard = DataOnboard(date_string=test_date())
+        data = {'CatalogNumber': ['123456'],
+                'verbatim_date': ['March 21, 2008'],
+                'start_date': ['3/21/2008'],
+                'end_date': [np.nan],
+                'collector_number': [180024],
+                'locality': ['Harden Lake'],
+                'geography_string': ['Mariposa County, California, United States'],
+                'county': 'Mariposa County',
+                'state': 'California',
+                'country': 'United States'}
+        self.DataOnboard.record_full = pd.DataFrame(data)
+
+    def test_assigned_to_variable(self):
+        for index, row in self.DataOnboard.record_full.iterrows():
+            print(row)
+            self.DataOnboard.populate_fields(row)
+            self.assertEqual(self.DataOnboard.barcode, '000123456')
+            self.assertEqual(self.DataOnboard.locality, 'Harden Lake')
+            self.assertEqual(self.DataOnboard.GeographyID, 16490)
+            self.assertEqual(self.DataOnboard.locality_id, 54)
+
+    def tearDown(self):
+        del self.DataOnboard
+
+
+
+
+class HideFilesTest(unittest.TestCase):
+
+    def setUp(self):
+        # initializing
+        self.DataOnboard = DataOnboard(date_string=test_date())
+
+        # print("setup called!")
+        # create test directories
+
+        date_string = test_date()
+
+        image = Image.new('RGB', (200, 200), color='white')
+
+        self.expected_image_path = ""
+        barcode_list = [123456, 123457, 123458]
+        for barcode in barcode_list:
+            self.expected_image_path = f"picturae_img/test_images{date_string}/CAS{barcode}.JPG"
+            os.makedirs(os.path.dirname(self.expected_image_path), exist_ok=True)
+            print(f"Created directory: {os.path.dirname(self.expected_image_path)}")
+            image.save(self.expected_image_path)
+
+        self.DataOnboard.image_list = [f"picturae_img/test_images{date_string}/CAS123456.JPG"]
+
+    # under construction !
+    def test_file_hide(self):
+        self.DataOnboard.hide_unwanted_files(date=test_date())
+        files = os.listdir(f"picturae_img/test_images{test_date()}")
+        print(files)
+
+    # under construction !
+    def test_file_unhide(self):
+        pass
+
+    def tearDown(self):
+        shutil.rmtree(os.path.dirname(self.expected_image_path))
+        del self.DataOnboard
 
 
 if __name__ == "__main__":
