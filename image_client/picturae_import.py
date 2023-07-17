@@ -148,6 +148,15 @@ class DataOnboard(Importer):
                     'collector_first_name 2': 'collector_first_name2',
                     'collector_middle_name 2': 'collector_middle_name2',
                     'collector_last_name 2': 'collector_last_name2',
+                    'collector_first_name 3': 'collector_first_name3',
+                    'collector_middle_name 3': 'collector_middle_name3',
+                    'collector_last_name 3': 'collector_last_name3',
+                    'collector_first_name 4': 'collector_first_name4',
+                    'collector_middle_name 4': 'collector_middle_name4',
+                    'collector_last_name 4': 'collector_last_name4',
+                    'collector_first_name 5': 'collector_first_name5',
+                    'collector_middle_name 5': 'collector_middle_name5',
+                    'collector_last_name 5': 'collector_last_name5',
                     'Genus': 'Genus',
                     'Species': 'Species',
                     'Qualifier': 'Qualifier',
@@ -379,6 +388,7 @@ class DataOnboard(Importer):
 
     def create_locality_record(self):
         """used to assign columns to database tables using sql"""
+        table = 'locality'
 
         column_list = ['LocalityID',
                        'TimestampCreated',
@@ -389,22 +399,26 @@ class DataOnboard(Importer):
                        'DisciplineID',
                        'GeographyID']
 
-        value_list =[f"{self.LocalityID}",
-                     f"{time_utils.get_pst_time_now_string()}",
-                     f"{time_utils.get_pst_time_now_string()}",
-                     1,
-                     f"{self.locality_guid}",
-                     f"{self.locality}",
-                     3,
-                     f"{self.GeographyID}"]
+        value_list = [f"{self.LocalityID}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      1,
+                      f"{self.locality_guid}",
+                      f"{self.locality}",
+                      3,
+                      f"{self.GeographyID}"]
 
         # assigning row ids
         if self.locality_id is None:
-            self.create_table_record(col_list=column_list,
-                                     val_list=value_list, tab_name='locality')
+            self.create_table_record(tab_name='locality',
+                                     col_list=column_list,
+                                     val_list=value_list)
 
     def create_agent_id(self):
         """creating new agent ids for missing agents"""
+
+        table = 'agent'
+
         for name_dict in self.collector_list:
             column_list = ['AgentID',
                            'TimestampCreated',
@@ -419,29 +433,29 @@ class DataOnboard(Importer):
                            'DivisionID',
                            'GUID']
 
-            value_list =[f"{self.AgentID}",
-                         f"{time_utils.get_pst_time_now_string()}",
-                         f"{time_utils.get_pst_time_now_string()}",
-                         1,
-                         1,
-                         1,
-                         1,
-                         f"{name_dict['collector_first_name']}",
-                         f"{name_dict['collector_last_name']}",
-                         f"{name_dict['collector_middle_name']}",
-                         3,
-                         f"{self.agent_guid}"
-                         ]
+            value_list = [f"{self.AgentID}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          1,
+                          1,
+                          1,
+                          1,
+                          f"{name_dict['collector_first_name']}",
+                          f"{name_dict['collector_last_name']}",
+                          f"{name_dict['collector_middle_name']}",
+                          3,
+                          f"{self.agent_guid}"
+                          ]
 
-            self.create_table_record(col_list=column_list,
-                                     val_list=value_list, tab_name='locality')
+            self.create_table_record(tab_name=table, col_list=column_list,
+                                     val_list=value_list)
 
 
     # is this needed?, does a collectorID need to be added for each sample?
 
     def create_collectingevent(self):
         """creates a record on the collecting event table"""
-        table ='collectingevent'
+        table = 'collectingevent'
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -475,7 +489,7 @@ class DataOnboard(Importer):
         """creates a record on the collection object table"""
         # will new collecting event ids need to be created ?
 
-        table_name = 'collectionobject'
+        table = 'collectionobject'
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -501,7 +515,7 @@ class DataOnboard(Importer):
                       1,
                       1]
 
-        self.create_table_record(table=table_name, col_list=column_list, val_list=value_list)
+        self.create_table_record(table=table, col_list=column_list, val_list=value_list)
 
     def upload_records(self):
         self.record_full = self.record_full[self.record_full['barcode'].isin(self.barcode_list)]
@@ -521,22 +535,22 @@ class DataOnboard(Importer):
             self.create_collection_object()
 
 
-    def hide_unwanted_files(self, date):
-        """"function to hide files inside of images folder,
+    def hide_unwanted_files(self, date_string):
+        """function to hide files inside of images folder,
             to filter out images not in images_list"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{date}{sla}'
+        folder_path = f'picturae_img/test_images_{date_string}{sla}'
         for file_name in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file_name)
-            if file_name not in self.image_list:
+            if file_path not in self.image_list:
                 new_file_name = f".hidden_{file_name}"
                 new_file_path = os.path.join(folder_path, new_file_name)
                 os.rename(file_path, new_file_path)
 
-    def unhide_files(self, date):
+    def unhide_files(self, date_string):
         """function to undo file hiding"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{date}{sla}'
+        folder_path = f'picturae_img/test_images_{date_string}{sla}'
         prefix = ".hidden_"  # The prefix added during hiding
         for file_name in os.listdir(folder_path):
             if file_name.startswith(prefix):
