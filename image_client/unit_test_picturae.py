@@ -1,21 +1,16 @@
 """This file contains unit tests for picturae_import.py"""
-import csv
-import datetime
 import unittest
 import random
 import shutil
 import numpy as np
-import pandas as pd
 from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
 from picturae_import import DataOnboard
-from importer import Importer
 from mock import patch
 from PIL import Image
 from casbotany_sql_lite import *
-# need to find a way to prevent the fake folders using today's date in the setUP,
-# from overwriting the contents of real folders
+
 
 def test_date():
     """test_date: creates an arbitrary date, 20 years in the past from today's date,
@@ -501,7 +496,6 @@ class TestPopulateFields(unittest.TestCase):
 
     def test_assigned_to_variable(self):
         for index, row in self.DataOnboard.record_full.iterrows():
-            print(row)
             self.DataOnboard.populate_fields(row)
             self.assertEqual(self.DataOnboard.barcode, '000123456')
             self.assertEqual(self.DataOnboard.locality, 'Harden Lake')
@@ -512,10 +506,108 @@ class TestPopulateFields(unittest.TestCase):
         del self.DataOnboard
 
 
+class SQLUploadTests(unittest.TestCase):
+    def setUp(self):
+
+        self.DataOnboard = DataOnboard(date_string=test_date())
+
+    # these functions are to ostensibly test the function create_table_record
+    def test_create_locality(self):
+        """testing create_locality function"""
+
+        LocalityName = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
+
+        column_list = ['TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'GUID',
+                       'SrcLatLongUnit',
+                       'LocalityName',
+                       'DisciplineID',
+                       'GeographyID']
+
+        value_list = [f"{time_utils.get_pst_time_now_string()}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      1,
+                      f"{uuid4()}",
+                      1,
+                      LocalityName,
+                      3,
+                      256]
+
+        # assigning row ids
+        self.DataOnboard.create_table_record(tab_name="locality", col_list=column_list,
+                                             val_list=value_list, is_test=True)
+
+        # checking whether locality id created
+        data_base_locality = casbotany_lite_getrecord(f'''SELECT `LocalityID` FROM locality WHERE 
+                                                         `LocalityName` = "{LocalityName}"''')
+
+        self.assertFalse(data_base_locality is None)
+
+        # checking whether geocode present
+        data_base_geo_code = casbotany_lite_getrecord(f'''SELECT `GeographyID` FROM locality WHERE 
+                                                         `LocalityName` = "{LocalityName}"''')
+
+        self.assertEqual(data_base_geo_code, 256)
+
+
+    def test_collection_object(self):
+        """creates a record on the collection object table"""
+        # will new collecting event ids need to be created ?
+
+        digits = list(range(10))
+
+        barcode = random.sample(digits, 6)
+
+        barcode = int(''.join(map(str, barcode)))
+
+        time_stamp = time_utils.get_pst_time_now_string()
+
+        column_list = ['TimestampCreated',
+                       'TimestampModified',
+                       'CollectingEventID',
+                       'Version',
+                       'CollectionMemberID',
+                       'CatalogNumber',
+                       'CatalogedDatePrecision',
+                       'GUID',
+                       'CollectionID',
+                       'Date1Precision',
+                       'InventoryDatePrecision']
+
+        value_list = [f"{time_stamp}",
+                      f"{time_stamp}",
+                      12390,
+                      0,
+                      4,
+                      barcode,
+                      1,
+                      f"{uuid4()}",
+                      4,
+                      1,
+                      1]
+
+        self.DataOnboard.create_table_record(tab_name="collectionobject", col_list=column_list,
+                                             val_list=value_list, is_test=True)
+
+        # checking whether barcode created
+        data_base_barcode = casbotany_lite_getrecord(f'''SELECT `CatalogNumber` FROM collectionobject WHERE 
+                                                         `TimestampCreated` = "{time_stamp}"''')
+
+        self.assertEqual(data_base_barcode, str(barcode))
+
+        # checking whether collecting Event ID
+        data_base_event_code = casbotany_lite_getrecord(f'''SELECT `CollectingEventID` FROM collectionobject WHERE 
+                                                         `TimestampCreated` = "{time_stamp}"''')
+
+        self.assertEqual(data_base_event_code, 12390)
+
+    def tearDown(self):
+        self.DataOnboard = DataOnboard(date_string=test_date())
 
 
 class HideFilesTest(unittest.TestCase):
-
     def setUp(self):
         # initializing
         self.DataOnboard = DataOnboard(date_string=test_date())

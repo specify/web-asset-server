@@ -386,12 +386,25 @@ def casbotany_lite_creator():
     connect = sqlite3.connect('cas_botanylite.db')
     sql_list = table_sql_list()
     curs = connect.cursor()
+    # running a loop through tables for sql_lite
     for table in sql_list:
         curs.execute(table)
         connect.commit()
+    # closing connection
     curs.close()
     connect.close()
 
+def casbotany_lite_getrecord(sql_query: str):
+    """modified get one record function for sql lite"""
+    connect = sqlite3.connect('cas_botanylite.db')
+    curs = connect.cursor()
+    # running sql query
+    curs.execute(sql_query)
+    record = curs.fetchone()
+    # closing connection
+    curs.close()
+    connect.close()
+    return record[0]
 
 casbotany_lite_creator()
 
