@@ -246,7 +246,7 @@ class Importer:
             if aid is None:
                 keep_filepaths.append(cur_filepath)
             else:
-                logging.debug(f"Already has an attachment with attachment_id: {aid}, sklipping")
+                logging.debug(f"Already has an attachment with attachment_id: {aid}, skipping")
         return keep_filepaths
 
     #

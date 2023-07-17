@@ -4,14 +4,12 @@ import sys
 import os
 import time_utils
 from uuid import uuid4
-from datetime import date
 from data_utils import *
 from importer import Importer
-from db_utils import DbUtils
 import logging
 import subprocess
 import pandas as pd
-
+from casbotany_sql_lite import *
 
 class DataOnboard(Importer):
     """DataOnboard: A class with methods designed to wrangle, verify, and upload a csv file
@@ -271,27 +269,6 @@ class DataOnboard(Importer):
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
-
-    def create_table_record(self, col_list, val_list, tab_name):
-        """creates a record on given database table, with column list and value list,
-                args:
-                    col_list: list of database table columns to fill
-                    val_list: list of values to input into each table
-                    tab_name: name of the table you wish to insert data into
-        """
-        # removing brackets, making sure comma is not inside of quotations
-        column_list = ', '.join(col_list)
-        value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
-
-        cursor = self.specify_db_connection.get_cursor()
-        sql = (f'''INSERT INTO casbotany.{tab_name} ( {column_list}
-                    )
-                    VALUES( {value_list})''')
-        self.logger.info(f'running query: {sql}')
-        self.logger.debug(sql)
-        cursor.execute(sql)
-        self.specify_db_connection.commit()
-
     # will change row references to numeric index
     def create_agent_list(self, row):
         """creates a list of collectors that will be checked and added to agent/collector tables"""
@@ -368,8 +345,6 @@ class DataOnboard(Importer):
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
-        print(self.geography_string)
-
         # taxon info
         # creating agent list
         self.create_agent_list(row)
@@ -385,13 +360,43 @@ class DataOnboard(Importer):
 
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
+    def create_table_record(self, col_list, val_list, tab_name, is_test=False):
+        """creates a record on given database table, with column list and value list,
+                args:
+                    col_list: list of database table columns to fill
+                    val_list: list of values to input into each table
+                    tab_name: name of the table you wish to insert data into
+        """
+        # removing brackets, making sure comma is not inside of quotations
+        column_list = ', '.join(col_list)
+        value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
+        if is_test is True:
+            connection = sqlite3.connect('cas_botanylite.db')
+            cursor = connection.cursor()
+        else:
+            cursor = self.specify_db_connection.get_cursor()
 
-    def create_locality_record(self):
+        sql = (f'''INSERT INTO {tab_name} ( {column_list} 
+                    )
+                    VALUES( {value_list})''')
+        self.logger.info(f'running query: {sql}')
+        self.logger.debug(sql)
+        cursor.execute(sql)
+        if is_test is True:
+            connection.commit()
+            cursor.close()
+            connection.close()
+        else:
+            self.specify_db_connection.commit()
+            cursor.close()
+            self.specify_db_connection.close()
+
+
+    def create_locality_record(self, is_test=False):
         """used to assign columns to database tables using sql"""
         table = 'locality'
 
-        column_list = ['LocalityID',
-                       'TimestampCreated',
+        column_list = ['TimestampCreated',
                        'TimestampModified',
                        'Version',
                        'GUID',
@@ -399,8 +404,7 @@ class DataOnboard(Importer):
                        'DisciplineID',
                        'GeographyID']
 
-        value_list = [f"{self.LocalityID}",
-                      f"{time_utils.get_pst_time_now_string()}",
+        value_list = [f"{time_utils.get_pst_time_now_string()}",
                       f"{time_utils.get_pst_time_now_string()}",
                       1,
                       f"{self.locality_guid}",
@@ -410,18 +414,16 @@ class DataOnboard(Importer):
 
         # assigning row ids
         if self.locality_id is None:
-            self.create_table_record(tab_name='locality',
-                                     col_list=column_list,
-                                     val_list=value_list)
+            self.create_table_record(tab_name=table, col_list=column_list,
+                                     val_list=value_list, is_test=is_test)
 
-    def create_agent_id(self):
-        """creating new agent ids for missing agents"""
+    def create_agent_id(self, is_test=False):
+        """creating new agent ids for missing agents, not already in DB"""
 
         table = 'agent'
 
         for name_dict in self.collector_list:
-            column_list = ['AgentID',
-                           'TimestampCreated',
+            column_list = ['TimestampCreated',
                            'TimestampModified',
                            'Version',
                            'AgentType',
@@ -433,8 +435,7 @@ class DataOnboard(Importer):
                            'DivisionID',
                            'GUID']
 
-            value_list = [f"{self.AgentID}",
-                          f"{time_utils.get_pst_time_now_string()}",
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
                           f"{time_utils.get_pst_time_now_string()}",
                           1,
                           1,
@@ -448,13 +449,13 @@ class DataOnboard(Importer):
                           ]
 
             self.create_table_record(tab_name=table, col_list=column_list,
-                                     val_list=value_list)
+                                     val_list=value_list, is_test=is_test)
 
 
     # is this needed?, does a collectorID need to be added for each sample?
-
     def create_collectingevent(self):
-        """creates a record on the collecting event table"""
+        """creates a record on the collecting event table,
+           for collecting events not already in DB"""
         table = 'collectingevent'
 
         column_list = ['TimestampCreated',
@@ -479,7 +480,8 @@ class DataOnboard(Importer):
                       f"{self.end_date}",
                       f"{self.locality_id}"]
 
-        self.create_table_record(tab_name=table, col_list=column_list, val_list=value_list)
+        self.create_table_record(tab_name=table, col_list=column_list,
+                                 val_list=value_list)
 
 
     def create_taxon(self):
@@ -515,7 +517,8 @@ class DataOnboard(Importer):
                       1,
                       1]
 
-        self.create_table_record(table=table, col_list=column_list, val_list=value_list)
+        self.create_table_record(tab_name=table, col_list=column_list,
+                                 val_list=value_list)
 
     def upload_records(self):
         self.record_full = self.record_full[self.record_full['barcode'].isin(self.barcode_list)]
@@ -533,7 +536,6 @@ class DataOnboard(Importer):
             if self.collecting_event_id is None:
                 self.create_collectingevent()
             self.create_collection_object()
-
 
     def hide_unwanted_files(self, date_string):
         """function to hide files inside of images folder,
@@ -563,11 +565,11 @@ class DataOnboard(Importer):
         """this function calls client tools,
         in order to add attachments in image list"""
 
-        self.hide_unwanted_files(date=self.date_use)
+        self.hide_unwanted_files(date_string=self.date_use)
 
         subprocess.run(['python', 'client_tools.py'])
 
-        self.unhide_files(date=self.date_use)
+        self.unhide_files(date_string=self.date_use)
 
     def run_all_methods(self):
         # setting directory
@@ -575,18 +577,18 @@ class DataOnboard(Importer):
         # verifying file presence
         self.file_present()
         # merging csv files
-        full_frame = self.csv_merge()
+        self.csv_merge()
         # renaming columns
-        full_frame = self.csv_colnames()
+        self.csv_colnames()
 
         # checking if barcode record present in database
-        full_frame = self.barcode_has_record()
+        self.barcode_has_record()
 
         # checking if barcode has valid image file
-        full_frame = self.check_if_images_present()
+        self.check_if_images_present()
 
         # checking if barcode has valid file name for barcode
-        full_frame = self.check_barcode_match()
+        self.check_barcode_match()
 
         # creating file list after conditions
         self.create_file_list()
