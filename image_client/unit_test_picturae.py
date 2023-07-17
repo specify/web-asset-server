@@ -13,7 +13,7 @@ from picturae_import import DataOnboard
 from importer import Importer
 from mock import patch
 from PIL import Image
-
+from casbotany_sql_lite import *
 # need to find a way to prevent the fake folders using today's date in the setUP,
 # from overwriting the contents of real folders
 
@@ -23,6 +23,16 @@ def test_date():
        ! if this code outlives 20 years of use I would be impressed"""
     unit_date = date.today() - timedelta(days=365 * 20)
     return str(unit_date)
+
+class TestSQLlite(unittest.TestCase):
+    def test_casbotanylite(self):
+        connection = sqlite3.connect('cas_botanylite.db')
+        curs = connection.cursor()
+        curs.execute('''SELECT * FROM agent''')
+        num_columns = len(curs.description)
+        self.assertEqual(num_columns, 45)
+        curs.close()
+        connection.close()
 
 
 class WorkingDirectoryTests(unittest.TestCase):
@@ -520,22 +530,26 @@ class HideFilesTest(unittest.TestCase):
         self.expected_image_path = ""
         barcode_list = [123456, 123457, 123458]
         for barcode in barcode_list:
-            self.expected_image_path = f"picturae_img/test_images{date_string}/CAS{barcode}.JPG"
+            self.expected_image_path = f"picturae_img/test_images_{date_string}/CAS{barcode}.JPG"
             os.makedirs(os.path.dirname(self.expected_image_path), exist_ok=True)
             print(f"Created directory: {os.path.dirname(self.expected_image_path)}")
             image.save(self.expected_image_path)
 
-        self.DataOnboard.image_list = [f"picturae_img/test_images{date_string}/CAS123456.JPG"]
+        self.DataOnboard.image_list = [f"picturae_img/test_images_{date_string}/CAS123456.JPG"]
 
     # under construction !
     def test_file_hide(self):
-        self.DataOnboard.hide_unwanted_files(date=test_date())
-        files = os.listdir(f"picturae_img/test_images{test_date()}")
-        print(files)
+        self.DataOnboard.hide_unwanted_files(date_string=test_date())
+        files = os.listdir(f"picturae_img/test_images_{test_date()}")
+        self.assertTrue('CAS123456.JPG' in files)
+        self.assertTrue('.hidden_CAS123457.JPG')
 
     # under construction !
     def test_file_unhide(self):
-        pass
+        self.DataOnboard.hide_unwanted_files(date_string=test_date())
+        self.DataOnboard.unhide_files(date_string=test_date())
+        files = os.listdir(f"picturae_img/test_images_{test_date()}")
+        self.assertEqual(set(files), {'CAS123456.JPG', 'CAS123457.JPG', 'CAS123458.JPG'})
 
     def tearDown(self):
         shutil.rmtree(os.path.dirname(self.expected_image_path))
