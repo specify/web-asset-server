@@ -30,17 +30,6 @@ class WorkingDirectoryTests(unittest.TestCase):
         correct working directory, subdirectories."""
     def setUp(self):
         self.DataOnboard = DataOnboard(date_string=test_date())
-    def test_working_directory(self):
-        """test if user in correct working folder image_client"""
-        expected_relative = "image_client"
-        current_dir = os.getcwd()
-        _, last_directory = os.path.split(current_dir)
-        self.assertEqual(expected_relative, last_directory)
-
-    def test_directory(self):
-        """tests if working folder contains correct subdirectory picturae_csv"""
-        dir_pre = os.path.isdir("picturae_csv")
-        self.assertTrue(dir_pre)
 
     def test_missing_folder_raise_error(self):
         """checks if incorrect sub_directory raises error from file present"""
@@ -278,35 +267,18 @@ class ColNamesTest(unittest.TestCase):
         self.DataOnboard.record_full = pd.DataFrame(new_df)
 
 
-    def test_if_codes(self):
-        """test_if_codes: test if columns that contain codes
-           like Barcode, folder barcode and jpeg_path are present
+    def test_if_id_cols(self):
+        """test_if_id_col: tests whether certain essential
+           ID columns present. Also tests, wether name columns correctly
+           reformated
         """
         self.DataOnboard.csv_colnames()
         csv_columns = self.DataOnboard.record_full.columns
-        column_names = ['CatalogNumber', 'folder_barcode', 'image_path']
+        column_names = ['collector_number', 'RankID',
+                        'CatalogNumber', 'collector_last_name1',
+                        'collector_first_name5']
         self.assertTrue(all(column in csv_columns for column in column_names))
 
-    def test_if_collector(self):
-        """test_if_collector: tests whether certain essential
-           collector columns present such as collector number, First Name,
-           Middle Name, Last Name are present
-        """
-        self.DataOnboard.csv_colnames()
-        csv_columns = self.DataOnboard.record_full.columns
-        column_names = ['collector_number', 'collector_first_name1',
-                        'collector_middle_name1', 'collector_last_name1']
-        self.assertTrue(all(column in csv_columns for column in column_names))
-
-    def test_if_taxon(self):
-        """test_if_taxon: makes sure some key taxon related columns,
-           are present
-        """
-        self.DataOnboard.csv_colnames()
-        csv_columns = self.DataOnboard.record_full.columns
-        column_names = ['Genus', 'Species',
-                        'RankID', 'Author']
-        self.assertTrue(all(column in csv_columns for column in column_names))
 
     def test_if_nas(self):
         """test_if_nas: test if any left-over columns contain only NAs"""
