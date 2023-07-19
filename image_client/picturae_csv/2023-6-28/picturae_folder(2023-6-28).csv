@@ -1,4 +1,0 @@
-﻿application_batch,csv_batch,object_type,folder_barcode,specimen_barcode,filed_as_family,barcode_info,path_jpg,Taxon ID,Family,Genus,Species,Qualifier,Author,Rank 1,Epithet 1,Rank 2,Epithet 2,Hybrid,Hybrid Genus,Hybrid Species,Hybrid Rank 1,Hybrid Epithet 1,Hybrid Level,Notes,Feedback
-1,csv_1234,raw_csv,Cover 123456_1.jpg,123456.jpg,TRUE,,Production/2023_6_28/CAS123456.JPG,54192,Ericaceae,Arctostaphylos,glandulosa,,A. Smith,,,,,FALSE,,,,,,cool sticker,leave this out
-1,csv_1234,raw_csv,Cover 123457_1.jpg,123457.jpg,TRUE,,Production/2023_6_28/CAS123457.JPG,54216,Sapindaceae,Aesculus,californica,,M. Turner,,,,,FALSE,,,,,,cool sticker,leave this out
-1,csv_1234,raw_csv,Cover 123458_1.jpeg,123458.jpg,TRUE,,Production/2023_6_28/CAS123458.JPG,54216,Testae,,,,Francis Milner,,,,,TRUE,Testalae,Tesidens,220,Tesidens,Species,cool sticker,leave this out

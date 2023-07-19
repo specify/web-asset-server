@@ -68,7 +68,6 @@ class FilePathTests(unittest.TestCase):
                                  str(date_string) + ').csv'
         # making the directories
         os.makedirs(os.path.dirname(expected_folder_path), exist_ok=True)
-        os.makedirs(os.path.dirname(expected_specimen_path), exist_ok=True)
 
         open(expected_folder_path, 'a').close()
         open(expected_specimen_path, 'a').close()
@@ -229,7 +228,6 @@ class CsvReadMergeTests(unittest.TestCase):
         """deletes destination directories for dummy datasets"""
         # print("teardown called!")
         # deleting instance
-        del self.DataOnboard.record_full
         del self.DataOnboard
         # deleting folders
         date_string = test_date()
@@ -374,10 +372,10 @@ class CheckImagePaths(unittest.TestCase):
 
         del self.DataOnboard
 
-class test_sql_insert(unittest.TestCase):
+
+class TestSqlInsert(unittest.TestCase):
     def setUp(self):
         self.DataOnboard = DataOnboard(test_date())
-
 
     def test_sql_concat(self):
         # creating function parameters
@@ -388,7 +386,7 @@ class test_sql_insert(unittest.TestCase):
         column_list = ', '.join(column_list)
         value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in value_list)
 
-        sql = (f'''INSERT INTO casbotany.{table_select} ({column_list}) VALUES({value_list})''')
+        sql = f'''INSERT INTO casbotany.{table_select} ({column_list}) VALUES({value_list})'''
         print(sql)
         # assert statement
         expected_output = f'''INSERT INTO casbotany.agent (AgentType, FirstName, MiddleInitial) VALUES(1, 'Fake', 'Name')'''
@@ -396,7 +394,6 @@ class test_sql_insert(unittest.TestCase):
 
     def tearDown(self):
         del self.DataOnboard
-
 
 
 class TestAgentList(unittest.TestCase):
@@ -617,7 +614,7 @@ class HideFilesTest(unittest.TestCase):
 
         date_string = test_date()
 
-        image = Image.new('RGB', (200, 200), color='white')
+        image = Image.new('RGB', (200, 200), color='red')
 
         self.expected_image_path = ""
         barcode_list = [123456, 123457, 123458]
@@ -629,7 +626,6 @@ class HideFilesTest(unittest.TestCase):
 
         self.DataOnboard.image_list = [f"picturae_img/test_images_{date_string}/CAS123456.JPG"]
 
-    # under construction !
     def test_file_hide(self):
         self.DataOnboard.hide_unwanted_files(date_string=test_date())
         files = os.listdir(f"picturae_img/test_images_{test_date()}")
