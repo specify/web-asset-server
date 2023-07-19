@@ -102,6 +102,10 @@ class BotanyImporter(Importer):
             self.barcode_map[barcode] = [full_path]
             self.barcode_map[barcode].append(full_path)
 
+
+
+
+
     def create_skeleton(self, barcode):
         self.logger.info(f"Creating skeleton for barcode {barcode}")
         barcode = str(barcode).zfill(9)

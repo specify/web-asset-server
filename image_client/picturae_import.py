@@ -10,6 +10,10 @@ import logging
 import subprocess
 import pandas as pd
 from casbotany_sql_lite import *
+from datetime import date
+import math
+from PIL import Image
+
 
 class DataOnboard(Importer):
     """DataOnboard: A class with methods designed to wrangle, verify, and upload a csv file
@@ -23,6 +27,7 @@ class DataOnboard(Importer):
         self.barcode_list = []
         self.image_list = []
         self.collector_list = []
+        self.agent_guid_list = []
         self.record_full = pd.DataFrame()
         # intializing parameters for database upload
         init_list = ['barcode', 'verbatim_date', 'start_date', 'end_date',
@@ -124,13 +129,12 @@ class DataOnboard(Importer):
 
         col_names = self.record_full.columns
 
-        print(col_names)
         cols_drop = ['application_batch', 'csv_batch', 'object_type', 'filed_as_family',
                      'barcode_info', 'Notes', 'Feedback']
         # dropping empty columns
         self.record_full = self.record_full.drop(columns=cols_drop)
 
-        self.record_full = self.record_full.dropna(axis=1, how='all')
+        # self.record_full = self.record_full.dropna(axis=1, how='all')
 
         # some of these are just placeholders for now
 
@@ -172,10 +176,18 @@ class DataOnboard(Importer):
     # under this point column transformations will be done through a series of functions
     # will reuse/modify some wrangling functions from data standardization
 
-    # def col_clean():
-    #    """will reformat and clean dataframe until ready for upload.
-    #       **Still need format end-goal
-    #       """
+    def col_clean(self):
+        """will reformat and clean dataframe until ready for upload.
+           **Still need format end-goal
+        """
+        self.record_full['verbatim_date'] = self.record_full['verbatim_date'].apply(replace_apostrophes)
+        date_col_list = ['start_date', 'end_date']
+        for col_string in date_col_list:
+            self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
+                                                          format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
+
+
+
 
     # after file is wrangled into clean importable form,
     # and QC protocols to follow before import
@@ -205,8 +217,8 @@ class DataOnboard(Importer):
         for index, row in self.record_full.iterrows():
             file_name = os.path.basename(row['image_path'])
             file_name = file_name.lower()
-            sql = f"select origFilename from casbotany.attachment " \
-                  f"where origFilename = {file_name}"
+            sql = f'''select origFilename from attachment
+                      where origFilename = "{file_name}"'''
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:
                 row['image_present'] = True
@@ -218,7 +230,6 @@ class DataOnboard(Importer):
         self.record_full['file_path_digits'] = self.record_full['image_path'].apply(
             lambda path: self.get_first_digits_from_filepath(path, field_size=9)
         )
-        print(self.record_full['file_path_digits'])
         self.record_full['is_barcode_match'] = self.record_full.apply(lambda row: row['file_path_digits'] ==
                                                                       row['CatalogNumber'].zfill(9), axis=1)
 
@@ -281,11 +292,10 @@ class DataOnboard(Importer):
                 last = column_names.index(f'collector_last_name{i}')
             except ValueError:
                 break
-            if row[first] and row[last]:
+            if not row[first] != '' and row[last] != '':
                 sql = f'''SELECT AgentID FROM agent WHERE FirstName = "{row[first]}"
                          AND LastName = "{row[last]}"'''
                 agent_id = self.specify_db_connection.get_one_record(sql)
-                print(agent_id)
                 if agent_id is None:
                     collector_dict = {f'collector_first_name': row[first],
                                       f'collector_middle_name': row[middle],
@@ -341,7 +351,6 @@ class DataOnboard(Importer):
         self.locality = row[index_list[5]]
         self.collecting_event_guid = uuid4()
         self.locality_guid = uuid4()
-        self.agent_guid = uuid4()
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
@@ -376,9 +385,10 @@ class DataOnboard(Importer):
         else:
             cursor = self.specify_db_connection.get_cursor()
 
-        sql = (f'''INSERT INTO {tab_name} ( {column_list} 
-                    )
-                    VALUES( {value_list})''')
+        sql = f'''INSERT INTO {tab_name} ({column_list})
+                  VALUES ({value_list})'''
+
+        print(sql)
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
         cursor.execute(sql)
@@ -389,10 +399,10 @@ class DataOnboard(Importer):
         else:
             self.specify_db_connection.commit()
             cursor.close()
-            self.specify_db_connection.close()
 
 
-    def create_locality_record(self, is_test=False):
+    # need to review locality data strategy(want to upload locality datat without lat/long, or upload with?
+    def create_locality_record(self):
         """used to assign columns to database tables using sql"""
         table = 'locality'
 
@@ -400,6 +410,8 @@ class DataOnboard(Importer):
                        'TimestampModified',
                        'Version',
                        'GUID',
+                       'SrcLatLongUnit',
+                       'OriginalLatLongUnit',
                        'LocalityName',
                        'DisciplineID',
                        'GeographyID']
@@ -408,21 +420,22 @@ class DataOnboard(Importer):
                       f"{time_utils.get_pst_time_now_string()}",
                       1,
                       f"{self.locality_guid}",
+                      0,
+                      0,
                       f"{self.locality}",
                       3,
                       f"{self.GeographyID}"]
 
-        # assigning row ids
-        if self.locality_id is None:
-            self.create_table_record(tab_name=table, col_list=column_list,
-                                     val_list=value_list, is_test=is_test)
+        self.create_table_record(tab_name=table, col_list=column_list,
+                                 val_list=value_list)
 
-    def create_agent_id(self, is_test=False):
+    def create_agent_id(self):
         """creating new agent ids for missing agents, not already in DB"""
 
         table = 'agent'
-
         for name_dict in self.collector_list:
+            self.agent_guid = uuid4()
+
             column_list = ['TimestampCreated',
                            'TimestampModified',
                            'Version',
@@ -449,13 +462,22 @@ class DataOnboard(Importer):
                           ]
 
             self.create_table_record(tab_name=table, col_list=column_list,
-                                     val_list=value_list, is_test=is_test)
+                                     val_list=value_list)
+            sql = '''SELECT AgentID from agent WHERE GUID = {self.agent_guid}'''
+            result = self.specify_db_connection.get_one_record(sql)
+            self.agent_guid_list.append(result)
+
 
 
     # is this needed?, does a collectorID need to be added for each sample?
     def create_collectingevent(self):
         """creates a record on the collecting event table,
            for collecting events not already in DB"""
+
+        # repulling locality id to relfect update
+        sql = f'''select LocalityID from casbotany.locality where `LocalityName`="{self.locality}"'''
+        self.locality_id = self.specify_db_connection.get_one_record(sql)
+
         table = 'collectingevent'
 
         column_list = ['TimestampCreated',
@@ -490,8 +512,16 @@ class DataOnboard(Importer):
     def create_collection_object(self):
         """creates a record on the collection object table"""
         # will new collecting event ids need to be created ?
+        # repulling collecting event id to relect new record
+        sql = f'''select CollectingEventID from casbotany.collectingevent 
+                  where guid="{self.collecting_event_guid}"'''
+
+        self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
+
+        print(self.collecting_event_id)
 
         table = 'collectionobject'
+
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -520,28 +550,65 @@ class DataOnboard(Importer):
         self.create_table_record(tab_name=table, col_list=column_list,
                                  val_list=value_list)
 
+    def purge_records(self, error, layers: int):
+        tabs = ['locality', 'agent', 'collectingevent', 'collectionobject'][:layers]
+        guid_string = [self.locality_id, self.agent_guid, self.collecting_event_guid,
+                       self.barcode]
+
+        cursor = self.specify_db_connection.get_cursor()
+
+        for index, table in enumerate(tabs):
+            print(f"Purging {guid_string[index]} from {table}")
+
+            if isinstance(guid_string[index], list):
+                guid_list = ', '.join(guid_string[index])
+                sql = f'''DELETE FROM {table} WHERE GUID IN ({guid_list})'''
+            else:
+                sql = f'''DELETE FROM {table} WHERE GUID = "{guid_string[index]}" '''
+
+            self.logger.info(f'running query: {sql}')
+
+            cursor.execute(sql)
+
+            self.specify_db_connection.commit()
+
+            cursor.close()
+
+        sys.exit(f"Terminating script: {error}")
+
     def upload_records(self):
-        self.record_full = self.record_full[self.record_full['barcode'].isin(self.barcode_list)]
+        self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
             self.create_agent_list(row)
             self.taxon_concat(row)
             self.populate_fields(row)
 
             if self.locality_id is None:
-                self.create_locality_record()
-
+                try:
+                    self.create_locality_record()
+                except Exception as e:
+                    self.purge_records(error=e, layers=1)
             if len(self.collector_list) > 0:
-                self.create_agent_id()
-
+                try:
+                    self.create_agent_id()
+                except Exception as e:
+                    self.purge_records(error=e, layers=2)
             if self.collecting_event_id is None:
-                self.create_collectingevent()
-            self.create_collection_object()
+                try:
+                    self.create_collectingevent()
+                except Exception as e:
+                    self.purge_records(error=e, layers=3)
+            try:
+                self.create_collection_object()
+            except Exception as e:
+                self.purge_records(error=e, layers=4)
+
 
     def hide_unwanted_files(self, date_string):
         """function to hide files inside of images folder,
             to filter out images not in images_list"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{date_string}{sla}'
+        folder_path = f'picturae_img/{date_string}{sla}'
         for file_name in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file_name)
             if file_path not in self.image_list:
@@ -552,7 +619,7 @@ class DataOnboard(Importer):
     def unhide_files(self, date_string):
         """function to undo file hiding"""
         sla = os.path.sep
-        folder_path = f'picturae_img/test_images_{date_string}{sla}'
+        folder_path = f'picturae_img/{date_string}{sla}'
         prefix = ".hidden_"  # The prefix added during hiding
         for file_name in os.listdir(folder_path):
             if file_name.startswith(prefix):
@@ -564,14 +631,30 @@ class DataOnboard(Importer):
     def upload_attachments(self):
         """this function calls client tools,
         in order to add attachments in image list"""
+        try:
+            self.hide_unwanted_files(date_string=self.date_use)
 
-        self.hide_unwanted_files(date_string=self.date_use)
+            subprocess.run(['python', 'client_tools.py'])
 
-        subprocess.run(['python', 'client_tools.py'])
-
-        self.unhide_files(date_string=self.date_use)
+            self.unhide_files(date_string=self.date_use)
+        except Exception as e:
+            self.purge_records(error=e, layers=4)
+            sys.exit('error in attachments, terminating script')
 
     def run_all_methods(self):
+
+        # create test images comment out when running for real.
+
+        # date_string = "2023-06-28"
+        # image = Image.new('RGB', (200, 200), color='red')
+
+        # barcode_list = [999999981, 999999982, 999999983]
+        # for barcode in barcode_list:
+        #     expected_image_path = f"picturae_img/{date_string}/CAS{barcode}.JPG"
+        #     os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
+        #     print(f"Created directory: {os.path.dirname(expected_image_path)}")
+        #     image.save(expected_image_path)
+
         # setting directory
         self.to_current_directory()
         # verifying file presence
@@ -580,6 +663,8 @@ class DataOnboard(Importer):
         self.csv_merge()
         # renaming columns
         self.csv_colnames()
+        # cleaning data
+        self.col_clean()
 
         # checking if barcode record present in database
         self.barcode_has_record()
@@ -587,6 +672,8 @@ class DataOnboard(Importer):
         # checking if barcode has valid image file
         self.check_if_images_present()
 
+        # checking if image has record
+        self.image_has_record()
         # checking if barcode has valid file name for barcode
         self.check_barcode_match()
 
@@ -601,4 +688,10 @@ class DataOnboard(Importer):
 
         self.logger.info("finished with file upload process reply y/n to undo")
 
-        # add in undo process to delete added records from database.
+
+def master_run(date_string):
+    DataOnboard_int = DataOnboard(date_string=date_string)
+    DataOnboard_int.run_all_methods()
+
+
+master_run(date_string="2023-06-28")

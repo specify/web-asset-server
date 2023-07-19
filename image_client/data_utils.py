@@ -47,6 +47,15 @@ def remove_non_numerics(string: str):
         re.sub: a string with only numerics, use .apply on dataframe objects"""
     return re.sub('[^0-9]+', '', string)
 
+def replace_apostrophes(string: str):
+    """replaces apostrophes like in possessive adjectives in order to not confuse quotation syntax
+    args:
+        string: a string containing an apostrophe
+    returns:
+        re.sub: a string with all apostrophes replaces by escape symbol"""
+
+    return re.sub("'", "`", string)
+
 
 def string_converter(df: pd.DataFrame, column: str, option: str):
     """function to turn string with decimal points into string or int with no decimals
