@@ -1,0 +1,12 @@
+
+Duplicate: cas999999982.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999982.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999982.jpg
+
+Duplicate: cas999999983.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999983.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999983.jpg
+
+Duplicate: cas999999981.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999981.jpg
+	 1.3KB: /users/mdelaroca/documents/sandbox_db/specify-sandbox/web-asset-server/image_client/picturae_img/2023-06-28/./cas999999981.jpg
