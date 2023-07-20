@@ -6,20 +6,23 @@ import time_utils
 from uuid import uuid4
 from data_utils import *
 from importer import Importer
-import logging
 import subprocess
 import pandas as pd
 from casbotany_sql_lite import *
+import client_tools
 from datetime import date
 import math
 from PIL import Image
+import traceback
+import logging
 
 
 class DataOnboard(Importer):
-    """DataOnboard: A class with methods designed to wrangle, verify, and upload a csv file
-       containing transcribed specimen sheet records into the casbotany database, along with attached,
-       images
-       """
+    """DataOnboard:
+           A class with methods designed to wrangle, verify, and upload a csv file
+           containing transcribed specimen sheet records into the casbotany database, along with attached,
+           images
+    """
     def __init__(self, date_string):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
@@ -28,6 +31,7 @@ class DataOnboard(Importer):
         self.image_list = []
         self.collector_list = []
         self.agent_guid_list = []
+        self.sql_concat = ""
         self.record_full = pd.DataFrame()
         # intializing parameters for database upload
         init_list = ['barcode', 'verbatim_date', 'start_date', 'end_date',
@@ -37,6 +41,8 @@ class DataOnboard(Importer):
                      'locality']
         for param in init_list:
             setattr(self, param, None)
+
+        self.created_by_agent = 99726
 
     def to_current_directory(self):
         """to_current_directory: changes current directory to .py file location
@@ -55,10 +61,11 @@ class DataOnboard(Importer):
         """file_present:
            checks if correct filepath in working directory,
            checks if file is on input date
-           checks if file folder is present
+           checks if file folder is present.
+           uses self.use_date to decide which folders to check
            args:
-                override: takes boolean to specify whether to override today's date for custom date
-                new_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
+                none
+        """
 
         self.to_current_directory()
 
@@ -84,10 +91,11 @@ class DataOnboard(Importer):
             raise ValueError(f"subdirectory for {self.date_use} not present")
 
     def csv_read_folder(self, folder_string):
-        """reads in folder_csv data for given date
+        """csv_read_folder:
+                reads in csv data for given date self.date_use
         args:
-            folder_string: denotes whether specimen or folder level data
-            import_date: datestring for custom date in form YYYY-M-D, only used when override = True"""
+            folder_string: denotes whether specimen or folder level data with "folder" or "specimen"
+        """
 
         folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_' + str(folder_string) + '(' + \
                        str(self.date_use) + ').csv'
@@ -177,7 +185,7 @@ class DataOnboard(Importer):
     # will reuse/modify some wrangling functions from data standardization
 
     def col_clean(self):
-        """will reformat and clean dataframe until ready for upload.
+        """will reformat and clean dataframe columns until ready for upload.
            **Still need format end-goal
         """
         self.record_full['verbatim_date'] = self.record_full['verbatim_date'].apply(replace_apostrophes)
@@ -193,7 +201,8 @@ class DataOnboard(Importer):
     # and QC protocols to follow before import
     # QC measures needed here ? before proceeding.
 
-    # it is faster to make booleans now, and filter later in the process function
+    # In my opinion it is faster to make booleans now, and filter later in the process function,
+    # but open to alterantive solutions
 
     def barcode_has_record(self):
         """check if barcode / catalog number already in collectionobject table"""
@@ -204,7 +213,7 @@ class DataOnboard(Importer):
             barcode = os.path.basename(row['CatalogNumber'])
             barcode = barcode.zfill(9)
             sql = f"select CatalogNumber from casbotany.collectionobject " \
-                  f"where CatalogNumber = {barcode}"
+                  f"where CatalogNumber = {barcode};"
             db_barcode = self.specify_db_connection.get_one_record(sql)
             if db_barcode is None:
                 row['barcode_present'] = False
@@ -217,8 +226,9 @@ class DataOnboard(Importer):
         for index, row in self.record_full.iterrows():
             file_name = os.path.basename(row['image_path'])
             file_name = file_name.lower()
-            sql = f'''select origFilename from attachment
-                      where origFilename = "{file_name}"'''
+            file_name = file_name.rsplit(".", 1)[0]
+            sql = f'''select title from casbotany.attachment
+                      where title = "{file_name}"'''
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:
                 row['image_present'] = True
@@ -271,14 +281,7 @@ class DataOnboard(Importer):
                 self.barcode_list.append(row['CatalogNumber'])
             # a stopping point, to allow user to read logger messages,
             # and decide whether to proceed
-            while True:
-                user_input = input("Do you want to continue? (y/n): ")
-                if user_input.lower() == "y":
-                    break
-                elif user_input.lower() == "n":
-                    sys.exit("Script terminated by user.")
-                else:
-                    print("Invalid input. Please enter 'y' or 'n'.")
+
 
     # will change row references to numeric index
     def create_agent_list(self, row):
@@ -292,9 +295,9 @@ class DataOnboard(Importer):
                 last = column_names.index(f'collector_last_name{i}')
             except ValueError:
                 break
-            if not row[first] != '' and row[last] != '':
-                sql = f'''SELECT AgentID FROM agent WHERE FirstName = "{row[first]}"
-                         AND LastName = "{row[last]}"'''
+            if pd.isna(row[first]) is False and pd.isna(row[last]) is False:
+                sql = f'''SELECT AgentID FROM casbotany.agent WHERE FirstName = "{row[first]}"
+                         AND LastName = "{row[last]}";'''
                 agent_id = self.specify_db_connection.get_one_record(sql)
                 if agent_id is None:
                     collector_dict = {f'collector_first_name': row[first],
@@ -302,9 +305,15 @@ class DataOnboard(Importer):
                                       f'collector_last_name': row[last]}
                     self.collector_list.append(collector_dict)
 
-    # check after getting real dataset
+    # check after getting real dataset, still not final
     def taxon_concat(self, row):
-        """parses taxon columns to check taxon database
+        """taxon_concat:
+                parses taxon columns to check taxon database, adds the Genus species, ranks, and Epithets,
+                in the correct order, to create new taxon fullname in self.fullname. so that can be used for
+                database checks.
+            args:
+                row: a row from a csv file containing taxon information with correct column names
+
         """
         hyb_index = self.record_full.columns.get_loc('Hybrid')
         rank_index = self.record_full.columns.get_loc('Rank 1')
@@ -333,8 +342,14 @@ class DataOnboard(Importer):
 
 
     def populate_fields(self, row):
-        """this populates all the
-           initialized data fields per row for input into database
+        """populate_fields:
+               this populates all the
+               initialized data fields per row for input into database,
+               make sure to check column list is correct so that the
+               row indexes are assigned correctly.
+           args:
+                row: a row from a botany specimen csv dataframe containing the required columns
+
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
                        'end_date', 'collector_number', 'locality', 'county', 'state', 'country']
@@ -353,45 +368,67 @@ class DataOnboard(Importer):
         self.locality_guid = uuid4()
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
-
-        # taxon info
-        # creating agent list
-        self.create_agent_list(row)
+        self.sql_concat = ""
 
         # Locality create
-        sql = f'''SELECT GeographyID FROM geography where `FullName` = "{self.geography_string}";'''
+        sql = f'''SELECT GeographyID FROM casbotany.geography 
+                  WHERE `FullName` = "{self.geography_string}";'''
         self.GeographyID = self.specify_db_connection.get_one_record(sql)
 
-        sql = f'''select LocalityID from casbotany.locality where `LocalityName`="{self.locality}"'''
+        sql = f'''SELECT LocalityID FROM casbotany.locality 
+                  WHERE `LocalityName`="{self.locality}";'''
         self.locality_id = self.specify_db_connection.get_one_record(sql)
 
-        sql = f'''select CollectingEventID from casbotany.collectingevent where guid="{self.collecting_event_guid}"'''
+        sql = f'''SELECT CollectingEventID FROM casbotany.collectingevent 
+                  WHERE StationFieldNumber="{self.collector_number}";'''
 
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
-    def create_table_record(self, col_list, val_list, tab_name, is_test=False):
-        """creates a record on given database table, with column list and value list,
-                args:
-                    col_list: list of database table columns to fill
-                    val_list: list of values to input into each table
-                    tab_name: name of the table you wish to insert data into
+
+    def create_sql_string(self, col_list, val_list, tab_name):
+        """create_sql_string:
+               creates a new sql insert statement given a list of db columns,
+               and values to input. Appends new statement to self.sql_concat
+               to form new multi-statement query.
+            args:
+                col_list: list of database table columns to fill
+                val_list: list of values to input into each table
+                tab_name: name of the table you wish to insert data into
         """
         # removing brackets, making sure comma is not inside of quotations
         column_list = ', '.join(col_list)
         value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
+
+
+        sql = f'''INSERT INTO casbotany.{tab_name} ({column_list}) VALUES({value_list});'''
+
+        self.sql_concat += sql
+
+
+    def create_table_record(self, sql, is_test=False):
+        """create_table_record:
+               general code for the inserting of a new record into any table on casbotany.
+               creates connection, and runs sql query. cursor.execute with arg multi, to
+               handle multi-query commands.
+           args:
+               sql: the verbatim sql string, or multi sql query string to send to database
+               is_test: set to False as default, if switched to true,
+                        uses sql-lite database instead for testing
+
+        """
         if is_test is True:
             connection = sqlite3.connect('cas_botanylite.db')
             cursor = connection.cursor()
         else:
             cursor = self.specify_db_connection.get_cursor()
 
-        sql = f'''INSERT INTO {tab_name} ({column_list})
-                  VALUES ({value_list})'''
-
-        print(sql)
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
-        cursor.execute(sql)
+        try:
+            cursor.execute(sql, multi=True)
+        except Exception as e:
+            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
+            self.logger.error(traceback.format_exc())
         if is_test is True:
             connection.commit()
             cursor.close()
@@ -402,8 +439,11 @@ class DataOnboard(Importer):
 
 
     # need to review locality data strategy(want to upload locality datat without lat/long, or upload with?
-    def create_locality_record(self):
-        """used to assign columns to database tables using sql"""
+    def append_locality_record(self):
+        """append_locality_record:
+               creates sql query to create new locality record if not already present in database,
+               appends sql string to mult-query string sql_concat
+        """
         table = 'locality'
 
         column_list = ['TimestampCreated',
@@ -414,7 +454,10 @@ class DataOnboard(Importer):
                        'OriginalLatLongUnit',
                        'LocalityName',
                        'DisciplineID',
-                       'GeographyID']
+                       'GeographyID',
+                       'ModifiedByAgentID',
+                       'CreatedByAgentID'
+                       ]
 
         value_list = [f"{time_utils.get_pst_time_now_string()}",
                       f"{time_utils.get_pst_time_now_string()}",
@@ -424,16 +467,23 @@ class DataOnboard(Importer):
                       0,
                       f"{self.locality}",
                       3,
-                      f"{self.GeographyID}"]
+                      f"{self.GeographyID}",
+                      f"{self.created_by_agent}",
+                      f"{self.created_by_agent}"]
 
-        self.create_table_record(tab_name=table, col_list=column_list,
-                                 val_list=value_list)
+        self.create_sql_string(tab_name=table, col_list=column_list,
+                               val_list=value_list)
 
-    def create_agent_id(self):
-        """creating new agent ids for missing agents, not already in DB"""
+    def append_agent_id(self):
+        """append_agent_id:
+               creates sql query to add new agent ids for missing agents,
+               that are not already in DB, appends sql to the  mult-query sql
+               string sql_concat
+        """
 
         table = 'agent'
         for name_dict in self.collector_list:
+            print(name_dict)
             self.agent_guid = uuid4()
 
             column_list = ['TimestampCreated',
@@ -446,7 +496,9 @@ class DataOnboard(Importer):
                            'LastName',
                            'MiddleInitial',
                            'DivisionID',
-                           'GUID']
+                           'GUID',
+                           'ModifiedByAgentID',
+                           'CreatedByAgentID']
 
             value_list = [f"{time_utils.get_pst_time_now_string()}",
                           f"{time_utils.get_pst_time_now_string()}",
@@ -457,25 +509,29 @@ class DataOnboard(Importer):
                           f"{name_dict['collector_first_name']}",
                           f"{name_dict['collector_last_name']}",
                           f"{name_dict['collector_middle_name']}",
-                          3,
-                          f"{self.agent_guid}"
+                          2,
+                          f"{self.agent_guid}",
+                          f"{self.created_by_agent}"
+                          f"{self.created_by_agent}"
                           ]
 
-            self.create_table_record(tab_name=table, col_list=column_list,
-                                     val_list=value_list)
-            sql = '''SELECT AgentID from agent WHERE GUID = {self.agent_guid}'''
-            result = self.specify_db_connection.get_one_record(sql)
-            self.agent_guid_list.append(result)
-
-
+            self.create_sql_string(tab_name=table, col_list=column_list,
+                                   val_list=value_list)
+            # sql = '''SELECT AgentID from agent WHERE GUID = {self.agent_guid}'''
+            # result = self.specify_db_connection.get_one_record(sql)
+            # self.agent_guid_list.append(result)
 
     # is this needed?, does a collectorID need to be added for each sample?
-    def create_collectingevent(self):
-        """creates a record on the collecting event table,
-           for collecting events not already in DB"""
+    def append_collectingevent(self):
+        """append_collecting_event:
+               creates sql code for collectingevent table,
+               appends new collectingevent sql to the multi-query sql string sql_concat,
+               for each row.
+        """
 
-        # repulling locality id to relfect update
+        # repulling locality id to reflect update
         sql = f'''select LocalityID from casbotany.locality where `LocalityName`="{self.locality}"'''
+
         self.locality_id = self.specify_db_connection.get_one_record(sql)
 
         table = 'collectingevent'
@@ -489,7 +545,10 @@ class DataOnboard(Importer):
                        'VerbatimDate',
                        'StartDate',
                        'EndDate',
-                       'LocalityID']
+                       'LocalityID',
+                       'ModifiedByAgentID',
+                       'CreatedByAgentID'
+                       ]
 
         value_list = [f"{time_utils.get_pst_time_now_string()}",
                       f"{time_utils.get_pst_time_now_string()}",
@@ -500,25 +559,35 @@ class DataOnboard(Importer):
                       f"{self.verbatim_date}",
                       f"{self.start_date}",
                       f"{self.end_date}",
-                      f"{self.locality_id}"]
+                      f"{self.locality_id}",
+                      f"{self.created_by_agent}",
+                      f"{self.created_by_agent}"]
 
-        self.create_table_record(tab_name=table, col_list=column_list,
-                                 val_list=value_list)
+        self.create_sql_string(tab_name=table, col_list=column_list,
+                               val_list=value_list)
 
 
-    def create_taxon(self):
-        pass
+    # def append_taxon(self):
+    #     table = "taxon"
+    #
+    #     columns = ['TaxonID', 'TimestampCreated', 'Version',
+    #                'Author', 'FullName', 'GUID', 'HighestChildNodeNumber',
+    #                'IsAccepted', 'IsHybrid', 'Name', 'NodeNumber', 'RankID',
+    #                'TaxonTreeDefID', 'ParentID', 'ModifiedByAgentID',
+    #                'CreatedByAgentID', 'TaxonTreeDegItemID']
 
-    def create_collection_object(self):
-        """creates a record on the collection object table"""
+    def append_collection_object(self):
+        """append_collection_object:
+               creates sql code for collection object table,
+               appends new collection_object sql to the multi-query sql string sql_concat,
+               for each row.
+        """
         # will new collecting event ids need to be created ?
         # repulling collecting event id to relect new record
-        sql = f'''select CollectingEventID from casbotany.collectingevent 
+        sql = f'''select CollectingEventID from casbotany.collectingevent
                   where guid="{self.collecting_event_guid}"'''
 
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
-
-        print(self.collecting_event_id)
 
         table = 'collectionobject'
 
@@ -533,7 +602,10 @@ class DataOnboard(Importer):
                        'GUID',
                        'CollectionID',
                        'Date1Precision',
-                       'InventoryDatePrecision']
+                       'InventoryDatePrecision',
+                       'ModifiedByAgentID',
+                       'CreatedByAgentID'
+                       ]
 
         value_list = [f"{time_utils.get_pst_time_now_string()}",
                       f"{time_utils.get_pst_time_now_string()}",
@@ -545,70 +617,101 @@ class DataOnboard(Importer):
                       f"{uuid4()}",
                       4,
                       1,
-                      1]
+                      1,
+                      f"{self.created_by_agent}",
+                      f"{self.created_by_agent}"]
 
-        self.create_table_record(tab_name=table, col_list=column_list,
-                                 val_list=value_list)
+        self.create_sql_string(val_list=value_list, col_list=column_list, tab_name=table)
 
-    def purge_records(self, error, layers: int):
-        tabs = ['locality', 'agent', 'collectingevent', 'collectionobject'][:layers]
-        guid_string = [self.locality_id, self.agent_guid, self.collecting_event_guid,
-                       self.barcode]
+    # def purge_records(self, error, layers: int):
+    #     tabs = ['locality', 'agent', 'collectingevent', 'collectionobject'][:layers]
+    #     guid_string = [self.locality_id, self.agent_guid, self.collecting_event_guid,
+    #                    self.barcode]
+    #
+    #     cursor = self.specify_db_connection.get_cursor()
+    #
+    #     for index, table in enumerate(tabs):
+    #         print(f"Purging {guid_string[index]} from {table}")
+    #
+    #         if isinstance(guid_string[index], list):
+    #             guid_list = ', '.join(guid_string[index])
+    #             sql = f'''DELETE FROM {table} WHERE GUID IN ({guid_list};)'''
+    #         else:
+    #             sql = f'''DELETE FROM {table} WHERE GUID = "{guid_string[index]};" '''
+    #
+    #         self.logger.info(f'running query: {sql}')
+    #
+    #         cursor.execute(sql)
+    #
+    #         self.specify_db_connection.commit()
+    #
+    #         cursor.close()
+    #
+    #     sys.exit(f"Terminating script: {error}")
 
-        cursor = self.specify_db_connection.get_cursor()
 
-        for index, table in enumerate(tabs):
-            print(f"Purging {guid_string[index]} from {table}")
-
-            if isinstance(guid_string[index], list):
-                guid_list = ', '.join(guid_string[index])
-                sql = f'''DELETE FROM {table} WHERE GUID IN ({guid_list})'''
+    def cont_prompter(self):
+        """cont_prompter:
+                placed critical step after database checks, prompts users to
+                confirm in order to continue. Allows user to check logger texts to make sure
+                no unwanted data is being uploaded.
+        """
+        while True:
+            user_input = input("Do you want to continue? (y/n): ")
+            if user_input.lower() == "y":
+                break
+            elif user_input.lower() == "n":
+                sys.exit("Script terminated by user.")
             else:
-                sql = f'''DELETE FROM {table} WHERE GUID = "{guid_string[index]}" '''
-
-            self.logger.info(f'running query: {sql}')
-
-            cursor.execute(sql)
-
-            self.specify_db_connection.commit()
-
-            cursor.close()
-
-        sys.exit(f"Terminating script: {error}")
+                print("Invalid input. Please enter 'y' or 'n'.")
 
     def upload_records(self):
+        """upload_records:
+               an ensemble function made up of all row level, and database functions,
+               loops through each row of the csv, updates the global values, and creates new table records
+           args:
+                none
+            returns:
+                new table records related
+        """
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
             self.create_agent_list(row)
             self.taxon_concat(row)
             self.populate_fields(row)
+            print(self.collector_list)
 
             if self.locality_id is None:
-                try:
-                    self.create_locality_record()
-                except Exception as e:
-                    self.purge_records(error=e, layers=1)
+                self.append_locality_record()
+
             if len(self.collector_list) > 0:
-                try:
-                    self.create_agent_id()
-                except Exception as e:
-                    self.purge_records(error=e, layers=2)
+                self.append_agent_id()
+
             if self.collecting_event_id is None:
-                try:
-                    self.create_collectingevent()
-                except Exception as e:
-                    self.purge_records(error=e, layers=3)
+                self.append_collectingevent()
+
+            self.append_collection_object()
+
+            print(self.sql_concat)
+
             try:
-                self.create_collection_object()
+                self.create_table_record(sql=self.sql_concat)
             except Exception as e:
-                self.purge_records(error=e, layers=4)
+                self.logger.error(f"sql error: {e}")
+                sys.exit("terminating script")
 
-
-    def hide_unwanted_files(self, date_string):
-        """function to hide files inside of images folder,
-            to filter out images not in images_list"""
+    def hide_unwanted_files(self):
+        """hide_unwanted_files:
+               function to hide files inside of images folder,
+               to filter out images not in images_list. Adds a substring '.hidden_'
+               in front of base file name.
+           args:
+                none
+           returns:
+                none
+        """
         sla = os.path.sep
-        folder_path = f'picturae_img/{date_string}{sla}'
+        folder_path = f'picturae_img/{self.date_use}{sla}'
         for file_name in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file_name)
             if file_path not in self.image_list:
@@ -616,10 +719,13 @@ class DataOnboard(Importer):
                 new_file_path = os.path.join(folder_path, new_file_name)
                 os.rename(file_path, new_file_path)
 
-    def unhide_files(self, date_string):
-        """function to undo file hiding"""
+    def unhide_files(self):
+        """unhide_files:
+                will directly undo the result of hide_unwanted_files.
+                Removes substring `.hidden_` from all base filenames
+        """
         sla = os.path.sep
-        folder_path = f'picturae_img/{date_string}{sla}'
+        folder_path = f'picturae_img/{self.date_use}{sla}'
         prefix = ".hidden_"  # The prefix added during hiding
         for file_name in os.listdir(folder_path):
             if file_name.startswith(prefix):
@@ -629,19 +735,44 @@ class DataOnboard(Importer):
                 os.rename(new_file_path, old_file_path)
 
     def upload_attachments(self):
-        """this function calls client tools,
-        in order to add attachments in image list"""
+        """upload_attachments:
+                this function calls client tools, in order to add
+                attachments in image list. Updates date in
+                botany_importer_config to ensure prefix is
+                updated for correct filepath
+
+        """
+
+        filename = "botany_importer_config.py"
+
+        with open(filename, 'r') as file:
+            # Read the contents of the file
+            content = file.read()
+        date_rep = self.date_use
+        # Replace the string
+        new_content = re.sub(r'\bdate_str = \w*\b', date_rep, content)
+
+        with open(filename, 'w') as file:
+            # Write the modified content back to the file
+            file.write(new_content)
+
         try:
-            self.hide_unwanted_files(date_string=self.date_use)
+            self.hide_unwanted_files()
 
-            subprocess.run(['python', 'client_tools.py'])
+            os.system('cd /Users/mdelaroca/Documents/sandbox_db/specify-sandbox/web-asset-server/image_client')
 
-            self.unhide_files(date_string=self.date_use)
+            os.system('python client_tools.py Botany import')
+
+            self.unhide_files()
         except Exception as e:
-            self.purge_records(error=e, layers=4)
-            sys.exit('error in attachments, terminating script')
+            self.logger.error(f"{e}")
+        # except Exception as e:
+        #     self.purge_records(error=e, layers=4)
+        #     sys.exit('error in attachments, terminating script')
 
     def run_all_methods(self):
+        """run_all_methods:
+                        self-explanatory function, will run all function in class in sequential manner"""
 
         # create test images comment out when running for real.
 
@@ -680,13 +811,16 @@ class DataOnboard(Importer):
         # creating file list after conditions
         self.create_file_list()
 
+        # prompt
+        self.cont_prompter()
+
         # uploading csv records
         self.upload_records()
 
         # uploading attachments
         self.upload_attachments()
 
-        self.logger.info("finished with file upload process reply y/n to undo")
+        self.logger.info("process finished")
 
 
 def master_run(date_string):

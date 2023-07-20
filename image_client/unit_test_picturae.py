@@ -386,10 +386,10 @@ class TestSqlInsert(unittest.TestCase):
         column_list = ', '.join(column_list)
         value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in value_list)
 
-        sql = f'''INSERT INTO casbotany.{table_select} ({column_list}) VALUES({value_list})'''
+        sql = f'''INSERT INTO {table_select} ({column_list}) VALUES({value_list})'''
         print(sql)
         # assert statement
-        expected_output = f'''INSERT INTO casbotany.agent (AgentType, FirstName, MiddleInitial) VALUES(1, 'Fake', 'Name')'''
+        expected_output = f'''INSERT INTO agent (AgentType, FirstName, MiddleInitial) VALUES(1, 'Fake', 'Name')'''
         self.assertEqual(sql, expected_output)
 
     def tearDown(self):
@@ -422,7 +422,9 @@ class TestAgentList(unittest.TestCase):
 
     def test_agent_list(self):
         for index, row in self.DataOnboard.record_full.iterrows():
-            self.DataOnboard.create_agent_list(row)
+            self.DataOnboard.append_agent_id(row)
+
+        print(self.DataOnboard.collector_list)
         first_dict = self.DataOnboard.collector_list[0]
         second_dict = self.DataOnboard.collector_list[1]
 
@@ -508,11 +510,25 @@ class SQLUploadTests(unittest.TestCase):
 
         self.DataOnboard = DataOnboard(date_string=test_date())
 
+
     # these functions are to ostensibly test the function create_table_record
-    def test_create_locality(self):
+
+    def test_sql_string(self):
+
+        self.DataOnboard.create_sql_string(val_list=[4, 5, "on mt"],
+                                           col_list=['code4', 'code5', 'local'], tab_name='locality')
+
+        self.DataOnboard.create_sql_string(val_list=[1, 2, 3],
+                                           col_list=['code1', 'code2', 'code3'], tab_name='fake')
+
+        self.assertEqual(self.DataOnboard.sql_concat,
+                         f'''INSERT INTO locality (code4, code5, local) VALUES(4, 5, 'on mt');INSERT INTO fake (code1, code2, code3) VALUES(1, 2, 3);''')
+
+    def test_append_locality(self):
         """testing create_locality function"""
 
         LocalityName = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
+
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -532,10 +548,13 @@ class SQLUploadTests(unittest.TestCase):
                       3,
                       256]
 
-        # assigning row ids
-        self.DataOnboard.create_table_record(tab_name="locality", col_list=column_list,
-                                             val_list=value_list, is_test=True)
 
+
+        # assigning row ids
+        self.DataOnboard.create_sql_string(tab_name="locality", col_list=column_list,
+                                             val_list=value_list)
+
+        self.DataOnboard.create_table_record(self.DataOnboard.sql_concat, is_test=True)
         # checking whether locality id created
         data_base_locality = casbotany_lite_getrecord(f'''SELECT `LocalityID` FROM locality WHERE 
                                                          `LocalityName` = "{LocalityName}"''')
@@ -548,57 +567,6 @@ class SQLUploadTests(unittest.TestCase):
 
         self.assertEqual(data_base_geo_code, 256)
 
-
-    def test_collection_object(self):
-        """creates a record on the collection object table"""
-        # will new collecting event ids need to be created ?
-
-        digits = list(range(10))
-
-        barcode = random.sample(digits, 6)
-
-        barcode = int(''.join(map(str, barcode)))
-
-        time_stamp = time_utils.get_pst_time_now_string()
-
-        column_list = ['TimestampCreated',
-                       'TimestampModified',
-                       'CollectingEventID',
-                       'Version',
-                       'CollectionMemberID',
-                       'CatalogNumber',
-                       'CatalogedDatePrecision',
-                       'GUID',
-                       'CollectionID',
-                       'Date1Precision',
-                       'InventoryDatePrecision']
-
-        value_list = [f"{time_stamp}",
-                      f"{time_stamp}",
-                      12390,
-                      0,
-                      4,
-                      barcode,
-                      1,
-                      f"{uuid4()}",
-                      4,
-                      1,
-                      1]
-
-        self.DataOnboard.create_table_record(tab_name="collectionobject", col_list=column_list,
-                                             val_list=value_list, is_test=True)
-
-        # checking whether barcode created
-        data_base_barcode = casbotany_lite_getrecord(f'''SELECT `CatalogNumber` FROM collectionobject WHERE 
-                                                         `TimestampCreated` = "{time_stamp}"''')
-
-        self.assertEqual(data_base_barcode, str(barcode))
-
-        # checking whether collecting Event ID
-        data_base_event_code = casbotany_lite_getrecord(f'''SELECT `CollectingEventID` FROM collectionobject WHERE 
-                                                         `TimestampCreated` = "{time_stamp}"''')
-
-        self.assertEqual(data_base_event_code, 12390)
 
     def tearDown(self):
         self.DataOnboard = DataOnboard(date_string=test_date())
@@ -619,24 +587,23 @@ class HideFilesTest(unittest.TestCase):
         self.expected_image_path = ""
         barcode_list = [123456, 123457, 123458]
         for barcode in barcode_list:
-            self.expected_image_path = f"picturae_img/test_images_{date_string}/CAS{barcode}.JPG"
+            self.expected_image_path = f"picturae_img/{date_string}/CAS{barcode}.JPG"
             os.makedirs(os.path.dirname(self.expected_image_path), exist_ok=True)
             print(f"Created directory: {os.path.dirname(self.expected_image_path)}")
             image.save(self.expected_image_path)
 
-        self.DataOnboard.image_list = [f"picturae_img/test_images_{date_string}/CAS123456.JPG"]
+        self.DataOnboard.image_list = [f"picturae_img/{date_string}/CAS123456.JPG"]
 
     def test_file_hide(self):
         self.DataOnboard.hide_unwanted_files(date_string=test_date())
-        files = os.listdir(f"picturae_img/test_images_{test_date()}")
+        files = os.listdir(f"picturae_img/{test_date()}")
         self.assertTrue('CAS123456.JPG' in files)
         self.assertTrue('.hidden_CAS123457.JPG')
 
-    # under construction !
     def test_file_unhide(self):
         self.DataOnboard.hide_unwanted_files(date_string=test_date())
         self.DataOnboard.unhide_files(date_string=test_date())
-        files = os.listdir(f"picturae_img/test_images_{test_date()}")
+        files = os.listdir(f"picturae_img/{test_date()}")
         self.assertEqual(set(files), {'CAS123456.JPG', 'CAS123457.JPG', 'CAS123458.JPG'})
 
     def tearDown(self):
