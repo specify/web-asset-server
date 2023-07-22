@@ -515,16 +515,13 @@ class SQLUploadTests(unittest.TestCase):
 
     def test_sql_string(self):
 
-        self.DataOnboard.create_sql_string(val_list=[4, 5, "on mt"],
-                                           col_list=['code4', 'code5', 'local'], tab_name='locality')
+        sql = self.DataOnboard.create_sql_string(val_list=[4, 5, "on mt"],
+                                                col_list=['code4', 'code5', 'local'], tab_name='locality')
 
-        self.DataOnboard.create_sql_string(val_list=[1, 2, 3],
-                                           col_list=['code1', 'code2', 'code3'], tab_name='fake')
+        self.assertEqual(sql,
+                         f'''INSERT INTO locality (code4, code5, local) VALUES(4, 5, 'on mt');''')
 
-        self.assertEqual(self.DataOnboard.sql_concat,
-                         f'''INSERT INTO locality (code4, code5, local) VALUES(4, 5, 'on mt');INSERT INTO fake (code1, code2, code3) VALUES(1, 2, 3);''')
-
-    def test_append_locality(self):
+    def test_create_locality(self):
         """testing create_locality function"""
 
         LocalityName = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
@@ -547,6 +544,8 @@ class SQLUploadTests(unittest.TestCase):
                       LocalityName,
                       3,
                       256]
+
+
 
 
 
