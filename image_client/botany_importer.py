@@ -51,6 +51,7 @@ class BotanyImporter(Importer):
 
             for cur_filepath in self.barcode_map[barcode]:
                 filename_list.append(cur_filepath)
+            print(filename_list)
             self.process_barcode(barcode, filename_list)
 
     def process_barcode(self, barcode, filepath_list):
@@ -58,7 +59,7 @@ class BotanyImporter(Importer):
             self.logger.debug(f"No barcode; skipping")
             return
         self.logger.debug(f"Barcode: {barcode}")
-        sql = f"select collectionobjectid  from collectionobject where catalognumber={barcode}"
+        sql = f"select CollectionObjectID from casbotany.collectionobject where CatalogNumber={barcode};"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
         force_redacted = False
         if collection_object_id is None:
@@ -111,7 +112,7 @@ class BotanyImporter(Importer):
         barcode = str(barcode).zfill(9)
         cursor = self.specify_db_connection.get_cursor()
         collecting_event_guid = uuid4()
-        sql = (f"""INSERT INTO collectingevent (
+        sql = (f"""INSERT INTO casbotany.collectingevent (
             TimestampCreated,
             TimestampModified,
             Version,
@@ -124,18 +125,18 @@ class BotanyImporter(Importer):
             0,
             '{collecting_event_guid}',
             3
-        )""")
+        );""")
         self.logger.debug(sql)
         cursor.execute(sql)
         self.specify_db_connection.commit()
 
         cursor.close()
 
-        sql = f"select CollectingEventID from collectingevent where guid='{collecting_event_guid}'"
+        sql = f"select CollectingEventID from casbotany.collectingevent where GUID='{collecting_event_guid}';"
         collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
         cursor = self.specify_db_connection.get_cursor()
-        sql = (f"""INSERT INTO collectionobject (
+        sql = (f"""INSERT INTO casbotany.collectionobject (
         TimestampCreated,
         TimestampModified,
         CollectingEventID,

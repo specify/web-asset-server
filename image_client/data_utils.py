@@ -1,6 +1,7 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
    for herbology related tasks
 """
+import numpy as np
 import pandas as pd
 import pymysql as psq
 import csv
@@ -48,14 +49,45 @@ def remove_non_numerics(string: str):
     return re.sub('[^0-9]+', '', string)
 
 def replace_apostrophes(string: str):
-    """replaces apostrophes like in possessive adjectives in order to not confuse quotation syntax
+    """replaces apostrophes in possessive adjectives with double qoutes to be readable by mysql
     args:
         string: a string containing an apostrophe
     returns:
-        re.sub: a string with all apostrophes replaces by escape symbol"""
+        re.sub: a string with all apostrophes replaces by double qoutes"""
+    # using double qoutes on one and single on the other is actually important this time
+    return re.sub("'", '"', string)
 
-    return re.sub("'", "`", string)
+def assign_titles(first_last, name: str):
+    """assign_titles: function designed to seperate out titles in names into new title field"""
+    # to lower to standardize matching
+    titles = ['mr.', 'mrs.', 'ms.', 'dr.', 'jr.', 'sr.', 'ii', 'iii', 'ii', 'v', 'vi', 'vii', 'viii', 'ix']
+    title = ""
+    new_name = ""
 
+    # Split the full name into words
+    if pd.notna(name):
+        name_parts = name.split()
+    # Find the title in the name_parts
+
+        if first_last == "first" and (name_parts[0].lower() in titles):
+            new_name = " ".join(name_parts[1:])
+            title = name_parts[0]
+
+        elif first_last == "last" and (name_parts[-1].lower() in titles):
+            new_name = " ".join(name_parts[:-1])
+            title = name_parts[-1]
+        else:
+            # If no title is found, assign the full name to the first name
+            new_name = name
+    else:
+        new_name = name
+
+    return new_name, title
+#
+#
+# new_name, title = assign_titles(first_last='last', name="morton Jr.")
+# print(new_name)
+# print(title)
 
 def string_converter(df: pd.DataFrame, column: str, option: str):
     """function to turn string with decimal points into string or int with no decimals

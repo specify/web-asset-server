@@ -19,9 +19,10 @@ import logging
 
 class DataOnboard(Importer):
     """DataOnboard:
-           A class with methods designed to wrangle, verify, and upload a csv file
-           containing transcribed specimen sheet records into the casbotany database, along with attached,
-           images
+           A class with methods designed to wrangle, verify,
+           and upload a csv file containing transcribed
+           specimen sheet records into the casbotany database,
+           along with attached images
     """
     def __init__(self, date_string):
         super().__init__(picturae_config, "Botany")
@@ -31,14 +32,15 @@ class DataOnboard(Importer):
         self.image_list = []
         self.collector_list = []
         self.agent_guid_list = []
-        self.sql_concat = ""
         self.record_full = pd.DataFrame()
         # intializing parameters for database upload
-        init_list = ['barcode', 'verbatim_date', 'start_date', 'end_date',
+        init_list = ['GeographyID','taxon_id', 'barcode',
+                     'verbatim_date', 'start_date', 'end_date',
                      'collector_number', 'locality', 'collecting_event_guid',
-                     'locality_guid', 'agent_guid', 'geography_string',
-                     'GeographyID', 'locality_id', 'full_name', 'tax_name',
-                     'locality']
+                     'collecting_event_id', 'locality_guid', 'agent_guid',
+                     'geography_string', 'GeographyID', 'locality_id',
+                     'full_name', 'tax_name', 'locality',
+                     'determination_guid', 'collection_ob_id', 'collection_ob_guid']
         for param in init_list:
             setattr(self, param, None)
 
@@ -132,14 +134,14 @@ class DataOnboard(Importer):
             raise ValueError("Barcode Columns do not match!")
 
     def csv_colnames(self):
-        """csv_colnames: function to be used to rename columns to specify standards"""
+        """csv_colnames: function to be used to rename columns to specify standards. includes csv)_
+           args:
+                none"""
         # remove columns !! review when real dataset received
-
-        col_names = self.record_full.columns
 
         cols_drop = ['application_batch', 'csv_batch', 'object_type', 'filed_as_family',
                      'barcode_info', 'Notes', 'Feedback']
-        # dropping empty columns
+
         self.record_full = self.record_full.drop(columns=cols_drop)
 
         # self.record_full = self.record_full.dropna(axis=1, how='all')
@@ -189,6 +191,7 @@ class DataOnboard(Importer):
            **Still need format end-goal
         """
         self.record_full['verbatim_date'] = self.record_full['verbatim_date'].apply(replace_apostrophes)
+        self.record_full['locality'] = self.record_full['locality'].apply(replace_apostrophes)
         date_col_list = ['start_date', 'end_date']
         for col_string in date_col_list:
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
@@ -202,23 +205,24 @@ class DataOnboard(Importer):
     # QC measures needed here ? before proceeding.
 
     # In my opinion it is faster to make booleans now, and filter later in the process function,
-    # but open to alterantive solutions
+    # but open to alternative solutions
 
     def barcode_has_record(self):
         """check if barcode / catalog number already in collectionobject table"""
         self.record_full['CatalogNumber'] = self.record_full['CatalogNumber'].apply(remove_non_numerics)
         self.record_full['CatalogNumber'] = self.record_full['CatalogNumber'].astype(str)
-        self.record_full['barcode_present'] = None
+        self.record_full['barcode_present'] = ''
+
         for index, row in self.record_full.iterrows():
             barcode = os.path.basename(row['CatalogNumber'])
             barcode = barcode.zfill(9)
-            sql = f"select CatalogNumber from casbotany.collectionobject " \
-                  f"where CatalogNumber = {barcode};"
+            sql = f'''select CatalogNumber from collectionobject
+                      where CatalogNumber = {barcode};'''
             db_barcode = self.specify_db_connection.get_one_record(sql)
             if db_barcode is None:
-                row['barcode_present'] = False
+                self.record_full.loc[index, 'barcode_present'] = False
             else:
-                row['barcode_present'] = True
+                self.record_full.loc[index, 'barcode_present'] = True
 
     def image_has_record(self):
         """checks if image name/barcode already on attachments table"""
@@ -227,13 +231,13 @@ class DataOnboard(Importer):
             file_name = os.path.basename(row['image_path'])
             file_name = file_name.lower()
             file_name = file_name.rsplit(".", 1)[0]
-            sql = f'''select title from casbotany.attachment
-                      where title = "{file_name}"'''
+            sql = f'''select title from attachment
+                      where title = "{file_name}";'''
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:
-                row['image_present'] = True
+                self.record_full.loc[index, 'image_present'] = False
             else:
-                row['image_present'] = False
+                self.record_full.loc[index, 'image_present'] = True
 
     def check_barcode_match(self):
         """checks if filepath barcode matches catalog number barcode"""
@@ -263,17 +267,17 @@ class DataOnboard(Importer):
                                  f"{row['CatalogNumber']}")
 
             elif row['barcode_present'] and row['image_present']:
-                raise ValueError(f"record {row['CatalogNumber']} and image {row['image_path']} "
-                                 f"already in database")
+                self.logger.warning(f"record {row['CatalogNumber']} and image {row['image_path']}"
+                                    f"already in database")
 
             elif row['barcode_present'] and not row['image_present']:
-                self.logger.debug(f"record {row['CatalogNumber']} "
-                                  f"already in database, appending image")
+                self.logger.warning(f"record {row['CatalogNumber']} "
+                                    f"already in database, appending image")
                 self.image_list.append(row['image_path'])
 
             elif not row['barcode_present'] and row['image_present']:
-                self.logger.debug(f"image {row['image_path']} "
-                                  f"already in database, appending record")
+                self.logger.warning(f"image {row['image_path']} "
+                                    f"already in database, appending record")
                 self.barcode_list.append(row['CatalogNumber'])
 
             else:
@@ -283,9 +287,16 @@ class DataOnboard(Importer):
             # and decide whether to proceed
 
 
-    # will change row references to numeric index
+    # will think of way to make this more fool-proof against duplicate names,
+    # there may be more than 1 of some common names
     def create_agent_list(self, row):
-        """creates a list of collectors that will be checked and added to agent/collector tables"""
+        """create_agent_list:
+                creates a list of collectors that will be checked and added to agent/collector tables.
+                checks each collector first and last name against the database, and
+                then if absent, appends the new agent name to a list of dictionaries self.collector_list.
+           args:
+                row: a dataframe row containing collector name information
+        """
         self.collector_list = []
         column_names = list(self.record_full.columns)
         for i in range(1, 6):
@@ -293,17 +304,27 @@ class DataOnboard(Importer):
                 first = column_names.index(f'collector_first_name{i}')
                 middle = column_names.index(f'collector_middle_name{i}')
                 last = column_names.index(f'collector_last_name{i}')
+                # first name title taking presedence over last
             except ValueError:
                 break
-            if pd.isna(row[first]) is False and pd.isna(row[last]) is False:
-                sql = f'''SELECT AgentID FROM casbotany.agent WHERE FirstName = "{row[first]}"
-                         AND LastName = "{row[last]}";'''
+            # sql code
+            if pd.notna(row[first]) or pd.notna(row[last]) or pd.notna(row[middle]):
+                first_name, title = assign_titles(first_last='first', name=f"{row[first]}")
+                last_name, title = assign_titles(first_last='last', name=f"{row[last]}")
+                sql = f'''SELECT AgentID FROM agent 
+                         WHERE FirstName = "{first_name}" 
+                         AND MiddleInitial = "{row[middle]}"
+                         AND LastName = "{last_name}"
+                         AND Title = "{title}";'''
+
                 agent_id = self.specify_db_connection.get_one_record(sql)
                 if agent_id is None:
-                    collector_dict = {f'collector_first_name': row[first],
-                                      f'collector_middle_name': row[middle],
-                                      f'collector_last_name': row[last]}
+                    collector_dict = {f'collector_first_name': first_name,
+                                      f'collector_middle_initial': row[middle],
+                                      f'collector_last_name': last_name,
+                                      f'collector_title': title}
                     self.collector_list.append(collector_dict)
+            print(self.collector_list.append(collector_dict))
 
     # check after getting real dataset, still not final
     def taxon_concat(self, row):
@@ -330,16 +351,22 @@ class DataOnboard(Importer):
 
         for column in columns:
             index = self.record_full.columns.get_loc(column)
-            if row[index]:
+            if pd.notna(row[index]):
                 self.full_name += f" {row[index]}"
-
-        # stripping leading and trailing space.
-        self.full_name = self.full_name.lstrip()
-        self.full_name = self.full_name.rstrip()
+        self.full_name.strip()
         # creating taxon name
         taxon_strings = self.full_name.split()
         self.tax_name = taxon_strings[-1]
 
+
+    def populate_sql(self, tab_name, id_col, key_col, match):
+        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
+
+        print(sql)
+
+        result = self.specify_db_connection.get_one_record(sql)
+
+        return result
 
     def populate_fields(self, row):
         """populate_fields:
@@ -365,31 +392,26 @@ class DataOnboard(Importer):
         self.collector_number = row[index_list[4]]
         self.locality = row[index_list[5]]
         self.collecting_event_guid = uuid4()
+        self.collection_ob_guid = uuid4()
         self.locality_guid = uuid4()
+        self.determination_guid = uuid4()
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
-        self.sql_concat = ""
 
-        # Locality create
-        sql = f'''SELECT GeographyID FROM casbotany.geography 
-                  WHERE `FullName` = "{self.geography_string}";'''
-        self.GeographyID = self.specify_db_connection.get_one_record(sql)
 
-        sql = f'''SELECT LocalityID FROM casbotany.locality 
-                  WHERE `LocalityName`="{self.locality}";'''
-        self.locality_id = self.specify_db_connection.get_one_record(sql)
+        self.GeographyID = self.populate_sql(tab_name='geography', id_col='GeographyID',
+                                             key_col='FullName', match=self.geography_string)
+        self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
+                                             key_col='LocalityName', match=self.locality)
 
-        sql = f'''SELECT CollectingEventID FROM casbotany.collectingevent 
-                  WHERE StationFieldNumber="{self.collector_number}";'''
 
-        self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
+
 
 
     def create_sql_string(self, col_list, val_list, tab_name):
         """create_sql_string:
                creates a new sql insert statement given a list of db columns,
-               and values to input. Appends new statement to self.sql_concat
-               to form new multi-statement query.
+               and values to input.
             args:
                 col_list: list of database table columns to fill
                 val_list: list of values to input into each table
@@ -399,10 +421,9 @@ class DataOnboard(Importer):
         column_list = ', '.join(col_list)
         value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
 
+        sql = f'''INSERT INTO {tab_name} ({column_list}) VALUES({value_list});'''
 
-        sql = f'''INSERT INTO casbotany.{tab_name} ({column_list}) VALUES({value_list});'''
-
-        self.sql_concat += sql
+        return sql
 
 
     def create_table_record(self, sql, is_test=False):
@@ -425,7 +446,7 @@ class DataOnboard(Importer):
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
         try:
-            cursor.execute(sql, multi=True)
+            cursor.execute(sql)
         except Exception as e:
             print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
             self.logger.error(traceback.format_exc())
@@ -434,16 +455,23 @@ class DataOnboard(Importer):
             cursor.close()
             connection.close()
         else:
-            self.specify_db_connection.commit()
+            try:
+                self.specify_db_connection.commit()
+
+            except Exception as e:
+                self.logger.error(f"sql debug: {e}")
+                sys.exit("terminating script")
+
             cursor.close()
 
 
     # need to review locality data strategy(want to upload locality datat without lat/long, or upload with?
-    def append_locality_record(self):
-        """append_locality_record:
-               creates sql query to create new locality record if not already present in database,
-               appends sql string to mult-query string sql_concat
+    def create_locality_record(self):
+        """create_locality_record:
+               defines column and value list , runs them as args through create_sql_string and create_table record
+               in order to add new locality record to database
         """
+
         table = 'locality'
 
         column_list = ['TimestampCreated',
@@ -459,8 +487,8 @@ class DataOnboard(Importer):
                        'CreatedByAgentID'
                        ]
 
-        value_list = [f"{time_utils.get_pst_time_now_string()}",
-                      f"{time_utils.get_pst_time_now_string()}",
+        value_list = [f'{time_utils.get_pst_time_now_string()}',
+                      f'{time_utils.get_pst_time_now_string()}',
                       1,
                       f"{self.locality_guid}",
                       0,
@@ -468,22 +496,23 @@ class DataOnboard(Importer):
                       f"{self.locality}",
                       3,
                       f"{self.GeographyID}",
-                      f"{self.created_by_agent}",
-                      f"{self.created_by_agent}"]
+                      f'{self.created_by_agent}',
+                      f'{self.created_by_agent}']
 
-        self.create_sql_string(tab_name=table, col_list=column_list,
-                               val_list=value_list)
+        sql = self.create_sql_string(tab_name=table, col_list=column_list,
+                                     val_list=value_list)
 
-    def append_agent_id(self):
-        """append_agent_id:
-               creates sql query to add new agent ids for missing agents,
-               that are not already in DB, appends sql to the  mult-query sql
-               string sql_concat
-        """
+        self.create_table_record(sql=sql)
 
+    def create_agent_id(self):
+        """create_agent_id:
+                defines column and value list , runs them as
+                args through create_sql_string and create_table record
+                in order to add new agent record to database.
+                Includes a forloop to cycle through multiple collectors.
+         """
         table = 'agent'
         for name_dict in self.collector_list:
-            print(name_dict)
             self.agent_guid = uuid4()
 
             column_list = ['TimestampCreated',
@@ -495,44 +524,48 @@ class DataOnboard(Importer):
                            'FirstName',
                            'LastName',
                            'MiddleInitial',
+                           'Title',
                            'DivisionID',
                            'GUID',
                            'ModifiedByAgentID',
                            'CreatedByAgentID']
 
-            value_list = [f"{time_utils.get_pst_time_now_string()}",
-                          f"{time_utils.get_pst_time_now_string()}",
+            value_list = [f'{time_utils.get_pst_time_now_string()}',
+                          f'{time_utils.get_pst_time_now_string()}',
                           1,
                           1,
                           1,
                           1,
                           f"{name_dict['collector_first_name']}",
                           f"{name_dict['collector_last_name']}",
-                          f"{name_dict['collector_middle_name']}",
+                          f"{name_dict['collector_middle_initial']}",
+                          f"{name_dict['collector_title']}",
                           2,
-                          f"{self.agent_guid}",
-                          f"{self.created_by_agent}"
-                          f"{self.created_by_agent}"
+                          f'{self.agent_guid}',
+                          f'{self.created_by_agent}',
+                          f'{self.created_by_agent}'
                           ]
 
-            self.create_sql_string(tab_name=table, col_list=column_list,
-                                   val_list=value_list)
-            # sql = '''SELECT AgentID from agent WHERE GUID = {self.agent_guid}'''
-            # result = self.specify_db_connection.get_one_record(sql)
-            # self.agent_guid_list.append(result)
+            sql = self.create_sql_string(tab_name=table, col_list=column_list,
+                                         val_list=value_list)
+
+            self.create_table_record(sql=sql)
 
     # is this needed?, does a collectorID need to be added for each sample?
-    def append_collectingevent(self):
-        """append_collecting_event:
-               creates sql code for collectingevent table,
-               appends new collectingevent sql to the multi-query sql string sql_concat,
-               for each row.
-        """
+    def create_collectingevent(self):
+        """create_collectingevent:
+                defines column and value list , runs them as
+                args through create_sql_string and create_table record
+                in order to add new collectingevent record to database.
+         """
 
         # repulling locality id to reflect update
-        sql = f'''select LocalityID from casbotany.locality where `LocalityName`="{self.locality}"'''
+
+        sql = f'''select LocalityID from locality where `LocalityName`="{self.locality}"'''
 
         self.locality_id = self.specify_db_connection.get_one_record(sql)
+
+        print(self.collecting_event_guid)
 
         table = 'collectingevent'
 
@@ -550,47 +583,53 @@ class DataOnboard(Importer):
                        'CreatedByAgentID'
                        ]
 
-        value_list = [f"{time_utils.get_pst_time_now_string()}",
-                      f"{time_utils.get_pst_time_now_string()}",
+        value_list = [f'{time_utils.get_pst_time_now_string()}',
+                      f'{time_utils.get_pst_time_now_string()}',
                       0,
-                      f"{self.collecting_event_guid}",
+                      f'{self.collecting_event_guid}',
                       3,
-                      f"{self.collector_number}",
-                      f"{self.verbatim_date}",
-                      f"{self.start_date}",
-                      f"{self.end_date}",
-                      f"{self.locality_id}",
-                      f"{self.created_by_agent}",
-                      f"{self.created_by_agent}"]
+                      f'{self.collector_number}',
+                      f'{self.verbatim_date}',
+                      f'{self.start_date}',
+                      f'{self.end_date}',
+                      f'{self.locality_id}',
+                      f'{self.created_by_agent}',
+                      f'{self.created_by_agent}'
+                      ]
 
-        self.create_sql_string(tab_name=table, col_list=column_list,
-                               val_list=value_list)
+        sql = self.create_sql_string(tab_name=table, col_list=column_list,
+                                     val_list=value_list)
+
+        self.create_table_record(sql=sql)
+
+    # temporarily creating exception list until reliable taxon api or library
+    def create_taxon(self):
+        # for now do not upload
+        new_taxon_list = []
+
+        self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
+                                          key_col='FullName', match=self.full_name)
+
+        if self.taxon_id is None:
+            new_taxon_list.append(self.full_name)
 
 
-    # def append_taxon(self):
-    #     table = "taxon"
-    #
-    #     columns = ['TaxonID', 'TimestampCreated', 'Version',
-    #                'Author', 'FullName', 'GUID', 'HighestChildNodeNumber',
-    #                'IsAccepted', 'IsHybrid', 'Name', 'NodeNumber', 'RankID',
-    #                'TaxonTreeDefID', 'ParentID', 'ModifiedByAgentID',
-    #                'CreatedByAgentID', 'TaxonTreeDegItemID']
 
-    def append_collection_object(self):
-        """append_collection_object:
-               creates sql code for collection object table,
-               appends new collection_object sql to the multi-query sql string sql_concat,
-               for each row.
-        """
+    def create_collection_object(self):
+        """create_collection_object:
+                defines column and value list , runs them as
+                args through create_sql_string and create_table record
+                in order to add new collectionobject record to database.
+         """
         # will new collecting event ids need to be created ?
         # repulling collecting event id to relect new record
-        sql = f'''select CollectingEventID from casbotany.collectingevent
-                  where guid="{self.collecting_event_guid}"'''
+
+        sql = f'''SELECT CollectingEventID FROM collectingevent
+                  WHERE GUID = "{self.collecting_event_guid}";'''
 
         self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
         table = 'collectionobject'
-
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -614,41 +653,57 @@ class DataOnboard(Importer):
                       4,
                       f"{self.barcode}",
                       1,
-                      f"{uuid4()}",
+                      f"{self.collection_ob_guid}",
                       4,
                       1,
                       1,
                       f"{self.created_by_agent}",
                       f"{self.created_by_agent}"]
 
-        self.create_sql_string(val_list=value_list, col_list=column_list, tab_name=table)
+        sql = self.create_sql_string(tab_name=table, col_list=column_list,
+                                     val_list=value_list)
 
-    # def purge_records(self, error, layers: int):
-    #     tabs = ['locality', 'agent', 'collectingevent', 'collectionobject'][:layers]
-    #     guid_string = [self.locality_id, self.agent_guid, self.collecting_event_guid,
-    #                    self.barcode]
-    #
-    #     cursor = self.specify_db_connection.get_cursor()
-    #
-    #     for index, table in enumerate(tabs):
-    #         print(f"Purging {guid_string[index]} from {table}")
-    #
-    #         if isinstance(guid_string[index], list):
-    #             guid_list = ', '.join(guid_string[index])
-    #             sql = f'''DELETE FROM {table} WHERE GUID IN ({guid_list};)'''
-    #         else:
-    #             sql = f'''DELETE FROM {table} WHERE GUID = "{guid_string[index]};" '''
-    #
-    #         self.logger.info(f'running query: {sql}')
-    #
-    #         cursor.execute(sql)
-    #
-    #         self.specify_db_connection.commit()
-    #
-    #         cursor.close()
-    #
-    #     sys.exit(f"Terminating script: {error}")
+        self.create_table_record(sql=sql)
 
+
+
+    def create_determination(self, row):
+        table = 'determination'
+
+        sql = f'''SELECT CollectionObjectID FROM collectionobject WHERE GUID = "{self.collection_ob_guid}"'''
+
+        self.collection_ob_id = self.specify_db_connection.get_one_record(sql)
+
+        columns = ['TimestampCreated',
+                   'TimestampModified',
+                   'Version',
+                   'CollectionMemberID',
+                   #'DeterminedDate',
+                   'DeterminedDatePrecision',
+                   'IsCurrent',
+                   # 'Qualifier',
+                   'GUID',
+                   'TaxonID',
+                   'CollectionObjectID',
+                   'ModifiedByAgentID',
+                   # 'DeterminerID',
+                   'PreferredTaxonID',
+                   ]
+        values = [f"{time_utils.get_pst_time_now_string()}",
+                  f"{time_utils.get_pst_time_now_string()}",
+                  1,
+                  4,
+                  1,
+                  True,
+                  f"{self.determination_guid}",
+                  f"{self.taxon_id}",
+                  f"{self.collection_ob_id}",
+                  f"{self.created_by_agent}",
+                  f"{self.created_by_agent}",
+                  f"{self.taxon_id}"
+                  ]
+
+        self.create_sql_string(col_list=columns, val_list=values, tab_name=table)
 
     def cont_prompter(self):
         """cont_prompter:
@@ -665,40 +720,6 @@ class DataOnboard(Importer):
             else:
                 print("Invalid input. Please enter 'y' or 'n'.")
 
-    def upload_records(self):
-        """upload_records:
-               an ensemble function made up of all row level, and database functions,
-               loops through each row of the csv, updates the global values, and creates new table records
-           args:
-                none
-            returns:
-                new table records related
-        """
-        self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
-        for index, row in self.record_full.iterrows():
-            self.create_agent_list(row)
-            self.taxon_concat(row)
-            self.populate_fields(row)
-            print(self.collector_list)
-
-            if self.locality_id is None:
-                self.append_locality_record()
-
-            if len(self.collector_list) > 0:
-                self.append_agent_id()
-
-            if self.collecting_event_id is None:
-                self.append_collectingevent()
-
-            self.append_collection_object()
-
-            print(self.sql_concat)
-
-            try:
-                self.create_table_record(sql=self.sql_concat)
-            except Exception as e:
-                self.logger.error(f"sql error: {e}")
-                sys.exit("terminating script")
 
     def hide_unwanted_files(self):
         """hide_unwanted_files:
@@ -734,13 +755,37 @@ class DataOnboard(Importer):
                 new_file_path = os.path.join(folder_path, file_name)
                 os.rename(new_file_path, old_file_path)
 
+    def upload_records(self):
+        """upload_records:
+               an ensemble function made up of all row level, and database functions,
+               loops through each row of the csv, updates the global values, and creates new table records
+           args:
+                none
+            returns:
+                new table records related
+        """
+        self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
+        for index, row in self.record_full.iterrows():
+            self.create_agent_list(row)
+            self.taxon_concat(row)
+            self.populate_fields(row)
+
+            if self.locality_id is None:
+                self.create_locality_record()
+
+            if len(self.collector_list) > 0:
+                self.create_agent_id()
+
+            self.create_collectingevent()
+
+            self.create_collection_object()
+
     def upload_attachments(self):
         """upload_attachments:
                 this function calls client tools, in order to add
                 attachments in image list. Updates date in
                 botany_importer_config to ensure prefix is
                 updated for correct filepath
-
         """
 
         filename = "botany_importer_config.py"
@@ -766,9 +811,6 @@ class DataOnboard(Importer):
             self.unhide_files()
         except Exception as e:
             self.logger.error(f"{e}")
-        # except Exception as e:
-        #     self.purge_records(error=e, layers=4)
-        #     sys.exit('error in attachments, terminating script')
 
     def run_all_methods(self):
         """run_all_methods:
