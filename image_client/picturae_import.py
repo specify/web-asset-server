@@ -1,21 +1,18 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
+import pandas as pd
+
 import picturae_config
 import sys
 import os
 import time_utils
 from uuid import uuid4
 from data_utils import *
-from importer import Importer
-import subprocess
-import pandas as pd
 from casbotany_sql_lite import *
-import client_tools
 from datetime import date
-import math
-from PIL import Image
 import traceback
 import logging
-
+from sql_csv_utils import *
+from importer import Importer
 
 class DataOnboard(Importer):
     """DataOnboard:
@@ -30,11 +27,16 @@ class DataOnboard(Importer):
         self.logger = logging.getLogger('DataOnboard')
         self.barcode_list = []
         self.image_list = []
-        self.collector_list = []
+        # full collector list is for populating existing and missing agents into collector table
+        self.full_collector_list = []
+        # new_collector_list is only for adding new agents to agent table.
+        self.new_collector_list = []
+        self.agent_guid_list = []
+        self.new_taxon_list = []
         self.agent_guid_list = []
         self.record_full = pd.DataFrame()
         # intializing parameters for database upload
-        init_list = ['GeographyID','taxon_id', 'barcode',
+        init_list = ['GeographyID', 'taxon_id', 'barcode',
                      'verbatim_date', 'start_date', 'end_date',
                      'collector_number', 'locality', 'collecting_event_guid',
                      'collecting_event_id', 'locality_guid', 'agent_guid',
@@ -289,6 +291,7 @@ class DataOnboard(Importer):
 
     # will think of way to make this more fool-proof against duplicate names,
     # there may be more than 1 of some common names
+
     def create_agent_list(self, row):
         """create_agent_list:
                 creates a list of collectors that will be checked and added to agent/collector tables.
@@ -297,34 +300,40 @@ class DataOnboard(Importer):
            args:
                 row: a dataframe row containing collector name information
         """
-        self.collector_list = []
         column_names = list(self.record_full.columns)
         for i in range(1, 6):
             try:
                 first = column_names.index(f'collector_first_name{i}')
                 middle = column_names.index(f'collector_middle_name{i}')
                 last = column_names.index(f'collector_last_name{i}')
-                # first name title taking presedence over last
+                # first name title taking priority over last
             except ValueError:
                 break
-            # sql code
-            if pd.notna(row[first]) or pd.notna(row[last]) or pd.notna(row[middle]):
+
+            if not pd.isna(row[first]) or not pd.isna(row[last]) or not pd.isna(row[middle]):
                 first_name, title = assign_titles(first_last='first', name=f"{row[first]}")
                 last_name, title = assign_titles(first_last='last', name=f"{row[last]}")
-                sql = f'''SELECT AgentID FROM agent 
-                         WHERE FirstName = "{first_name}" 
-                         AND MiddleInitial = "{row[middle]}"
-                         AND LastName = "{last_name}"
-                         AND Title = "{title}";'''
+                middle = row[middle]
+                elements = [first_name, last_name, title, middle]
+
+                # Iterate through the list and replace empty strings with pd.NA
+                for index in range(len(elements)):
+                    if elements[index] == '':
+                        elements[index] = pd.NA
+
+                first_name, last_name, title, middle = elements
+
+                sql = create_name_sql(first_name, last_name, middle, title)
 
                 agent_id = self.specify_db_connection.get_one_record(sql)
+
+                collector_dict = {f'collector_first_name': first_name,
+                                  f'collector_middle_initial': middle,
+                                  f'collector_last_name': last_name,
+                                  f'collector_title': title}
+                self.full_collector_list.append(collector_dict)
                 if agent_id is None:
-                    collector_dict = {f'collector_first_name': first_name,
-                                      f'collector_middle_initial': row[middle],
-                                      f'collector_last_name': last_name,
-                                      f'collector_title': title}
-                    self.collector_list.append(collector_dict)
-            print(self.collector_list.append(collector_dict))
+                    self.new_collector_list.append(collector_dict)
 
     # check after getting real dataset, still not final
     def taxon_concat(self, row):
@@ -342,18 +351,18 @@ class DataOnboard(Importer):
         self.full_name = ""
         if row[hyb_index] is False:
             columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
-            if row[rank_index] == 'Species':
-                columns = ['Genus', 'Species', 'Rank 2', 'Epithet 2']
+            # if row[rank_index] == 'Species':
+            #     columns = ['Genus', 'Species', 'Rank 2', 'Epithet 2']
         else:
-            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Level', 'Hybrid Epithet']
-            if row[hyb_level] == 'Species':
-                columns = ['Hybrid Genus', 'Hybrid Species']
+            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1', 'Hybrid Level']
+            # if row[hyb_level] == 'Species':
+            #     columns = ['Hybrid Genus', 'Hybrid Species']
 
         for column in columns:
             index = self.record_full.columns.get_loc(column)
             if pd.notna(row[index]):
                 self.full_name += f" {row[index]}"
-        self.full_name.strip()
+        self.full_name = self.full_name.strip()
         # creating taxon name
         taxon_strings = self.full_name.split()
         self.tax_name = taxon_strings[-1]
@@ -361,8 +370,6 @@ class DataOnboard(Importer):
 
     def populate_sql(self, tab_name, id_col, key_col, match):
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
-
-        print(sql)
 
         result = self.specify_db_connection.get_one_record(sql)
 
@@ -384,7 +391,8 @@ class DataOnboard(Importer):
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
             index_list.append(barcode_index)
-
+        self.new_collector_list = []
+        self.full_collector_list = []
         self.barcode = row[index_list[0]].zfill(9)
         self.verbatim_date = row[index_list[1]]
         self.start_date = row[index_list[2]]
@@ -395,6 +403,7 @@ class DataOnboard(Importer):
         self.collection_ob_guid = uuid4()
         self.locality_guid = uuid4()
         self.determination_guid = uuid4()
+        self.agent_guid_list = []
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
@@ -405,25 +414,9 @@ class DataOnboard(Importer):
                                              key_col='LocalityName', match=self.locality)
 
 
+        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}" AND IsAccepted = true;'''
 
-
-
-    def create_sql_string(self, col_list, val_list, tab_name):
-        """create_sql_string:
-               creates a new sql insert statement given a list of db columns,
-               and values to input.
-            args:
-                col_list: list of database table columns to fill
-                val_list: list of values to input into each table
-                tab_name: name of the table you wish to insert data into
-        """
-        # removing brackets, making sure comma is not inside of quotations
-        column_list = ', '.join(col_list)
-        value_list = ', '.join(f"'{value}'" if isinstance(value, str) else repr(value) for value in val_list)
-
-        sql = f'''INSERT INTO {tab_name} ({column_list}) VALUES({value_list});'''
-
-        return sql
+        self.taxon_id = self.specify_db_connection.get_one_record(sql)
 
 
     def create_table_record(self, sql, is_test=False):
@@ -499,10 +492,14 @@ class DataOnboard(Importer):
                       f'{self.created_by_agent}',
                       f'{self.created_by_agent}']
 
-        sql = self.create_sql_string(tab_name=table, col_list=column_list,
-                                     val_list=value_list)
+        # removing na values from both lists
+        value_list, column_list = remove_two_index(value_list, column_list)
+
+        sql = create_sql_string(tab_name=table, col_list=column_list,
+                                val_list=value_list)
 
         self.create_table_record(sql=sql)
+
 
     def create_agent_id(self):
         """create_agent_id:
@@ -512,44 +509,49 @@ class DataOnboard(Importer):
                 Includes a forloop to cycle through multiple collectors.
          """
         table = 'agent'
-        for name_dict in self.collector_list:
+        for name_dict in self.new_collector_list:
             self.agent_guid = uuid4()
 
-            column_list = ['TimestampCreated',
-                           'TimestampModified',
-                           'Version',
-                           'AgentType',
-                           'DateOfBirthPrecision',
-                           'DateOfDeathPrecision',
-                           'FirstName',
-                           'LastName',
-                           'MiddleInitial',
-                           'Title',
-                           'DivisionID',
-                           'GUID',
-                           'ModifiedByAgentID',
-                           'CreatedByAgentID']
+            columns = ['TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'AgentType',
+                       'DateOfBirthPrecision',
+                       'DateOfDeathPrecision',
+                       'FirstName',
+                       'LastName',
+                       'MiddleInitial',
+                       'Title',
+                       'DivisionID',
+                       'GUID',
+                       'ModifiedByAgentID',
+                       'CreatedByAgentID']
 
-            value_list = [f'{time_utils.get_pst_time_now_string()}',
-                          f'{time_utils.get_pst_time_now_string()}',
-                          1,
-                          1,
-                          1,
-                          1,
-                          f"{name_dict['collector_first_name']}",
-                          f"{name_dict['collector_last_name']}",
-                          f"{name_dict['collector_middle_initial']}",
-                          f"{name_dict['collector_title']}",
-                          2,
-                          f'{self.agent_guid}',
-                          f'{self.created_by_agent}',
-                          f'{self.created_by_agent}'
-                          ]
+            values = [f'{time_utils.get_pst_time_now_string()}',
+                      f'{time_utils.get_pst_time_now_string()}',
+                      1,
+                      1,
+                      1,
+                      1,
+                      f"{name_dict['collector_first_name']}",
+                      f"{name_dict['collector_last_name']}",
+                      f"{name_dict['collector_middle_initial']}",
+                      f"{name_dict['collector_title']}",
+                      2,
+                      f'{self.agent_guid}',
+                      f'{self.created_by_agent}',
+                      f'{self.created_by_agent}'
+                      ]
+            # removing na values from both lists
+            values, columns = remove_two_index(values, columns)
 
-            sql = self.create_sql_string(tab_name=table, col_list=column_list,
-                                         val_list=value_list)
+            sql = create_sql_string(tab_name=table, col_list=columns,
+                                    val_list=values)
+
+            print(sql)
 
             self.create_table_record(sql=sql)
+
 
     # is this needed?, does a collectorID need to be added for each sample?
     def create_collectingevent(self):
@@ -565,7 +567,6 @@ class DataOnboard(Importer):
 
         self.locality_id = self.specify_db_connection.get_one_record(sql)
 
-        print(self.collecting_event_guid)
 
         table = 'collectingevent'
 
@@ -597,21 +598,25 @@ class DataOnboard(Importer):
                       f'{self.created_by_agent}'
                       ]
 
-        sql = self.create_sql_string(tab_name=table, col_list=column_list,
-                                     val_list=value_list)
+        # removing na values from both lists
+        value_list, column_list = remove_two_index(value_list, column_list)
+
+        sql = create_sql_string(tab_name=table, col_list=column_list,
+                                val_list=value_list)
 
         self.create_table_record(sql=sql)
 
     # temporarily creating exception list until reliable taxon api or library
     def create_taxon(self):
         # for now do not upload
-        new_taxon_list = []
-
-        self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
-                                          key_col='FullName', match=self.full_name)
+        self.new_taxon_list = []
 
         if self.taxon_id is None:
-            new_taxon_list.append(self.full_name)
+            self.new_taxon_list.append(self.full_name)
+        # sql not yet created as need to establish protocol propegating higher taxa with vtaxon
+        else:
+            pass
+
 
 
 
@@ -660,50 +665,98 @@ class DataOnboard(Importer):
                       f"{self.created_by_agent}",
                       f"{self.created_by_agent}"]
 
-        sql = self.create_sql_string(tab_name=table, col_list=column_list,
-                                     val_list=value_list)
+        # removing na values from both lists
+        value_list, column_list = remove_two_index(value_list, column_list)
+
+        sql = create_sql_string(tab_name=table, col_list=column_list,
+                                val_list=value_list)
 
         self.create_table_record(sql=sql)
 
 
 
-    def create_determination(self, row):
+    def create_determination(self):
         table = 'determination'
 
-        sql = f'''SELECT CollectionObjectID FROM collectionobject WHERE GUID = "{self.collection_ob_guid}"'''
+        sql = f'''SELECT CollectionObjectID FROM collectionobject 
+                  WHERE GUID = "{self.collection_ob_guid}";'''
 
         self.collection_ob_id = self.specify_db_connection.get_one_record(sql)
 
-        columns = ['TimestampCreated',
-                   'TimestampModified',
-                   'Version',
-                   'CollectionMemberID',
-                   #'DeterminedDate',
-                   'DeterminedDatePrecision',
-                   'IsCurrent',
-                   # 'Qualifier',
-                   'GUID',
-                   'TaxonID',
-                   'CollectionObjectID',
-                   'ModifiedByAgentID',
-                   # 'DeterminerID',
-                   'PreferredTaxonID',
-                   ]
-        values = [f"{time_utils.get_pst_time_now_string()}",
-                  f"{time_utils.get_pst_time_now_string()}",
-                  1,
-                  4,
-                  1,
-                  True,
-                  f"{self.determination_guid}",
-                  f"{self.taxon_id}",
-                  f"{self.collection_ob_id}",
-                  f"{self.created_by_agent}",
-                  f"{self.created_by_agent}",
-                  f"{self.taxon_id}"
-                  ]
+        column_list = ['TimestampCreated',
+                       'TimestampModified',
+                       'Version',
+                       'CollectionMemberID',
+                       #'DeterminedDate',
+                       'DeterminedDatePrecision',
+                       'IsCurrent',
+                       # 'Qualifier',
+                       'GUID',
+                       'TaxonID',
+                       'CollectionObjectID',
+                       'ModifiedByAgentID',
+                       # 'DeterminerID',
+                       'PreferredTaxonID',
+                       ]
+        value_list = [f"{time_utils.get_pst_time_now_string()}",
+                      f"{time_utils.get_pst_time_now_string()}",
+                      1,
+                      4,
+                      1,
+                      True,
+                      f"{self.determination_guid}",
+                      f"{self.taxon_id}",
+                      f"{self.collection_ob_id}",
+                      f"{self.created_by_agent}",
+                      f"{self.taxon_id}",
+                      ]
 
-        self.create_sql_string(col_list=columns, val_list=values, tab_name=table)
+        # removing na values from both lists
+        value_list, column_list = remove_two_index(value_list, column_list)
+
+        sql = create_sql_string(tab_name=table, col_list=column_list,
+                                val_list=value_list)
+        self.create_table_record(sql)
+
+
+    def create_collector(self):
+        primary_bool = [True, False, False, False, False]
+        for index, agent_dict in enumerate(self.full_collector_list):
+
+            table = 'collector'
+
+            sql = create_name_sql(first_name=agent_dict["collector_first_name"],
+                                  last_name=agent_dict["collector_last_name"],
+                                  middle_initial=agent_dict["collector_middle_initial"],
+                                  title=agent_dict["collector_title"])
+
+            agent_id = self.specify_db_connection.get_one_record(sql=sql)
+
+            column_list = ['TimestampCreated',
+                           'TimestampModified',
+                           'Version',
+                           'IsPrimary',
+                           'OrderNumber',
+                           'ModifiedByAgentID',
+                           'CollectingEventID',
+                           'AgentID']
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          1,
+                          primary_bool[index],
+                          1,
+                          f"{self.created_by_agent}",
+                          f"{self.collecting_event_id}",
+                          f"{agent_id}"]
+
+            # removing na values from both lists
+            value_list, column_list = remove_two_index(value_list, column_list)
+
+            sql = create_sql_string(tab_name=table, col_list=column_list,
+                                    val_list=value_list)
+
+            self.create_table_record(sql)
+
 
     def cont_prompter(self):
         """cont_prompter:
@@ -766,19 +819,24 @@ class DataOnboard(Importer):
         """
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
+            self.populate_fields(row)
             self.create_agent_list(row)
             self.taxon_concat(row)
-            self.populate_fields(row)
 
             if self.locality_id is None:
                 self.create_locality_record()
 
-            if len(self.collector_list) > 0:
+            if len(self.new_collector_list) > 0:
                 self.create_agent_id()
 
             self.create_collectingevent()
 
             self.create_collection_object()
+
+            if self.taxon_id is not None:
+                self.create_determination()
+
+            self.create_collector()
 
     def upload_attachments(self):
         """upload_attachments:
@@ -859,11 +917,14 @@ class DataOnboard(Importer):
         # uploading csv records
         self.upload_records()
 
+        #creating new taxon list
+        if len(self.new_taxon_list) > 0:
+            write_list_to_csv(f"picturae_csv/{self.date_use}/new_taxa_{date.today()}", self.new_taxon_list)
+
         # uploading attachments
         self.upload_attachments()
 
         self.logger.info("process finished")
-
 
 def master_run(date_string):
     DataOnboard_int = DataOnboard(date_string=date_string)

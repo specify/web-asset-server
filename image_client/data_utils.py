@@ -40,6 +40,13 @@ def data_exporter(query_string: str, local_path: str, fromsql: bool):
     return df_init
 
 
+def write_list_to_csv(file_path, data_list):
+    with open(file_path, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(["FullName"])
+        csv_writer.writerows(data_list)
+
+
 def remove_non_numerics(string: str):
     """remove_non_numerics: A small data_cleaning function to remove numerics from a string
     args:
@@ -203,3 +210,16 @@ def to_decimal_degrees(coord: str, num_digits: int):
 def zero_out_barcode(number):
     """changes barcode to specify barcode with leading zeroes, function made for lapply"""
     return str(number).zfill(9)
+
+
+def remove_two_index(value_list, column_list):
+    missing_index = []
+    for index, entry in enumerate(value_list):
+        if entry == '<NA>' or entry == '' or entry == np.nan:
+            value_list.remove(entry)
+            missing_index.append(index)
+
+    column_list = [column_list[i] for i in range(len(column_list)) if i not in missing_index]
+
+    return value_list, column_list
+
