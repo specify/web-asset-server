@@ -223,3 +223,13 @@ def remove_two_index(value_list, column_list):
 
     return value_list, column_list
 
+
+def write_list_to_txt_file(lst, filename):
+    try:
+        with open(filename, 'w') as file:
+            for item in lst:
+                file.write(str(item) + '\n')
+        print(f"The list has been successfully written to {filename}.")
+    except Exception as e:
+        print(f"An error occurred while writing to the file: {e}")
+
