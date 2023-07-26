@@ -348,7 +348,6 @@ class CheckImagePaths(unittest.TestCase):
        there is an equivalent relevant jpeg and tif file."""
     def setUp(self):
         """setup creating matrix with real test image paths to test."""
-        # intializing
         self.DataOnboard = DataOnboard(date_string=test_date())
         # creating dummy frame of real test paths
         folder_path = 'test_images'
@@ -369,16 +368,19 @@ class CheckImagePaths(unittest.TestCase):
         self.assertTrue(all(self.DataOnboard.record_full['image_valid']))
 
     def tearDown(self):
+        """deleting instance of DataOnboard"""
 
         del self.DataOnboard
 
 
 class TestSqlInsert(unittest.TestCase):
     def setUp(self):
+        """setting up instance of DataOnboard"""
         self.DataOnboard = DataOnboard(test_date())
 
-    def test_sql_concat(self):
-        # creating function parameters
+    def test_sql_populate(self):
+        """testing if the joining sql_operations in the
+           function populate are creating the right sql string"""
         table_select = 'agent'
         column_list = ['AgentType', 'FirstName', 'MiddleInitial']
         value_list = [1, 'Fake', 'Name']
@@ -393,11 +395,14 @@ class TestSqlInsert(unittest.TestCase):
         self.assertEqual(sql, expected_output)
 
     def tearDown(self):
+        """deleting instance of DataOnboard"""
         del self.DataOnboard
 
 
 class TestAgentList(unittest.TestCase):
     def setUp(self):
+        """creating instance of DataOnboard, +
+           creating dummy dataset of real and fake names"""
         self.DataOnboard = DataOnboard(date_string=test_date())
 
         # jose Gonzalez is a real agent,
@@ -421,25 +426,30 @@ class TestAgentList(unittest.TestCase):
 
 
     def test_agent_list(self):
+        """makes sure the correct list of dictionaries is produced of collectors,
+           where new agents are included, and old agents are excluded from new_collector_list"""
         for index, row in self.DataOnboard.record_full.iterrows():
-            self.DataOnboard.append_agent_id(row)
+            self.DataOnboard.create_agent_list(row)
 
-        print(self.DataOnboard.collector_list)
-        first_dict = self.DataOnboard.collector_list[0]
-        second_dict = self.DataOnboard.collector_list[1]
+        print(self.DataOnboard.new_collector_list)
+        first_dict = self.DataOnboard.new_collector_list[0]
+        second_dict = self.DataOnboard.new_collector_list[1]
 
         self.assertEqual(first_dict['collector_first_name'], 'Bob')
         self.assertEqual(first_dict['collector_last_name'], 'Fakeson')
         self.assertEqual(second_dict['collector_first_name'], 'Enrique')
         self.assertEqual(second_dict['collector_middle_name'], 'X')
-        self.assertEqual(len(self.DataOnboard.collector_list), 2)
+        self.assertEqual(len(self.DataOnboard.new_collector_list), 2)
 
     def tearDown(self):
         del self.DataOnboard
 
 
+# revise after real dataset recieved
 class ConcatTaxonTests(unittest.TestCase):
     def setUp(self):
+        """creates fake taxon columns in
+           dummy dataset to test out taxon_concat string output"""
         self.DataOnboard = DataOnboard(date_string=test_date())
 
         # jose Gonzalez is a real agent,
@@ -465,6 +475,7 @@ class ConcatTaxonTests(unittest.TestCase):
 
 
     def test_taxon_concat_string(self):
+        """tests whether correct full taxon name string is returned from taxon_concat"""
         temp_taxon_list = []
         for index, row in self.DataOnboard.record_full.iterrows():
             self.DataOnboard.taxon_concat(row)
@@ -475,11 +486,14 @@ class ConcatTaxonTests(unittest.TestCase):
         self.assertEqual(len(temp_taxon_list), 2)
 
     def tearDown(self):
+        """deleting instance of DataOnboard"""
         del self.DataOnboard
 
 
 class TestPopulateFields(unittest.TestCase):
     def setUp(self):
+        """creating fake dataset to check if
+          populate fields function assigns the strings and numbers"""
         self.DataOnboard = DataOnboard(date_string=test_date())
         data = {'CatalogNumber': ['123456'],
                 'verbatim_date': ['March 21, 2008'],
@@ -494,6 +508,8 @@ class TestPopulateFields(unittest.TestCase):
         self.DataOnboard.record_full = pd.DataFrame(data)
 
     def test_assigned_to_variable(self):
+        """tests whether correct integer and string values assigned to
+           initialized variables from populate_fields"""
         for index, row in self.DataOnboard.record_full.iterrows():
             self.DataOnboard.populate_fields(row)
             self.assertEqual(self.DataOnboard.barcode, '000123456')
@@ -502,27 +518,28 @@ class TestPopulateFields(unittest.TestCase):
             self.assertEqual(self.DataOnboard.locality_id, 54)
 
     def tearDown(self):
+        """deleting DataOnboard class instance"""
         del self.DataOnboard
 
 
 class SQLUploadTests(unittest.TestCase):
     def setUp(self):
+        """creating DataOnboard class instance"""
 
         self.DataOnboard = DataOnboard(date_string=test_date())
 
-
-    # these functions are to ostensibly test the function create_table_record
-
     def test_sql_string(self):
+        """testing if create_sql_string
+           creates the correct multi-value sql string for insert statements"""
 
-        sql = self.DataOnboard.create_sql_string(val_list=[4, 5, "on mt"],
-                                                col_list=['code4', 'code5', 'local'], tab_name='locality')
+        sql = create_sql_string(val_list=[4, 5, "on mt"],
+                                col_list=['code4', 'code5', 'local'], tab_name='locality')
 
-        self.assertEqual(sql,
-                         f'''INSERT INTO locality (code4, code5, local) VALUES(4, 5, 'on mt');''')
+        self.assertEqual(sql, f'''INSERT INTO locality (code4, code5, local) VALUES(4, 5, 'on mt');''')
 
     def test_create_locality(self):
-        """testing create_locality function"""
+        """testing create_locality function by
+           recreating insert protocol for locality table, but with sqlLite DB"""
 
         LocalityName = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
 
@@ -550,11 +567,11 @@ class SQLUploadTests(unittest.TestCase):
 
 
         # assigning row ids
-        self.DataOnboard.create_sql_string(tab_name="locality", col_list=column_list,
-                                             val_list=value_list)
+        sql = create_sql_string(tab_name="locality", col_list=column_list,
+                                val_list=value_list)
 
-        self.DataOnboard.create_table_record(self.DataOnboard.sql_concat, is_test=True)
-        # checking whether locality id created
+        self.DataOnboard.create_table_record(sql, is_test=True)
+        # checking whether locality id created properly
         data_base_locality = casbotany_lite_getrecord(f'''SELECT `LocalityID` FROM locality WHERE 
                                                          `LocalityName` = "{LocalityName}"''')
 
@@ -568,11 +585,14 @@ class SQLUploadTests(unittest.TestCase):
 
 
     def tearDown(self):
+        """deleting instance of DataOnboard"""
         self.DataOnboard = DataOnboard(date_string=test_date())
 
 
 class HideFilesTest(unittest.TestCase):
     def setUp(self):
+        """creating test images in test_date folder, in order to test
+           file_hide and file_unhide functions"""
         # initializing
         self.DataOnboard = DataOnboard(date_string=test_date())
 
@@ -594,18 +614,21 @@ class HideFilesTest(unittest.TestCase):
         self.DataOnboard.image_list = [f"picturae_img/{date_string}/CAS123456.JPG"]
 
     def test_file_hide(self):
-        self.DataOnboard.hide_unwanted_files(date_string=test_date())
+        """testing whether file_hide hides files not in barcode list"""
+        self.DataOnboard.hide_unwanted_files()
         files = os.listdir(f"picturae_img/{test_date()}")
         self.assertTrue('CAS123456.JPG' in files)
         self.assertTrue('.hidden_CAS123457.JPG')
 
     def test_file_unhide(self):
-        self.DataOnboard.hide_unwanted_files(date_string=test_date())
-        self.DataOnboard.unhide_files(date_string=test_date())
+        """testing whether files are correctly unhidden after running hide_unwanted_files"""
+        self.DataOnboard.hide_unwanted_files()
+        self.DataOnboard.unhide_files()
         files = os.listdir(f"picturae_img/{test_date()}")
         self.assertEqual(set(files), {'CAS123456.JPG', 'CAS123457.JPG', 'CAS123458.JPG'})
 
     def tearDown(self):
+        """deleting test directory and instance of DataOnboard class"""
         shutil.rmtree(os.path.dirname(self.expected_image_path))
         del self.DataOnboard
 

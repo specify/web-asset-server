@@ -13,6 +13,8 @@ import traceback
 import logging
 from sql_csv_utils import *
 from importer import Importer
+from taxon_check.taxon_checker import call_tropicos_api
+from taxon_check.taxon_checker import check_synonyms
 
 class DataOnboard(Importer):
     """DataOnboard:
@@ -34,6 +36,8 @@ class DataOnboard(Importer):
         self.agent_guid_list = []
         self.new_taxon_list = []
         self.agent_guid_list = []
+        # manual taxon list, list of skipped taxons to be manually verified
+        self.manual_taxon_list = []
         self.record_full = pd.DataFrame()
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -42,7 +46,8 @@ class DataOnboard(Importer):
                      'collecting_event_id', 'locality_guid', 'agent_guid',
                      'geography_string', 'GeographyID', 'locality_id',
                      'full_name', 'tax_name', 'locality',
-                     'determination_guid', 'collection_ob_id', 'collection_ob_guid']
+                     'determination_guid', 'collection_ob_id', 'collection_ob_guid',
+                     'name_id', 'author_sci', 'family']
         for param in init_list:
             setattr(self, param, None)
 
@@ -109,10 +114,12 @@ class DataOnboard(Importer):
         return folder_csv
 
     def csv_merge(self):
-        """csv_merge: merges the folder_csv and the specimen_csv on barcode
-       args:
-            fold_csv: folder level csv to be input as argument for merging
-            spec_csv: specimen level csv to be input as argument for merging """
+        """csv_merge:
+                merges the folder_csv and the specimen_csv on barcode
+           args:
+                fold_csv: folder level csv to be input as argument for merging
+                spec_csv: specimen level csv to be input as argument for merging
+        """
         fold_csv = self.csv_read_folder("folder")
         spec_csv = self.csv_read_folder("specimen")
 
@@ -414,9 +421,13 @@ class DataOnboard(Importer):
                                              key_col='LocalityName', match=self.locality)
 
 
+        print(self.full_name)
         sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}" AND IsAccepted = true;'''
+        print(sql)
 
         self.taxon_id = self.specify_db_connection.get_one_record(sql)
+
+        print(self.taxon_id)
 
 
     def create_table_record(self, sql, is_test=False):
@@ -459,6 +470,62 @@ class DataOnboard(Importer):
 
 
     # need to review locality data strategy(want to upload locality datat without lat/long, or upload with?
+    def check_taxon_real(self):
+        """check_taxon_real:
+                -sends an api caLL to tropicos to check if
+                name exists and is legitimate
+                -if name exists, check synonyms, check synonyms against database, if no synonyms in database,
+                 add name, if synonym in database add name under synonym,
+                 if plural synonyms in database, delegate to hand_check
+        """
+        valid_name = None
+        if self.taxon_id is None:
+            self.manual_taxon_list.append(self.full_name)
+            valid_name = False
+
+        return valid_name
+
+            # try:
+            #     self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
+            #
+            # except Exception as e:
+            #     self.logger.warning(f"no connection: {e}")
+            #     valid_name = False
+            #     self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
+            #     self.manual_taxon_list.append(self.full_name)
+            # if self.name_id == 'No Match':
+            #     valid_name = False
+            #     self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
+            #     self.manual_taxon_list.append(self.full_name)
+            # elif self.name_id != 'No Match':
+            #     valid_name = True
+            #     self.manual_taxon_list.append(self.full_name)
+
+        #     elif valid_name is None:
+        #         name_list, author_list = check_synonyms(tropicos_id=self.name_id)
+        #         # checking if synonyms in DB
+        #         for name in name_list[:]:
+        #             sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
+        #             valid_id = self.specify_db_connection.get_one_record(sql)
+        #             if valid_id is None:
+        #                 name_list.remove(name)
+        #         if len(name_list) == 1:
+        #             self.full_name = name_list[0]
+        #             valid_name = None
+        #         elif len(name_list) > 1:
+        #             self.logger.warning(f'multiple synonyms for {self.full_name}')
+        #             valid_name = False
+        #             self.manual_taxon_list.append(self.full_name)
+        #         else:
+        #             valid_name = True
+        #
+        # return valid_name
+
+
+
+
+
+
     def create_locality_record(self):
         """create_locality_record:
                defines column and value list , runs them as args through create_sql_string and create_table record
@@ -609,13 +676,9 @@ class DataOnboard(Importer):
     # temporarily creating exception list until reliable taxon api or library
     def create_taxon(self):
         # for now do not upload
-        self.new_taxon_list = []
 
-        if self.taxon_id is None:
-            self.new_taxon_list.append(self.full_name)
         # sql not yet created as need to establish protocol propegating higher taxa with vtaxon
-        else:
-            pass
+        print("taxon_created!")
 
 
 
@@ -676,6 +739,13 @@ class DataOnboard(Importer):
 
 
     def create_determination(self):
+        """create_determination:
+                inserts data into determination table, and ties it to collection object table.
+           args:
+                none
+           returns:
+                none
+        """
         table = 'determination'
 
         sql = f'''SELECT CollectionObjectID FROM collectionobject 
@@ -720,6 +790,13 @@ class DataOnboard(Importer):
 
 
     def create_collector(self):
+        """create_collector:
+                adds collector to collector table, after pulling collection object, agent codes.
+           args:
+                none
+           returns:
+                none
+        """
         primary_bool = [True, False, False, False, False]
         for index, agent_dict in enumerate(self.full_collector_list):
 
@@ -773,7 +850,7 @@ class DataOnboard(Importer):
             else:
                 print("Invalid input. Please enter 'y' or 'n'.")
 
-
+            
     def hide_unwanted_files(self):
         """hide_unwanted_files:
                function to hide files inside of images folder,
@@ -819,24 +896,32 @@ class DataOnboard(Importer):
         """
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
-            self.populate_fields(row)
             self.create_agent_list(row)
             self.taxon_concat(row)
+            self.populate_fields(row)
+            pass_taxon = self.check_taxon_real()
+            if pass_taxon is False:
+                self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
+                print(self.image_list)
+                continue
+            else:
 
-            if self.locality_id is None:
-                self.create_locality_record()
+                self.create_taxon()
 
-            if len(self.new_collector_list) > 0:
-                self.create_agent_id()
+                if self.locality_id is None:
+                    self.create_locality_record()
 
-            self.create_collectingevent()
+                if len(self.new_collector_list) > 0:
+                    self.create_agent_id()
 
-            self.create_collection_object()
+                self.create_collectingevent()
 
-            if self.taxon_id is not None:
-                self.create_determination()
+                self.create_collection_object()
 
-            self.create_collector()
+                if self.taxon_id is not None:
+                    self.create_determination()
+
+                self.create_collector()
 
     def upload_attachments(self):
         """upload_attachments:
@@ -923,6 +1008,9 @@ class DataOnboard(Importer):
 
         # uploading attachments
         self.upload_attachments()
+
+        write_list_to_txt_file(lst=self.manual_taxon_list, filename=f"taxon_check/unmatched_taxa/"
+                                                                    f"manual_taxa_{self.date_use}.txt")
 
         self.logger.info("process finished")
 
