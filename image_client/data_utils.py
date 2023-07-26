@@ -215,7 +215,7 @@ def zero_out_barcode(number):
 def remove_two_index(value_list, column_list):
     missing_index = []
     for index, entry in enumerate(value_list):
-        if entry == '<NA>' or entry == '' or entry == np.nan:
+        if entry == '<NA>' or entry == '' or entry == np.nan or entry == pd.NA:
             value_list.remove(entry)
             missing_index.append(index)
 
