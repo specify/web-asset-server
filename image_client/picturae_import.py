@@ -400,6 +400,7 @@ class DataOnboard(Importer):
             index_list.append(barcode_index)
         self.new_collector_list = []
         self.full_collector_list = []
+        self.agent_guid_list = []
         self.barcode = row[index_list[0]].zfill(9)
         self.verbatim_date = row[index_list[1]]
         self.start_date = row[index_list[2]]
@@ -410,7 +411,6 @@ class DataOnboard(Importer):
         self.collection_ob_guid = uuid4()
         self.locality_guid = uuid4()
         self.determination_guid = uuid4()
-        self.agent_guid_list = []
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
@@ -850,7 +850,7 @@ class DataOnboard(Importer):
             else:
                 print("Invalid input. Please enter 'y' or 'n'.")
 
-            
+
     def hide_unwanted_files(self):
         """hide_unwanted_files:
                function to hide files inside of images folder,
