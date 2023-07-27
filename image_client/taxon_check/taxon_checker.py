@@ -61,7 +61,7 @@ def check_synonyms(tropicos_id):
             name_list.append(synonym)
             author_list.append(auth)
     else:
-        print('no synonyms adding to taxon')
+        print('no synonyms')
 
     name_list = list(set(name_list))
     author_list = list(set(name_list))
@@ -69,16 +69,16 @@ def check_synonyms(tropicos_id):
     return name_list, author_list
 
 
-# name, author, fam = call_tropicos_api('Arctostaphylos glandulosa')
-#
-# print(name)
-# print(author)
-# print(fam)
-#
-#
-# name_list, author_list = check_synonyms(name)
-#
-# print(name_list)
-# print(author_list)
-#
-# # Clidemea Almedea
+name, author, fam = call_tropicos_api('Arctostaphylos glandulosa')
+
+print(name)
+print(author)
+print(fam)
+
+
+name_list, author_list = check_synonyms(name)
+
+print(name_list)
+print(author_list)
+
+# Clidemea Almedea
