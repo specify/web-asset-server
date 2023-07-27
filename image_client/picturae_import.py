@@ -1,4 +1,8 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
+import datetime
+
+import pandas as pd
+
 import picturae_config
 import time_utils
 from uuid import uuid4
@@ -24,18 +28,15 @@ class DataOnboard(Importer):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
-        self.barcode_list = []
-        self.image_list = []
         # full collector list is for populating existing and missing agents into collector table
-        self.full_collector_list = []
         # new_collector_list is only for adding new agents to agent table.
-        self.new_collector_list = []
-        self.agent_guid_list = []
-        self.new_taxon_list = []
-        self.agent_guid_list = []
         # manual taxon list, list of skipped taxons to be manually verified
-        self.manual_taxon_list = []
-        self.record_full = pd.DataFrame()
+        empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
+                       'agent_guid_list', 'new_taxon_list', 'agent_guid_list', 'manual_taxon_list']
+
+        for empty_list in empty_lists:
+            setattr(self, empty_list, [])
+
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
                      'verbatim_date', 'start_date', 'end_date',
@@ -45,6 +46,7 @@ class DataOnboard(Importer):
                      'full_name', 'tax_name', 'locality',
                      'determination_guid', 'collection_ob_id', 'collection_ob_guid',
                      'name_id', 'author_sci', 'family']
+
         for param in init_list:
             setattr(self, param, None)
 
@@ -291,19 +293,20 @@ class DataOnboard(Importer):
                 # first name title taking priority over last
             except ValueError:
                 break
-
-            if not pd.isna(row[first]) or not pd.isna(row[last]) or not pd.isna(row[middle]):
+            # need a way to keep ones with nas, but only split titles from real names
+            if not pd.isna(row[first]) or not pd.isna(row[middle]) or not pd.isna(row[last]):
                 first_name, title = assign_titles(first_last='first', name=f"{row[first]}")
                 last_name, title = assign_titles(first_last='last', name=f"{row[last]}")
+
                 middle = row[middle]
                 elements = [first_name, last_name, title, middle]
 
-                # Iterate through the list and replace empty strings with pd.NA
                 for index in range(len(elements)):
                     if elements[index] == '':
                         elements[index] = pd.NA
 
                 first_name, last_name, title, middle = elements
+
 
                 sql = create_name_sql(first_name, last_name, middle, title)
 
@@ -349,7 +352,7 @@ class DataOnboard(Importer):
         taxon_strings = self.full_name.split()
         self.tax_name = taxon_strings[-1]
 
-    def populate_sql(self, tab_name, id_col, key_col, match):
+    def populate_sql(self, tab_name, id_col, key_col, match, match_type=str):
         """populate_sql:
                 creates a custom select statement for get one record,
                 from which a result can be gotten more seamlessly
@@ -360,7 +363,10 @@ class DataOnboard(Importer):
                 key_col: column on which to match values
                 match: value with which to match key_col
         """
-        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
+        if match_type == str:
+            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
+        elif match_type == int:
+            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match}'''
 
         result = self.specify_db_connection.get_one_record(sql)
 
@@ -391,10 +397,12 @@ class DataOnboard(Importer):
         self.end_date = row[index_list[3]]
         self.collector_number = row[index_list[4]]
         self.locality = row[index_list[5]]
-        self.collecting_event_guid = uuid4()
-        self.collection_ob_guid = uuid4()
-        self.locality_guid = uuid4()
-        self.determination_guid = uuid4()
+
+        guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
+        for guid_string in guid_list:
+            setattr(self, guid_string, uuid4())
+
+
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
@@ -465,11 +473,9 @@ class DataOnboard(Importer):
             except Exception as e:
                 self.logger.warning(f"no connection: {e}")
                 valid_name = False
-                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
                 self.manual_taxon_list.append(self.full_name)
             if self.name_id == 'No Match':
                 valid_name = False
-                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
                 self.manual_taxon_list.append(self.full_name)
 
             if valid_name is None:
@@ -582,8 +588,6 @@ class DataOnboard(Importer):
             sql = create_sql_string(tab_name=table, col_list=columns,
                                     val_list=values)
 
-            print(sql)
-
             self.create_table_record(sql=sql)
 
     def create_collectingevent(self):
@@ -595,9 +599,8 @@ class DataOnboard(Importer):
 
         # repulling locality id to reflect update
 
-        sql = f'''select LocalityID from locality where `LocalityName`="{self.locality}"'''
-
-        self.locality_id = self.specify_db_connection.get_one_record(sql)
+        self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
+                                             key_col='LocalityName', match=self.locality)
 
         table = 'collectingevent'
 
@@ -653,10 +656,8 @@ class DataOnboard(Importer):
         # will new collecting event ids need to be created ?
         # repulling collecting event id to relect new record
 
-        sql = f'''SELECT CollectingEventID FROM collectingevent
-                  WHERE GUID = "{self.collecting_event_guid}";'''
-
-        self.collecting_event_id = self.specify_db_connection.get_one_record(sql)
+        self.collecting_event_id = self.populate_sql(tab_name='collectingevent', id_col='CollectingEventID',
+                                                     key_col='GUID', match=self.collecting_event_guid)
 
         table = 'collectionobject'
 
@@ -666,13 +667,15 @@ class DataOnboard(Importer):
                        'Version',
                        'CollectionMemberID',
                        'CatalogNumber',
+                       'CatalogedDate',
                        'CatalogedDatePrecision',
                        'GUID',
                        'CollectionID',
                        'Date1Precision',
                        'InventoryDatePrecision',
                        'ModifiedByAgentID',
-                       'CreatedByAgentID'
+                       'CreatedByAgentID',
+                       'CatalogerID'
                        ]
 
         value_list = [f"{time_utils.get_pst_time_now_string()}",
@@ -681,11 +684,13 @@ class DataOnboard(Importer):
                       0,
                       4,
                       f"{self.barcode}",
+                      f"{datetime.date.today()}",
                       1,
                       f"{self.collection_ob_guid}",
                       4,
                       1,
                       1,
+                      f"{self.created_by_agent}",
                       f"{self.created_by_agent}",
                       f"{self.created_by_agent}"]
 
@@ -707,14 +712,12 @@ class DataOnboard(Importer):
         """
         table = 'determination'
 
-        sql = f'''SELECT CollectionObjectID FROM collectionobject 
-                  WHERE GUID = "{self.collection_ob_guid}";'''
+        self.collection_ob_id = self.populate_sql(tab_name='collectionobject', id_col='CollectionObjectID',
+                                                  key_col='GUID', match=self.collection_ob_guid)
 
-        self.collection_ob_id = self.specify_db_connection.get_one_record(sql)
 
-        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}"'''
-
-        self.taxon_id = self.specify_db_connection.get_one_record(sql)
+        self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
+                                          key_col='FullName', match=self.full_name)
 
         if self.taxon_id is not None:
 
@@ -730,6 +733,7 @@ class DataOnboard(Importer):
                            'TaxonID',
                            'CollectionObjectID',
                            'ModifiedByAgentID',
+                           'CreatedByAgentID',
                            # 'DeterminerID',
                            'PreferredTaxonID',
                            ]
@@ -742,6 +746,7 @@ class DataOnboard(Importer):
                           f"{self.determination_guid}",
                           f"{self.taxon_id}",
                           f"{self.collection_ob_id}",
+                          f"{self.created_by_agent}",
                           f"{self.created_by_agent}",
                           f"{self.taxon_id}",
                           ]
@@ -783,15 +788,20 @@ class DataOnboard(Importer):
                            'IsPrimary',
                            'OrderNumber',
                            'ModifiedByAgentID',
+                           'CreatedByAgentID',
                            'CollectingEventID',
+                           'DivisionID',
                            'AgentID']
+
             value_list = [f"{time_utils.get_pst_time_now_string()}",
                           f"{time_utils.get_pst_time_now_string()}",
                           1,
                           primary_bool[index],
                           1,
                           f"{self.created_by_agent}",
+                          f"{self.created_by_agent}",
                           f"{self.collecting_event_id}",
+                          2,
                           f"{agent_id}"]
 
             # removing na values from both lists
@@ -845,15 +855,15 @@ class DataOnboard(Importer):
             returns:
                 new table records related
         """
+        # the order of operations matters, if you change the order certain variables may overwrite
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
-            self.create_agent_list(row)
             self.taxon_concat(row)
             self.populate_fields(row)
+            self.create_agent_list(row)
             pass_taxon = self.check_taxon_real()
             if pass_taxon is False:
                 self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
-                print(self.image_list)
                 continue
             else:
                 if pass_taxon is True:
@@ -861,7 +871,6 @@ class DataOnboard(Importer):
 
                 if self.locality_id is None:
                     self.create_locality_record()
-
                 if len(self.new_collector_list) > 0:
                     self.create_agent_id()
 
@@ -880,7 +889,6 @@ class DataOnboard(Importer):
                 botany_importer_config to ensure prefix is
                 updated for correct filepath
         """
-
         filename = "botany_importer_config.py"
 
         with open(filename, 'r') as file:
@@ -908,11 +916,10 @@ class DataOnboard(Importer):
     def run_all_methods(self):
         """run_all_methods:
                         self-explanatory function, will run all function in class in sequential manner"""
-
         # create_test_images(list(range(999999981, 999999985)), date_string=self.date_use)
 
         # setting directory
-        self.to_current_directory()
+        to_current_directory()
         # verifying file presence
         self.file_present()
         # merging csv files
@@ -939,7 +946,11 @@ class DataOnboard(Importer):
         # prompt
         cont_prompter()
 
-        # uploading csv records
+        # marking starting time_stamp
+        starting_time_stamp = time_utils.get_pst_time_now_string()
+
+        # creating tables
+
         self.upload_records()
 
         # creating new taxon list
@@ -951,6 +962,14 @@ class DataOnboard(Importer):
 
         write_list_to_txt_file(lst=self.manual_taxon_list, filename=f"taxon_check/unmatched_taxa/"
                                                                     f"manual_taxa_{self.date_use}.txt")
+        # marking ending_time_stamp
+        ending_time_stamp = time_utils.get_pst_time_now_string()
+
+        time_stamp_list = [starting_time_stamp, ending_time_stamp]
+
+        write_list_to_txt_file(lst=time_stamp_list, filename=f'csv_purge_sql/upload_{datetime.time}_timestamps.txt')
+
+        # writing time stamps to txt file
 
         self.logger.info("process finished")
 
@@ -961,3 +980,4 @@ def master_run(date_string):
 
 
 master_run(date_string="2023-06-28")
+

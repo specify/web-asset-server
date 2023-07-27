@@ -1,4 +1,3 @@
-import os as os
 import requests
 import logging
 import json
@@ -42,6 +41,7 @@ def call_tropicos_api(full_name):
             return match_status, match_status, match_status
 
 def check_synonyms(tropicos_id):
+    """check_synonyms: retrieves synonym list from tropicos, and pulls accepted name"""
     syn_response = requests.get(f"https://services.tropicos.org/Name/{tropicos_id}/"
                                 f"AcceptedNames?apikey={KEY}&format=json")
 
@@ -68,17 +68,17 @@ def check_synonyms(tropicos_id):
 
     return name_list, author_list
 
-
-name, author, fam = call_tropicos_api('Arctostaphylos glandulosa')
-
-print(name)
-print(author)
-print(fam)
-
-
-name_list, author_list = check_synonyms(name)
-
-print(name_list)
-print(author_list)
+#
+# name, author, fam = call_tropicos_api('Arctostaphylos glandulosa')
+#
+# print(name)
+# print(author)
+# print(fam)
+#
+#
+# name_list, author_list = check_synonyms(name)
+#
+# print(name_list)
+# print(author_list)
 
 # Clidemea Almedea

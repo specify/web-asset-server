@@ -1,0 +1,1 @@
+DELETE FROM images WHERE datetime  > '2023-07-27 13:49:26';

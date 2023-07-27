@@ -1,6 +1,7 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
    for herbology related tasks
 """
+import math
 import sys
 import numpy as np
 import pandas as pd
@@ -61,13 +62,13 @@ def remove_non_numerics(string: str):
 
 
 def replace_apostrophes(string: str):
-    """replaces apostrophes in possessive adjectives with double qoutes to be readable by mysql
+    """replaces apostrophes in possessive adjectives with double quotes to be readable by mysql
     args:
         string: a string containing an apostrophe
     returns:
         re.sub: a string with all apostrophes replaces by double quotes
     """
-    # using double qoutes on one and single on the other is actually important this time
+    # using double quotes on one and single on the other is actually important this time
     return re.sub("'", '"', string)
 
 
@@ -228,7 +229,7 @@ def zero_out_barcode(number):
 def remove_two_index(value_list, column_list):
     missing_index = []
     for index, entry in enumerate(value_list):
-        if entry == '<NA>' or entry == '' or entry == np.nan or entry == pd.NA:
+        if entry == '<NA>' or entry == '' or pd.isna(entry):
             value_list.remove(entry)
             missing_index.append(index)
 
