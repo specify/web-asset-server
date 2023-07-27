@@ -1,9 +1,5 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
-import pandas as pd
-
 import picturae_config
-import sys
-import os
 import time_utils
 from uuid import uuid4
 from data_utils import *
@@ -15,6 +11,7 @@ from sql_csv_utils import *
 from importer import Importer
 from taxon_check.taxon_checker import call_tropicos_api
 from taxon_check.taxon_checker import check_synonyms
+
 
 class DataOnboard(Importer):
     """DataOnboard:
@@ -53,19 +50,6 @@ class DataOnboard(Importer):
 
         self.created_by_agent = 99726
 
-    def to_current_directory(self):
-        """to_current_directory: changes current directory to .py file location
-            args:
-                none
-            returns:
-                resets current directory to source file location
-        """
-        current_file_path = os.path.abspath(__file__)
-
-        directory = os.path.dirname(current_file_path)
-
-        os.chdir(directory)
-
     def file_present(self):
         """file_present:
            checks if correct filepath in working directory,
@@ -76,16 +60,16 @@ class DataOnboard(Importer):
                 none
         """
 
-        self.to_current_directory()
+        to_current_directory()
 
         dir_sub = os.path.isdir(str("picturae_csv/") + str(self.date_use))
 
         if dir_sub is True:
             folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_folder(' + \
-                           str(self.date_use) + ').csv'
+                          str(self.date_use) + ').csv'
 
             specimen_path = 'picturae_csv/' + str(self.date_use) + '/picturae_specimen(' + \
-                             str(self.date_use) + ').csv'
+                            str(self.date_use) + ').csv'
 
             if os.path.exists(folder_path):
                 print("Folder csv exists!")
@@ -107,7 +91,7 @@ class DataOnboard(Importer):
         """
 
         folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_' + str(folder_string) + '(' + \
-                       str(self.date_use) + ').csv'
+                      str(self.date_use) + ').csv'
 
         folder_csv = pd.read_csv(folder_path)
 
@@ -206,9 +190,6 @@ class DataOnboard(Importer):
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
                                                           format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
 
-
-
-
     # after file is wrangled into clean importable form,
     # and QC protocols to follow before import
     # QC measures needed here ? before proceeding.
@@ -292,12 +273,6 @@ class DataOnboard(Importer):
             else:
                 self.image_list.append(row['image_path'])
                 self.barcode_list.append(row['CatalogNumber'])
-            # a stopping point, to allow user to read logger messages,
-            # and decide whether to proceed
-
-
-    # will think of way to make this more fool-proof against duplicate names,
-    # there may be more than 1 of some common names
 
     def create_agent_list(self, row):
         """create_agent_list:
@@ -374,8 +349,17 @@ class DataOnboard(Importer):
         taxon_strings = self.full_name.split()
         self.tax_name = taxon_strings[-1]
 
-
     def populate_sql(self, tab_name, id_col, key_col, match):
+        """populate_sql:
+                creates a custom select statement for get one record,
+                from which a result can be gotten more seamlessly
+                without having to rewrite the sql variable every time
+           args:
+                tab_name: the name of the table to select
+                id_col: the name of the column in which the unique id is stored
+                key_col: column on which to match values
+                match: value with which to match key_col
+        """
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
 
         result = self.specify_db_connection.get_one_record(sql)
@@ -414,21 +398,14 @@ class DataOnboard(Importer):
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
 
-
         self.GeographyID = self.populate_sql(tab_name='geography', id_col='GeographyID',
                                              key_col='FullName', match=self.geography_string)
         self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
                                              key_col='LocalityName', match=self.locality)
 
-
-        print(self.full_name)
         sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}" AND IsAccepted = true;'''
-        print(sql)
 
         self.taxon_id = self.specify_db_connection.get_one_record(sql)
-
-        print(self.taxon_id)
-
 
     def create_table_record(self, sql, is_test=False):
         """create_table_record:
@@ -468,63 +445,54 @@ class DataOnboard(Importer):
 
             cursor.close()
 
-
-    # need to review locality data strategy(want to upload locality datat without lat/long, or upload with?
     def check_taxon_real(self):
         """check_taxon_real:
                 -sends an api caLL to tropicos to check if
                 name exists and is legitimate
                 -if name exists, check synonyms, check synonyms against database, if no synonyms in database,
                  add name, if synonym in database add name under synonym,
-                 if plural synonyms in database, delegate to hand_check
+                -if plural synonyms in database, delegate to hand_check
         """
         valid_name = None
         if self.taxon_id is None:
-            self.manual_taxon_list.append(self.full_name)
-            valid_name = False
-
-        return valid_name
-
-            # try:
-            #     self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
-            #
-            # except Exception as e:
-            #     self.logger.warning(f"no connection: {e}")
-            #     valid_name = False
-            #     self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
-            #     self.manual_taxon_list.append(self.full_name)
-            # if self.name_id == 'No Match':
-            #     valid_name = False
-            #     self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
-            #     self.manual_taxon_list.append(self.full_name)
-            # elif self.name_id != 'No Match':
-            #     valid_name = True
-            #     self.manual_taxon_list.append(self.full_name)
-
-        #     elif valid_name is None:
-        #         name_list, author_list = check_synonyms(tropicos_id=self.name_id)
-        #         # checking if synonyms in DB
-        #         for name in name_list[:]:
-        #             sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
-        #             valid_id = self.specify_db_connection.get_one_record(sql)
-        #             if valid_id is None:
-        #                 name_list.remove(name)
-        #         if len(name_list) == 1:
-        #             self.full_name = name_list[0]
-        #             valid_name = None
-        #         elif len(name_list) > 1:
-        #             self.logger.warning(f'multiple synonyms for {self.full_name}')
-        #             valid_name = False
-        #             self.manual_taxon_list.append(self.full_name)
-        #         else:
-        #             valid_name = True
-        #
+        #     self.manual_taxon_list.append(self.full_name)
+        #     valid_name = False
         # return valid_name
 
+            try:
+                self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
 
+            except Exception as e:
+                self.logger.warning(f"no connection: {e}")
+                valid_name = False
+                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
+                self.manual_taxon_list.append(self.full_name)
+            if self.name_id == 'No Match':
+                valid_name = False
+                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
+                self.manual_taxon_list.append(self.full_name)
 
+            if valid_name is None:
+                name_list, author_list = check_synonyms(tropicos_id=self.name_id)
+                # checking if synonyms in DB
+                if len(name_list) != 0:
+                    for name in name_list[:]:
+                        sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
+                        valid_id = self.specify_db_connection.get_one_record(sql)
+                        if valid_id is None:
+                            name_list.remove(name)
+                    if len(name_list) == 1:
+                        self.full_name = name_list[0]
+                        valid_name = True
+                    else:
+                        self.logger.warning(f'multiple synonyms for {self.full_name}')
+                        valid_name = False
+                        self.manual_taxon_list.append(self.full_name)
+                else:
+                    valid_name = False
+                    self.manual_taxon_list.append(self.full_name)
 
-
+        return valid_name
 
     def create_locality_record(self):
         """create_locality_record:
@@ -566,7 +534,6 @@ class DataOnboard(Importer):
                                 val_list=value_list)
 
         self.create_table_record(sql=sql)
-
 
     def create_agent_id(self):
         """create_agent_id:
@@ -619,8 +586,6 @@ class DataOnboard(Importer):
 
             self.create_table_record(sql=sql)
 
-
-    # is this needed?, does a collectorID need to be added for each sample?
     def create_collectingevent(self):
         """create_collectingevent:
                 defines column and value list , runs them as
@@ -633,7 +598,6 @@ class DataOnboard(Importer):
         sql = f'''select LocalityID from locality where `LocalityName`="{self.locality}"'''
 
         self.locality_id = self.specify_db_connection.get_one_record(sql)
-
 
         table = 'collectingevent'
 
@@ -673,15 +637,12 @@ class DataOnboard(Importer):
 
         self.create_table_record(sql=sql)
 
-    # temporarily creating exception list until reliable taxon api or library
+    # temporarily creating exception list until reliable taxon protocol
     def create_taxon(self):
         # for now do not upload
 
         # sql not yet created as need to establish protocol propegating higher taxa with vtaxon
         print("taxon_created!")
-
-
-
 
     def create_collection_object(self):
         """create_collection_object:
@@ -736,8 +697,6 @@ class DataOnboard(Importer):
 
         self.create_table_record(sql=sql)
 
-
-
     def create_determination(self):
         """create_determination:
                 inserts data into determination table, and ties it to collection object table.
@@ -753,41 +712,50 @@ class DataOnboard(Importer):
 
         self.collection_ob_id = self.specify_db_connection.get_one_record(sql)
 
-        column_list = ['TimestampCreated',
-                       'TimestampModified',
-                       'Version',
-                       'CollectionMemberID',
-                       #'DeterminedDate',
-                       'DeterminedDatePrecision',
-                       'IsCurrent',
-                       # 'Qualifier',
-                       'GUID',
-                       'TaxonID',
-                       'CollectionObjectID',
-                       'ModifiedByAgentID',
-                       # 'DeterminerID',
-                       'PreferredTaxonID',
-                       ]
-        value_list = [f"{time_utils.get_pst_time_now_string()}",
-                      f"{time_utils.get_pst_time_now_string()}",
-                      1,
-                      4,
-                      1,
-                      True,
-                      f"{self.determination_guid}",
-                      f"{self.taxon_id}",
-                      f"{self.collection_ob_id}",
-                      f"{self.created_by_agent}",
-                      f"{self.taxon_id}",
-                      ]
+        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}"'''
 
-        # removing na values from both lists
-        value_list, column_list = remove_two_index(value_list, column_list)
+        self.taxon_id = self.specify_db_connection.get_one_record(sql)
 
-        sql = create_sql_string(tab_name=table, col_list=column_list,
-                                val_list=value_list)
-        self.create_table_record(sql)
+        if self.taxon_id is not None:
 
+            column_list = ['TimestampCreated',
+                           'TimestampModified',
+                           'Version',
+                           'CollectionMemberID',
+                           # 'DeterminedDate',
+                           'DeterminedDatePrecision',
+                           'IsCurrent',
+                           # 'Qualifier',
+                           'GUID',
+                           'TaxonID',
+                           'CollectionObjectID',
+                           'ModifiedByAgentID',
+                           # 'DeterminerID',
+                           'PreferredTaxonID',
+                           ]
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          1,
+                          4,
+                          1,
+                          True,
+                          f"{self.determination_guid}",
+                          f"{self.taxon_id}",
+                          f"{self.collection_ob_id}",
+                          f"{self.created_by_agent}",
+                          f"{self.taxon_id}",
+                          ]
+
+            # removing na values from both lists
+            value_list, column_list = remove_two_index(value_list, column_list)
+
+            sql = create_sql_string(tab_name=table, col_list=column_list,
+                                    val_list=value_list)
+            self.create_table_record(sql)
+
+        else:
+            self.logger.error(f"failed to add determination , missing taxon for {self.full_name}")
+            sys.exit()
 
     def create_collector(self):
         """create_collector:
@@ -833,23 +801,6 @@ class DataOnboard(Importer):
                                     val_list=value_list)
 
             self.create_table_record(sql)
-
-
-    def cont_prompter(self):
-        """cont_prompter:
-                placed critical step after database checks, prompts users to
-                confirm in order to continue. Allows user to check logger texts to make sure
-                no unwanted data is being uploaded.
-        """
-        while True:
-            user_input = input("Do you want to continue? (y/n): ")
-            if user_input.lower() == "y":
-                break
-            elif user_input.lower() == "n":
-                sys.exit("Script terminated by user.")
-            else:
-                print("Invalid input. Please enter 'y' or 'n'.")
-
 
     def hide_unwanted_files(self):
         """hide_unwanted_files:
@@ -901,12 +852,12 @@ class DataOnboard(Importer):
             self.populate_fields(row)
             pass_taxon = self.check_taxon_real()
             if pass_taxon is False:
-                self.image_list.remove(f"picturae_img/2023-06-28/CAS{self.barcode}.JPG")
+                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
                 print(self.image_list)
                 continue
             else:
-
-                self.create_taxon()
+                if pass_taxon is True:
+                    self.create_taxon()
 
                 if self.locality_id is None:
                     self.create_locality_record()
@@ -918,8 +869,7 @@ class DataOnboard(Importer):
 
                 self.create_collection_object()
 
-                if self.taxon_id is not None:
-                    self.create_determination()
+                self.create_determination()
 
                 self.create_collector()
 
@@ -959,17 +909,7 @@ class DataOnboard(Importer):
         """run_all_methods:
                         self-explanatory function, will run all function in class in sequential manner"""
 
-        # create test images comment out when running for real.
-
-        # date_string = "2023-06-28"
-        # image = Image.new('RGB', (200, 200), color='red')
-
-        # barcode_list = [999999981, 999999982, 999999983]
-        # for barcode in barcode_list:
-        #     expected_image_path = f"picturae_img/{date_string}/CAS{barcode}.JPG"
-        #     os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
-        #     print(f"Created directory: {os.path.dirname(expected_image_path)}")
-        #     image.save(expected_image_path)
+        # create_test_images(list(range(999999981, 999999985)), date_string=self.date_use)
 
         # setting directory
         self.to_current_directory()
@@ -997,12 +937,12 @@ class DataOnboard(Importer):
         self.create_file_list()
 
         # prompt
-        self.cont_prompter()
+        cont_prompter()
 
         # uploading csv records
         self.upload_records()
 
-        #creating new taxon list
+        # creating new taxon list
         if len(self.new_taxon_list) > 0:
             write_list_to_csv(f"picturae_csv/{self.date_use}/new_taxa_{date.today()}", self.new_taxon_list)
 
@@ -1014,9 +954,10 @@ class DataOnboard(Importer):
 
         self.logger.info("process finished")
 
+
 def master_run(date_string):
-    DataOnboard_int = DataOnboard(date_string=date_string)
-    DataOnboard_int.run_all_methods()
+    dataonboard_int = DataOnboard(date_string=date_string)
+    dataonboard_int.run_all_methods()
 
 
 master_run(date_string="2023-06-28")

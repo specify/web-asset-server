@@ -2,12 +2,10 @@
 import unittest
 import random
 import shutil
-import numpy as np
 from picturae_import import *
 from faker import Faker
 from datetime import date, timedelta
 from picturae_import import DataOnboard
-from mock import patch
 from PIL import Image
 from casbotany_sql_lite import *
 
@@ -18,6 +16,7 @@ def test_date():
        ! if this code outlives 20 years of use I would be impressed"""
     unit_date = date.today() - timedelta(days=365 * 20)
     return str(unit_date)
+
 
 class TestSQLlite(unittest.TestCase):
     def test_casbotanylite(self):
@@ -269,7 +268,6 @@ class ColNamesTest(unittest.TestCase):
 
         self.DataOnboard.record_full = pd.DataFrame(new_df)
 
-
     def test_if_id_cols(self):
         """test_if_id_col: tests whether certain essential
            ID columns present. Also tests, wether name columns correctly
@@ -282,7 +280,6 @@ class ColNamesTest(unittest.TestCase):
                         'collector_first_name5']
         self.assertTrue(all(column in csv_columns for column in column_names))
 
-
     def test_if_nas(self):
         """test_if_nas: test if any left-over columns contain only NAs"""
         self.DataOnboard.csv_colnames()
@@ -292,7 +289,6 @@ class ColNamesTest(unittest.TestCase):
     def tearDown(self):
 
         del self.DataOnboard
-
 
 
 class DatabaseChecks(unittest.TestCase):
@@ -424,7 +420,6 @@ class TestAgentList(unittest.TestCase):
 
         print(self.DataOnboard.record_full)
 
-
     def test_agent_list(self):
         """makes sure the correct list of dictionaries is produced of collectors,
            where new agents are included, and old agents are excluded from new_collector_list"""
@@ -442,6 +437,7 @@ class TestAgentList(unittest.TestCase):
         self.assertEqual(len(self.DataOnboard.new_collector_list), 2)
 
     def tearDown(self):
+        """deleting instance of self.DataOnboard"""
         del self.DataOnboard
 
 
@@ -472,7 +468,6 @@ class ConcatTaxonTests(unittest.TestCase):
         self.DataOnboard.tax_name = ""
 
         self.DataOnboard.full_name = ""
-
 
     def test_taxon_concat_string(self):
         """tests whether correct full taxon name string is returned from taxon_concat"""
@@ -541,8 +536,7 @@ class SQLUploadTests(unittest.TestCase):
         """testing create_locality function by
            recreating insert protocol for locality table, but with sqlLite DB"""
 
-        LocalityName = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
-
+        localityname = f"2 miles from eastern side of Mt.Fake + {time_utils.get_pst_time_now_string()}"
 
         column_list = ['TimestampCreated',
                        'TimestampModified',
@@ -558,13 +552,9 @@ class SQLUploadTests(unittest.TestCase):
                       1,
                       f"{uuid4()}",
                       1,
-                      LocalityName,
+                      localityname,
                       3,
                       256]
-
-
-
-
 
         # assigning row ids
         sql = create_sql_string(tab_name="locality", col_list=column_list,
@@ -573,16 +563,15 @@ class SQLUploadTests(unittest.TestCase):
         self.DataOnboard.create_table_record(sql, is_test=True)
         # checking whether locality id created properly
         data_base_locality = casbotany_lite_getrecord(f'''SELECT `LocalityID` FROM locality WHERE 
-                                                         `LocalityName` = "{LocalityName}"''')
+                                                         `LocalityName` = "{localityname}"''')
 
         self.assertFalse(data_base_locality is None)
 
         # checking whether geocode present
         data_base_geo_code = casbotany_lite_getrecord(f'''SELECT `GeographyID` FROM locality WHERE 
-                                                         `LocalityName` = "{LocalityName}"''')
+                                                         `LocalityName` = "{localityname}"''')
 
         self.assertEqual(data_base_geo_code, 256)
-
 
     def tearDown(self):
         """deleting instance of DataOnboard"""
@@ -592,7 +581,8 @@ class SQLUploadTests(unittest.TestCase):
 class HideFilesTest(unittest.TestCase):
     def setUp(self):
         """creating test images in test_date folder, in order to test
-           file_hide and file_unhide functions"""
+           file_hide and file_unhide functions, creates 3 sample test
+           images with sample barcodes"""
         # initializing
         self.DataOnboard = DataOnboard(date_string=test_date())
 

@@ -1,13 +1,17 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
    for herbology related tasks
 """
+import sys
 import numpy as np
 import pandas as pd
 import pymysql as psq
 import csv
 import re
-from datetime import datetime
+import os
+from PIL import Image
 pd.set_option('expand_frame_repr', False)
+
+
 def data_exporter(query_string: str, local_path: str, fromsql: bool):
     """csv_exporter: creates a table in the database using a SQL query, and writes it to a local file.
     args:
@@ -55,17 +59,25 @@ def remove_non_numerics(string: str):
         re.sub: a string with only numerics, use .apply on dataframe objects"""
     return re.sub('[^0-9]+', '', string)
 
+
 def replace_apostrophes(string: str):
     """replaces apostrophes in possessive adjectives with double qoutes to be readable by mysql
     args:
         string: a string containing an apostrophe
     returns:
-        re.sub: a string with all apostrophes replaces by double qoutes"""
+        re.sub: a string with all apostrophes replaces by double quotes
+    """
     # using double qoutes on one and single on the other is actually important this time
     return re.sub("'", '"', string)
 
+
 def assign_titles(first_last, name: str):
-    """assign_titles: function designed to seperate out titles in names into new title field"""
+    """assign_titles:
+            function designed to separate out titles in names into a new title column
+        args:
+            first_last: whether the name is a first or a last name with string 'first' 'last'
+            name: the name string from which to separate out the titles.
+    """
     # to lower to standardize matching
     titles = ['mr.', 'mrs.', 'ms.', 'dr.', 'jr.', 'sr.', 'ii', 'iii', 'ii', 'v', 'vi', 'vii', 'viii', 'ix']
     title = ""
@@ -95,6 +107,7 @@ def assign_titles(first_last, name: str):
 # new_name, title = assign_titles(first_last='last', name="morton Jr.")
 # print(new_name)
 # print(title)
+
 
 def string_converter(df: pd.DataFrame, column: str, option: str):
     """function to turn string with decimal points into string or int with no decimals
@@ -233,3 +246,52 @@ def write_list_to_txt_file(lst, filename):
     except Exception as e:
         print(f"An error occurred while writing to the file: {e}")
 
+
+def cont_prompter():
+    """cont_prompter:
+            placed critical step after database checks, prompts users to
+            confirm in order to continue. Allows user to check logger texts to make sure
+            no unwanted data is being uploaded.
+    """
+    while True:
+        user_input = input("Do you want to continue? (y/n): ")
+        if user_input.lower() == "y":
+            break
+        elif user_input.lower() == "n":
+            sys.exit("Script terminated by user.")
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def to_current_directory():
+    """to_current_directory: changes current directory to .py file location
+        args:
+            none
+        returns:
+            resets current directory to source file location
+    """
+    current_file_path = os.path.abspath(__file__)
+
+    directory = os.path.dirname(current_file_path)
+
+    os.chdir(directory)
+
+
+def create_test_images(barcode_list: list, date_string: str):
+    """create_test_images:
+            creates a number of standard test images in a range of barcodes,
+            and with a specific date string
+       args:
+            barcode_list: a list or range() of barcodes that
+                          you wish to create dummy images for.
+            date_string: a date string , with which to name directory
+                         in which to create and store the dummy images
+    """
+    image = Image.new('RGB', (200, 200), color='red')
+
+    barcode_list = barcode_list
+    for barcode in barcode_list:
+        expected_image_path = f"picturae_img/{date_string}/CAS{barcode}.JPG"
+        os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
+        print(f"Created directory: {os.path.dirname(expected_image_path)}")
+        image.save(expected_image_path)
