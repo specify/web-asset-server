@@ -1,4 +1,9 @@
 import pandas as pd
+from importer import Importer
+import traceback
+import picturae_config
+
+# static methods
 def create_name_sql(first_name: str, last_name: str, middle_initial: str, title: str):
     """create_name_sql: create a custom sql string, based on number of non-na arguments, the
                         casbotany database does not recognize empty strings '' and NA as equivalent.
@@ -50,3 +55,29 @@ def create_sql_string(col_list, val_list, tab_name):
     sql = f'''INSERT INTO {tab_name} ({column_list}) VALUES({value_list});'''
 
     return sql
+
+class CsvDatabase(Importer):
+    def __init__(self):
+        super().__init__(picturae_config, "Botany")
+
+    def sql_time_purger(self, database, table, timestamp1, timestamp2):
+        try:
+            cursor = self.specify_db_connection.get_cursor()
+        except Exception as e:
+            self.logger.error(f"Connection Error: {e}")
+
+        sql = f'''DELETE FROM {database}.{table} WHERE TimestampCreated > 
+                  "{timestamp1}" AND TimestampCreated < "{timestamp2}"'''
+        self.logger.info(f'running query: {sql}')
+        self.logger.debug(sql)
+        try:
+            cursor.execute(sql)
+        except Exception as e:
+            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
+            self.logger.error(traceback.format_exc())
+
+        self.specify_db_connection.commit()
+
+        cursor.close()
+
+
