@@ -1,9 +1,8 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
-import datetime
+import random
 
 import pandas as pd
-
-import picturae_config
+from datetime import datetime, timedelta
 import time_utils
 from uuid import uuid4
 from data_utils import *
@@ -16,6 +15,8 @@ from importer import Importer
 from taxon_check.taxon_checker import call_tropicos_api
 from taxon_check.taxon_checker import check_synonyms
 
+# marking starting time stamp
+starting_time_stamp = datetime.now()
 
 class DataOnboard(Importer):
     """DataOnboard:
@@ -684,7 +685,7 @@ class DataOnboard(Importer):
                       0,
                       4,
                       f"{self.barcode}",
-                      f"{datetime.date.today()}",
+                      f"{starting_time_stamp.strftime('%Y-%m-%d')}",
                       1,
                       f"{self.collection_ob_guid}",
                       4,
@@ -946,8 +947,7 @@ class DataOnboard(Importer):
         # prompt
         cont_prompter()
 
-        # marking starting time_stamp
-        starting_time_stamp = time_utils.get_pst_time_now_string()
+        # marking starting time_stam
 
         # creating tables
 
@@ -962,13 +962,6 @@ class DataOnboard(Importer):
 
         write_list_to_txt_file(lst=self.manual_taxon_list, filename=f"taxon_check/unmatched_taxa/"
                                                                     f"manual_taxa_{self.date_use}.txt")
-        # marking ending_time_stamp
-        ending_time_stamp = time_utils.get_pst_time_now_string()
-
-        time_stamp_list = [starting_time_stamp, ending_time_stamp]
-
-        write_list_to_txt_file(lst=time_stamp_list, filename=f'csv_purge_sql/upload_{datetime.time}_timestamps.txt')
-
         # writing time stamps to txt file
 
         self.logger.info("process finished")
@@ -977,6 +970,38 @@ class DataOnboard(Importer):
 def master_run(date_string):
     dataonboard_int = DataOnboard(date_string=date_string)
     dataonboard_int.run_all_methods()
+
+
+
+master_run(date_string="2023-06-28")
+# marking ending_time_stamp
+
+
+ending_time_stamp = datetime.now()
+
+
+delt_time = timedelta(seconds=10)
+
+time_stamp_list = [starting_time_stamp-delt_time, ending_time_stamp+delt_time]
+
+csv_file_path = 'csv_purge_sql/upload_time_stamps.csv'
+
+with open(csv_file_path, 'a', newline='') as csvfile:
+    fieldnames = ['StartTime', 'EndTime', 'UploadCode']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+    if csvfile.tell() == 0:
+        writer.writeheader()
+
+    writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
+                     'UploadCode': random.randint(100000, 999999)})
+
+
+print(f"The timestamps have been added to '{csv_file_path}'.")
+
+
+# writing ending and starting timestamp to txt file
+# adding buffer seconds, to get all samples written in window
 
 
 master_run(date_string="2023-06-28")

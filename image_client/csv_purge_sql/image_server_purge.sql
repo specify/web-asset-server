@@ -1,1 +1,1 @@
-DELETE FROM images WHERE datetime  > '2023-07-27 13:49:26';
+DELETE FROM images WHERE datetime  > '2023-07-27 14:56:00.130227' AND datetime < '2023-07-27 14:56:50.121451';
