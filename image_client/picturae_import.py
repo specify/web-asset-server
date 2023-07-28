@@ -8,6 +8,7 @@ from uuid import uuid4
 from data_utils import *
 from casbotany_sql_lite import *
 from datetime import date
+from datetime import datetime
 import traceback
 import logging
 from sql_csv_utils import *
@@ -979,29 +980,8 @@ master_run(date_string="2023-06-28")
 
 ending_time_stamp = datetime.now()
 
-
-delt_time = timedelta(seconds=10)
-
-time_stamp_list = [starting_time_stamp-delt_time, ending_time_stamp+delt_time]
-
-csv_file_path = 'csv_purge_sql/upload_time_stamps.csv'
-
-with open(csv_file_path, 'a', newline='') as csvfile:
-    fieldnames = ['StartTime', 'EndTime', 'UploadCode']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-    if csvfile.tell() == 0:
-        writer.writeheader()
-
-    writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
-                     'UploadCode': random.randint(100000, 999999)})
-
-
-print(f"The timestamps have been added to '{csv_file_path}'.")
-
-
-# writing ending and starting timestamp to txt file
-# adding buffer seconds, to get all samples written in window
+# appending timestamp csv
+create_timestamps(start_time=starting_time_stamp, end_time=ending_time_stamp)
 
 
 master_run(date_string="2023-06-28")
