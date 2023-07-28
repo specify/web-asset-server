@@ -1,7 +1,9 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
    for herbology related tasks
 """
-import math
+import datetime
+from datetime import timedelta
+import random
 import sys
 import numpy as np
 import pandas as pd
@@ -296,3 +298,31 @@ def create_test_images(barcode_list: list, date_string: str):
         os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
         print(f"Created directory: {os.path.dirname(expected_image_path)}")
         image.save(expected_image_path)
+
+
+def create_timestamps(start_time, end_time):
+    """create_timestamps:
+            uses starting and ending timestamps to create window for sql database purge,
+            adds 10 second buffer on either end to allow sql queries to populate.
+            appends each timestamp record to a csv log.
+        args:
+            start_time: starting time stamp
+            end_time: ending time stamp
+    """
+    delt_time = timedelta(seconds=10)
+
+    time_stamp_list = [start_time - delt_time, end_time + delt_time]
+
+    csv_file_path = 'csv_purge_sql/upload_time_stamps.csv'
+
+    with open(csv_file_path, 'a', newline='') as csvfile:
+        fieldnames = ['StartTime', 'EndTime', 'UploadCode']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        if csvfile.tell() == 0:
+            writer.writeheader()
+
+            writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
+                             'UploadCode': random.randint(100000, 999999)})
+
+    print(f"The timestamps have been added to '{csv_file_path}'.")
