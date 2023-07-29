@@ -32,6 +32,10 @@ class CsvDatabase(Importer):
 
 CsvDatabase = CsvDatabase()
 def casbotany_csv_purger(number: int):
+    """casbotany_csv_purger: runs sql commands to database, to purge sql records created between two timestamps
+                             in which the original upload script was run,
+        uses log of sql uploads to retrieve record by randomly generated 6 digit upload code.
+    """
     time_stamp_csv = pd.read_csv('csv_purge_sql/upload_time_stamps.csv')
 
     selected_row = time_stamp_csv[time_stamp_csv['UploadCode'] == number]
@@ -40,7 +44,6 @@ def casbotany_csv_purger(number: int):
 
     time_stamp_list.append(selected_row['StartTime'].to_string(index=False))
     time_stamp_list.append(selected_row['EndTime'].to_string(index=False))
-
 
     table_list = ['collectionobjectattachment', 'attachment',
                   'determination', 'collectionobject', 'collector',
