@@ -1,7 +1,7 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
    for herbology related tasks
 """
-import datetime
+from datetime import datetime
 from datetime import timedelta
 import random
 import sys
@@ -240,14 +240,15 @@ def remove_two_index(value_list, column_list):
     return value_list, column_list
 
 
-def write_list_to_txt_file(lst, filename):
-    try:
-        with open(filename, 'w') as file:
-            for item in lst:
-                file.write(str(item) + '\n')
-        print(f"The list has been successfully written to {filename}.")
-    except Exception as e:
-        print(f"An error occurred while writing to the file: {e}")
+def write_dict_to_csv(tax_dict, filename):
+    with open(filename, mode='w', newline='') as file:
+        fieldnames = ['Barcode', 'FullName', 'AcceptedName']
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for barcode, info in tax_dict.items():
+            row = {'Barcode': barcode, 'FullName': info['FullName'], 'AcceptedName': info['AcceptedName']}
+            writer.writerow(row)
 
 
 def cont_prompter():
@@ -300,7 +301,7 @@ def create_test_images(barcode_list: list, date_string: str):
         image.save(expected_image_path)
 
 
-def create_timestamps(start_time, end_time):
+def create_timestamps(start_time):
     """create_timestamps:
             uses starting and ending timestamps to create window for sql database purge,
             adds 10 second buffer on either end to allow sql queries to populate.
@@ -309,6 +310,9 @@ def create_timestamps(start_time, end_time):
             start_time: starting time stamp
             end_time: ending time stamp
     """
+
+    end_time = datetime.now()
+
     delt_time = timedelta(seconds=10)
 
     time_stamp_list = [start_time - delt_time, end_time + delt_time]
@@ -326,3 +330,30 @@ def create_timestamps(start_time, end_time):
                              'UploadCode': random.randint(100000, 999999)})
 
     print(f"The timestamps have been added to '{csv_file_path}'.")
+
+def unique_ordered_list(input_list):
+    """unique_ordered_list:
+            takes a list and selects only unique elements,
+            while preserving order
+        args:
+            input_list: list which will be made to have
+                        only unique elements.
+    """
+    unique_elements = []
+    set_elements = set(input_list)
+    for element in input_list:
+        if element not in set_elements:
+            unique_elements.append(element)
+    return unique_elements
+class Timer:
+    def __enter__(self):
+        self.start_time = datetime.now()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = datetime.now()
+
+    def get_duration(self):
+        return self.end_tim - self.start_time
+
+

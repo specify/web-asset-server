@@ -1,6 +1,7 @@
 import requests
 import logging
 import json
+from image_client.data_utils import unique_ordered_list
 
 KEY = 'ad2063c0-b19a-4349-b8c3-c00ef7e2cc0b'
 
@@ -40,10 +41,16 @@ def call_tropicos_api(full_name):
             match_status = "No Match"
             return match_status, match_status, match_status
 
-def check_synonyms(tropicos_id):
-    """check_synonyms: retrieves synonym list from tropicos, and pulls accepted name"""
+def check_synonyms(tropicos_id, acc_syn: str):
+    """check_synonyms:
+            retrieves synonym list from tropicos, and pulls accepted name,
+        args:
+            tropicos_id: number id for tropicos taxon
+            acc_syn: only takes argument "Synonyms" or "AcceptedNames", for api query
+
+    """
     syn_response = requests.get(f"https://services.tropicos.org/Name/{tropicos_id}/"
-                                f"AcceptedNames?apikey={KEY}&format=json")
+                                f"{acc_syn}?apikey={KEY}&format=json")
 
     logging.info(f"response_code: {syn_response.status_code}")
 
@@ -52,33 +59,39 @@ def check_synonyms(tropicos_id):
 
     syn_list = syn_response.json()
     name_list = []
-    author_list = []
-    print(syn_list)
     if len(syn_list[0]) != 1:
+        first_iteration = True
         for dict in syn_list:
-            synonym = dict.get('AcceptedName', {}).get('ScientificName')
-            auth = dict.get('AcceptedName', {}).get('ScientificNameWithAuthors')
+            accept_name = dict.get('AcceptedName', {}).get('ScientificName')
+            synonym = dict.get('SynonymName', {}).get('ScientificName')
+            if first_iteration:
+                name_list.append(accept_name)
+                first_iteration = False
             name_list.append(synonym)
-            author_list.append(auth)
     else:
         print('no synonyms')
 
-    name_list = list(set(name_list))
-    author_list = list(set(name_list))
+    name_list = unique_ordered_list(name_list)
 
-    return name_list, author_list
+    return name_list
 
-#
-# name, author, fam = call_tropicos_api('Arctostaphylos glandulosa')
-#
-# print(name)
-# print(author)
-# print(fam)
-#
-#
-# name_list, author_list = check_synonyms(name)
-#
-# print(name_list)
-# print(author_list)
 
-# Clidemea Almedea
+
+
+
+name, author, fam = call_tropicos_api('Poa algida')
+
+print(name)
+print(author)
+print(fam)
+
+
+synonym_list = check_synonyms(name, acc_syn='Synonyms')
+
+accept_list = check_synonyms(name, acc_syn='AcceptedNames')
+
+print(synonym_list)
+
+print(accept_list)
+
+# Clidemia almedae

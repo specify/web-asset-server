@@ -1,8 +1,8 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
-import random
 
-import pandas as pd
-from datetime import datetime, timedelta
+import atexit
+import sys
+
 import time_utils
 from uuid import uuid4
 from data_utils import *
@@ -19,6 +19,8 @@ from taxon_check.taxon_checker import check_synonyms
 # marking starting time stamp
 starting_time_stamp = datetime.now()
 
+# at exit run ending timestamp and append timestamp csv
+atexit.register(create_timestamps(start_time=starting_time_stamp))
 class DataOnboard(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -34,10 +36,13 @@ class DataOnboard(Importer):
         # new_collector_list is only for adding new agents to agent table.
         # manual taxon list, list of skipped taxons to be manually verified
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'agent_guid_list', 'new_taxon_list', 'agent_guid_list', 'manual_taxon_list']
+                       'agent_guid_list', 'new_taxon_list', 'agent_guid_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
+
+        self.manual_taxon_dict = {}
+        self.no_match_dict = {}
 
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -425,8 +430,7 @@ class DataOnboard(Importer):
            args:
                sql: the verbatim sql string, or multi sql query string to send to database
                is_test: set to False as default, if switched to true,
-                        uses sql-lite database instead for testing
-
+                        uses sql-lite database instead for testing.
         """
         if is_test is True:
             connection = sqlite3.connect('cas_botanylite.db')
@@ -474,31 +478,32 @@ class DataOnboard(Importer):
 
             except Exception as e:
                 self.logger.warning(f"no connection: {e}")
-                valid_name = False
-                self.manual_taxon_list.append(self.full_name)
+                sys.exit()
             if self.name_id == 'No Match':
                 valid_name = False
-                self.manual_taxon_list.append(self.full_name)
-
+                self.no_match_dict[self.barcode] = {'FullName': self.full_name}
             if valid_name is None:
-                name_list, author_list = check_synonyms(tropicos_id=self.name_id)
+                synonym_list = check_synonyms(tropicos_id=self.name_id, acc_syn="Synonyms")
+                accepted_names = check_synonyms(tropicos_id=self.name_id, acc_syn="AcceptedNames")
                 # checking if synonyms in DB
-                if len(name_list) != 0:
-                    for name in name_list[:]:
+                if len(accepted_names) != 0:
+                    accepted_name = accepted_names[0]
+                    sql = self.populate_sql(tab_name='taxon', id_col='TaxonID',
+                                            key_col='FullName', match=accepted_name)
+                    valid_id = self.specify_db_connection.get_one_record(sql)
+                if len(synonym_list) != 0 and valid_id is None:
+                    for name in synonym_list[:]:
                         sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
                         valid_id = self.specify_db_connection.get_one_record(sql)
                         if valid_id is None:
-                            name_list.remove(name)
-                    if len(name_list) == 1:
-                        self.full_name = name_list[0]
+                            synonym_list.remove(name)
+                    if len(synonym_list) != 0:
+                        accepted_name = synonym_list[0]
                         valid_name = True
                     else:
-                        self.logger.warning(f'multiple synonyms for {self.full_name}')
                         valid_name = False
-                        self.manual_taxon_list.append(self.full_name)
-                else:
-                    valid_name = False
-                    self.manual_taxon_list.append(self.full_name)
+                        self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
+                                                                'AcceptedName': accepted_name}
 
         return valid_name
 
@@ -961,8 +966,8 @@ class DataOnboard(Importer):
         # uploading attachments
         self.upload_attachments()
 
-        write_list_to_txt_file(lst=self.manual_taxon_list, filename=f"taxon_check/unmatched_taxa/"
-                                                                    f"manual_taxa_{self.date_use}.txt")
+        write_dict_to_csv(tax_dict=self.manual_taxon_dict, filename=f"taxon_check/unmatched_taxa/"
+                          f"manual_taxa_{self.date_use}.csv")
         # writing time stamps to txt file
 
         self.logger.info("process finished")
@@ -973,16 +978,4 @@ def master_run(date_string):
     dataonboard_int.run_all_methods()
 
 
-
 master_run(date_string="2023-06-28")
-# marking ending_time_stamp
-
-
-ending_time_stamp = datetime.now()
-
-# appending timestamp csv
-create_timestamps(start_time=starting_time_stamp, end_time=ending_time_stamp)
-
-
-master_run(date_string="2023-06-28")
-
