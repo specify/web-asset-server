@@ -331,6 +331,7 @@ def create_timestamps(start_time):
 
     print(f"The timestamps have been added to '{csv_file_path}'.")
 
+
 def unique_ordered_list(input_list):
     """unique_ordered_list:
             takes a list and selects only unique elements,
@@ -340,11 +341,12 @@ def unique_ordered_list(input_list):
                         only unique elements.
     """
     unique_elements = []
-    set_elements = set(input_list)
     for element in input_list:
-        if element not in set_elements:
+        if element not in unique_elements:
             unique_elements.append(element)
     return unique_elements
+
+
 class Timer:
     def __enter__(self):
         self.start_time = datetime.now()

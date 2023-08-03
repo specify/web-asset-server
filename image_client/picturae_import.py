@@ -2,7 +2,7 @@
 
 import atexit
 import sys
-
+import rpy2.robjects as pandas2ri
 import time_utils
 from uuid import uuid4
 from data_utils import *
@@ -13,14 +13,14 @@ import traceback
 import logging
 from sql_csv_utils import *
 from importer import Importer
-from taxon_check.taxon_checker import call_tropicos_api
-from taxon_check.taxon_checker import check_synonyms
+# from taxon_check.taxon_checker import call_tropicos_api
+# from taxon_check.taxon_checker import check_synonyms
 
 # marking starting time stamp
 starting_time_stamp = datetime.now()
 
 # at exit run ending timestamp and append timestamp csv
-atexit.register(create_timestamps(start_time=starting_time_stamp))
+atexit.register(create_timestamps, start_time=starting_time_stamp)
 class DataOnboard(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -188,6 +188,35 @@ class DataOnboard(Importer):
     # under this point column transformations will be done through a series of functions
     # will reuse/modify some wrangling functions from data standardization
 
+    def taxon_concat(self, row):
+        """taxon_concat:
+                parses taxon columns to check taxon database, adds the Genus species, ranks, and Epithets,
+                in the correct order, to create new taxon fullname in self.fullname. so that can be used for
+                database checks.
+            args:
+                row: a row from a csv file containing taxon information with correct column names
+
+        """
+        hyb_index = self.record_full.columns.get_loc('Hybrid')
+        full_name = ""
+        tax_name = ""
+        if row[hyb_index] is False:
+            columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
+        else:
+            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1']
+
+        for column in columns:
+            index = self.record_full.columns.get_loc(column)
+            if pd.notna(row[index]):
+                full_name += f" {row[index]}"
+
+        full_name = full_name.strip()
+        # creating taxon name
+        taxon_strings = full_name.split()
+        tax_name = taxon_strings[-1]
+
+        return full_name, tax_name
+
     def col_clean(self):
         """will reformat and clean dataframe columns until ready for upload.
            **Still need format end-goal
@@ -198,6 +227,9 @@ class DataOnboard(Importer):
         for col_string in date_col_list:
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
                                                           format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
+
+        self.record_full[['fullname', 'taxname']] = self.record_full.apply(self.taxon_concat,
+                                                                           axis=1, result_type='expand')
 
     # after file is wrangled into clean importable form,
     # and QC protocols to follow before import
@@ -328,36 +360,6 @@ class DataOnboard(Importer):
                     self.new_collector_list.append(collector_dict)
 
     # check after getting real dataset, still not final
-    def taxon_concat(self, row):
-        """taxon_concat:
-                parses taxon columns to check taxon database, adds the Genus species, ranks, and Epithets,
-                in the correct order, to create new taxon fullname in self.fullname. so that can be used for
-                database checks.
-            args:
-                row: a row from a csv file containing taxon information with correct column names
-
-        """
-        hyb_index = self.record_full.columns.get_loc('Hybrid')
-        rank_index = self.record_full.columns.get_loc('Rank 1')
-        hyb_level = self.record_full.columns.get_loc('Hybrid Level')
-        self.full_name = ""
-        if row[hyb_index] is False:
-            columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
-            # if row[rank_index] == 'Species':
-            #     columns = ['Genus', 'Species', 'Rank 2', 'Epithet 2']
-        else:
-            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1', 'Hybrid Level']
-            # if row[hyb_level] == 'Species':
-            #     columns = ['Hybrid Genus', 'Hybrid Species']
-
-        for column in columns:
-            index = self.record_full.columns.get_loc(column)
-            if pd.notna(row[index]):
-                self.full_name += f" {row[index]}"
-        self.full_name = self.full_name.strip()
-        # creating taxon name
-        taxon_strings = self.full_name.split()
-        self.tax_name = taxon_strings[-1]
 
     def populate_sql(self, tab_name, id_col, key_col, match, match_type=str):
         """populate_sql:
@@ -390,7 +392,7 @@ class DataOnboard(Importer):
 
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
-                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country']
+                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname']
         index_list = []
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
@@ -404,6 +406,8 @@ class DataOnboard(Importer):
         self.end_date = row[index_list[3]]
         self.collector_number = row[index_list[4]]
         self.locality = row[index_list[5]]
+        self.full_name = row[index_list[9]]
+        self.tax_name = row[index_list[10]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
@@ -459,53 +463,76 @@ class DataOnboard(Importer):
 
             cursor.close()
 
-    def check_taxon_real(self):
-        """check_taxon_real:
-                -sends an api caLL to tropicos to check if
-                name exists and is legitimate
-                -if name exists, check synonyms, check synonyms against database, if no synonyms in database,
-                 add name, if synonym in database add name under synonym,
-                -if plural synonyms in database, delegate to hand_check
-        """
-        valid_name = None
-        if self.taxon_id is None:
-        #     self.manual_taxon_list.append(self.full_name)
-        #     valid_name = False
-        # return valid_name
-
-            try:
-                self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
-
-            except Exception as e:
-                self.logger.warning(f"no connection: {e}")
-                sys.exit()
-            if self.name_id == 'No Match':
-                valid_name = False
-                self.no_match_dict[self.barcode] = {'FullName': self.full_name}
-            if valid_name is None:
-                synonym_list = check_synonyms(tropicos_id=self.name_id, acc_syn="Synonyms")
-                accepted_names = check_synonyms(tropicos_id=self.name_id, acc_syn="AcceptedNames")
-                # checking if synonyms in DB
-                if len(accepted_names) != 0:
-                    accepted_name = accepted_names[0]
-                    sql = self.populate_sql(tab_name='taxon', id_col='TaxonID',
-                                            key_col='FullName', match=accepted_name)
-                    valid_id = self.specify_db_connection.get_one_record(sql)
-                if len(synonym_list) != 0 and valid_id is None:
-                    for name in synonym_list[:]:
-                        sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
-                        valid_id = self.specify_db_connection.get_one_record(sql)
-                        if valid_id is None:
-                            synonym_list.remove(name)
-                    if len(synonym_list) != 0:
-                        accepted_name = synonym_list[0]
-                        valid_name = True
-                    else:
-                        valid_name = False
-                        self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
-                                                                'AcceptedName': accepted_name}
-
-        return valid_name
+    # def check_taxon_real(self):
+    #     """check_taxon_real:
+    #             -sends an api caLL to tropicos to check if
+    #             name exists and is legitimate
+    #             -if name exists, check synonyms, check synonyms against database, if no synonyms in database,
+    #              add name, if synonym in database add name under synonym,
+    #             -if plural synonyms in database, delegate to hand_check
+    #     """
+    #     valid_name = None
+    #     accepted_name = None
+    #     valid_id = None
+    #     if self.taxon_id is None:
+    #     #     self.manual_taxon_list.append(self.full_name)
+    #     #     valid_name = False
+    #     # return valid_name
+    #
+    #         try:
+    #             self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
+    #         # exception error if non 200 code returned
+    #         except Exception as e:
+    #             self.logger.warning(f"no connection: {e}")
+    #             sys.exit()
+    #         # if function has no tropicos match, add to handcheck
+    #         if self.name_id == 'No Match':
+    #             valid_name = False
+    #             self.no_match_dict[self.barcode] = {'FullName': self.full_name}
+    #         # otherwise go ahead and check for accepted name and synonym for iterative db check
+    #         else:
+    #             synonym_list = check_synonyms(tropicos_id=self.name_id, mode="Synonyms")
+    #             accepted_names = check_synonyms(tropicos_id=self.name_id, mode="AcceptedNames")
+    #             # if accepted names list returned and synonym list returned
+    #             if len(accepted_names) != 0:
+    #                 # pull accepted name from top of list, will always be first entry
+    #                 accepted_name = accepted_names[0]
+    #                 sql = self.populate_sql(tab_name='taxon', id_col='TaxonID',
+    #                                         key_col='FullName', match=accepted_name)
+    #                 valid_id = self.specify_db_connection.get_one_record(sql)
+    #                 if valid_id is not None:
+    #                     valid_name = True
+    #                     self.full_name = accepted_name
+    #             # if only synonym list returned and no match on accepted name list
+    #             if len(synonym_list) != 0 and valid_id is None:
+    #                 accepted_name = synonym_list[0]
+    #                 for name in synonym_list[:]:
+    #                     # checking and filtering out all non-matching names
+    #                     sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
+    #                     valid_id = self.specify_db_connection.get_one_record(sql)
+    #                     if valid_id is None:
+    #                         synonym_list.remove(name)
+    #                     # if at least one matching name in db
+    #                 if len(synonym_list) != 0:
+    #                     # if name synonym
+    #                     if synonym_list[0] != accepted_name:
+    #                         self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
+    #                                                                 'AcceptedName': accepted_name,
+    #                                                                 'DatabaseMatch': synonym_list[0]}
+    #                     # if name is accepted name
+    #                     else:
+    #                         self.full_name = accepted_name
+    #                         valid_name = True
+    #
+    #                 # if no match in either list, add to manual list.
+    #             else:
+    #                     valid_name = False
+    #                     exact_match = True
+    #                     self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
+    #                                                             'AcceptedName': accepted_name,
+    #                                                             'DatabaseMatch': None}
+    #
+    #     return valid_name
 
     def create_locality_record(self):
         """create_locality_record:
@@ -865,7 +892,6 @@ class DataOnboard(Importer):
         # the order of operations matters, if you change the order certain variables may overwrite
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
         for index, row in self.record_full.iterrows():
-            self.taxon_concat(row)
             self.populate_fields(row)
             self.create_agent_list(row)
             pass_taxon = self.check_taxon_real()
@@ -935,6 +961,8 @@ class DataOnboard(Importer):
         self.csv_colnames()
         # cleaning data
         self.col_clean()
+
+        print(self.record_full)
 
         # checking if barcode record present in database
         self.barcode_has_record()
