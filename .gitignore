@@ -1,3 +1,6 @@
+.Rhistory
+.RData
+/unmatched_taxa/*
 *.pyc
 .idea
 venv

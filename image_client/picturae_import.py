@@ -1,20 +1,19 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
 
 import atexit
-import sys
-import rpy2.robjects as pandas2ri
+
+import pandas as pd
+from rpy2 import robjects
+from rpy2.robjects import pandas2ri
 import time_utils
 from uuid import uuid4
 from data_utils import *
 from casbotany_sql_lite import *
 from datetime import date
 from datetime import datetime
-import traceback
 import logging
 from sql_csv_utils import *
 from importer import Importer
-# from taxon_check.taxon_checker import call_tropicos_api
-# from taxon_check.taxon_checker import check_synonyms
 
 # marking starting time stamp
 starting_time_stamp = datetime.now()
@@ -463,76 +462,26 @@ class DataOnboard(Importer):
 
             cursor.close()
 
-    # def check_taxon_real(self):
-    #     """check_taxon_real:
-    #             -sends an api caLL to tropicos to check if
-    #             name exists and is legitimate
-    #             -if name exists, check synonyms, check synonyms against database, if no synonyms in database,
-    #              add name, if synonym in database add name under synonym,
-    #             -if plural synonyms in database, delegate to hand_check
-    #     """
-    #     valid_name = None
-    #     accepted_name = None
-    #     valid_id = None
-    #     if self.taxon_id is None:
-    #     #     self.manual_taxon_list.append(self.full_name)
-    #     #     valid_name = False
-    #     # return valid_name
-    #
-    #         try:
-    #             self.name_id, self.author_sci, self.family = call_tropicos_api(self.full_name)
-    #         # exception error if non 200 code returned
-    #         except Exception as e:
-    #             self.logger.warning(f"no connection: {e}")
-    #             sys.exit()
-    #         # if function has no tropicos match, add to handcheck
-    #         if self.name_id == 'No Match':
-    #             valid_name = False
-    #             self.no_match_dict[self.barcode] = {'FullName': self.full_name}
-    #         # otherwise go ahead and check for accepted name and synonym for iterative db check
-    #         else:
-    #             synonym_list = check_synonyms(tropicos_id=self.name_id, mode="Synonyms")
-    #             accepted_names = check_synonyms(tropicos_id=self.name_id, mode="AcceptedNames")
-    #             # if accepted names list returned and synonym list returned
-    #             if len(accepted_names) != 0:
-    #                 # pull accepted name from top of list, will always be first entry
-    #                 accepted_name = accepted_names[0]
-    #                 sql = self.populate_sql(tab_name='taxon', id_col='TaxonID',
-    #                                         key_col='FullName', match=accepted_name)
-    #                 valid_id = self.specify_db_connection.get_one_record(sql)
-    #                 if valid_id is not None:
-    #                     valid_name = True
-    #                     self.full_name = accepted_name
-    #             # if only synonym list returned and no match on accepted name list
-    #             if len(synonym_list) != 0 and valid_id is None:
-    #                 accepted_name = synonym_list[0]
-    #                 for name in synonym_list[:]:
-    #                     # checking and filtering out all non-matching names
-    #                     sql = self.populate_sql(tab_name='taxon', id_col='TaxonID', key_col='FullName', match=name)
-    #                     valid_id = self.specify_db_connection.get_one_record(sql)
-    #                     if valid_id is None:
-    #                         synonym_list.remove(name)
-    #                     # if at least one matching name in db
-    #                 if len(synonym_list) != 0:
-    #                     # if name synonym
-    #                     if synonym_list[0] != accepted_name:
-    #                         self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
-    #                                                                 'AcceptedName': accepted_name,
-    #                                                                 'DatabaseMatch': synonym_list[0]}
-    #                     # if name is accepted name
-    #                     else:
-    #                         self.full_name = accepted_name
-    #                         valid_name = True
-    #
-    #                 # if no match in either list, add to manual list.
-    #             else:
-    #                     valid_name = False
-    #                     exact_match = True
-    #                     self.manual_taxon_dict[self.barcode] = {'FullName': self.full_name,
-    #                                                             'AcceptedName': accepted_name,
-    #                                                             'DatabaseMatch': None}
-    #
-    #     return valid_name
+    def taxon_check_real(self):
+
+        bar_tax = self.record_full[['CatalogNumber', 'fullname']]
+
+        bar_tax = bar_tax.to_dict()
+
+        r_dataframe_tax = robjects.DataFrame(bar_tax)
+
+        with open('taxon_check/test_TNRS.R', 'r') as file:
+            r_script = file.read()
+
+        r_output = robjects.r(r_script)
+
+        resolved_taxon = pd.DataFrame(r_output)
+
+        self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
+
+
+
+
 
     def create_locality_record(self):
         """create_locality_record:
@@ -962,6 +911,8 @@ class DataOnboard(Importer):
         # cleaning data
         self.col_clean()
 
+        self.taxon_check_real()
+
         print(self.record_full)
 
         # checking if barcode record present in database
@@ -980,8 +931,6 @@ class DataOnboard(Importer):
 
         # prompt
         cont_prompter()
-
-        # marking starting time_stam
 
         # creating tables
 
