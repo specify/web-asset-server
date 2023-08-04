@@ -312,6 +312,7 @@ class Importer:
                 traceback.print_exc()
 
     def check_for_valid_image(self, full_path):
+        print(full_path)
         # self.logger.debug(f"Ich importer verify file: {full_path}")
         if not filetype.is_image(full_path):
             logging.debug(f"Not identified as a file, looks like: {filetype.guess(full_path)}")

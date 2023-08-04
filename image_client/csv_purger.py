@@ -55,10 +55,7 @@ def casbotany_csv_purger(number: int):
                                     timestamp2=time_stamp_list[1])
 
 
-casbotany_csv_purger(number=476987)
-
-
-
+# casbotany_csv_purger(number=476987)
 
 
 # class_int = CsvDatabase()

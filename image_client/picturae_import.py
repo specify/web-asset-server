@@ -1,8 +1,10 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
 
 import atexit
+import os
 
 import pandas as pd
+import rpy2.robjects.vectors
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 import time_utils
@@ -15,11 +17,17 @@ import logging
 from sql_csv_utils import *
 from importer import Importer
 
-# marking starting time stamp
-starting_time_stamp = datetime.now()
 
-# at exit run ending timestamp and append timestamp csv
-atexit.register(create_timestamps, start_time=starting_time_stamp)
+upload_time = datetime.now()
+
+
+def time_stamper():
+    # marking starting time stamp
+    starting_time_stamp = datetime.now()
+
+    # at exit run ending timestamp and append timestamp csv
+    atexit.register(create_timestamps, start_time=starting_time_stamp)
+
 class DataOnboard(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -214,7 +222,7 @@ class DataOnboard(Importer):
         taxon_strings = full_name.split()
         tax_name = taxon_strings[-1]
 
-        return full_name, tax_name
+        return str(full_name), str(tax_name)
 
     def col_clean(self):
         """will reformat and clean dataframe columns until ready for upload.
@@ -229,7 +237,13 @@ class DataOnboard(Importer):
 
         self.record_full[['fullname', 'taxname']] = self.record_full.apply(self.taxon_concat,
                                                                            axis=1, result_type='expand')
+        # setting datatypes for columns
+        string_list = self.record_full.columns.to_list()
 
+        self.record_full[string_list] = self.record_full[string_list].astype(str)
+
+
+    # will split file into two files
     # after file is wrangled into clean importable form,
     # and QC protocols to follow before import
     # QC measures needed here ? before proceeding.
@@ -281,7 +295,11 @@ class DataOnboard(Importer):
 
     def check_if_images_present(self):
         """checks that each image exists, creating boolean column for later use"""
+
+        print(os.getcwd())
+
         self.record_full['image_valid'] = self.record_full['image_path'].apply(self.check_for_valid_image)
+
 
     # think of finding way to make this function logic not so repetitive
     def create_file_list(self):
@@ -463,25 +481,37 @@ class DataOnboard(Importer):
             cursor.close()
 
     def taxon_check_real(self):
-
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
-        bar_tax = bar_tax.to_dict()
+        pandas2ri.activate()
 
-        r_dataframe_tax = robjects.DataFrame(bar_tax)
+        r_dataframe_tax = pandas2ri.py2rpy(bar_tax)
+
+        robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
 
         with open('taxon_check/test_TNRS.R', 'r') as file:
             r_script = file.read()
 
-        r_output = robjects.r(r_script)
+        robjects.r(r_script)
 
-        resolved_taxon = pd.DataFrame(r_output)
+        resolved_taxon = robjects.r['resolved_taxa']
+
+        resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
 
         self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
 
+        upload_length = len(self.record_full.index)
 
+        # dropping taxon rows with no match
 
+        self.record_full = self.record_full.dropna(subset=['name_matched'])
 
+        clean_length = len(self.record_full.index)
+
+        records_dropped = upload_length-clean_length
+
+        if records_dropped != 0:
+            self.logger.info(f"{records_dropped} rows dropped due to taxon errors")
 
     def create_locality_record(self):
         """create_locality_record:
@@ -667,7 +697,7 @@ class DataOnboard(Importer):
                       0,
                       4,
                       f"{self.barcode}",
-                      f"{starting_time_stamp.strftime('%Y-%m-%d')}",
+                      f"{upload_time.strftime('%Y-%m-%d')}",
                       1,
                       f"{self.collection_ob_guid}",
                       4,
@@ -913,8 +943,6 @@ class DataOnboard(Importer):
 
         self.taxon_check_real()
 
-        print(self.record_full)
-
         # checking if barcode record present in database
         self.barcode_has_record()
 
@@ -931,6 +959,9 @@ class DataOnboard(Importer):
 
         # prompt
         cont_prompter()
+
+        # starting purge timer
+        time_stamper()
 
         # creating tables
 

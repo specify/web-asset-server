@@ -313,7 +313,7 @@ def create_timestamps(start_time):
 
     end_time = datetime.now()
 
-    delt_time = timedelta(seconds=10)
+    delt_time = timedelta(seconds=15)
 
     time_stamp_list = [start_time - delt_time, end_time + delt_time]
 
