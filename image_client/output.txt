@@ -1,0 +1,8 @@
+  CatalogNumber                  fullname
+0     999999981 Arctostaphylos glandulosa
+1     999999982      Aesculus californica
+2     999999983        Quercus x kinselae
+3     999999984          Wrongus wrongica
+          fullname     Name_matched Overall_score  Unmatched_terms
+1 Wrongus wrongica [No match found]               Wrongus wrongica
+[1] "writing spell/mismatch error csv"

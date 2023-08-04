@@ -6,32 +6,27 @@ library(taxize)
 library(httr)
 library(jsonlite)
 
-process_taxon_resolve <- function(r_dataframe_taxon){
+# sink("output.txt")
+
+process_taxon_resolve <- function(tax_frame){
   
   today_date <- format(Sys.Date(), "%Y-%m-%d")
   
-  setwd("/Users/mdelaroca/specify-sandbox/web-asset-server/image_client/taxon_check")
+  setwd("/Users/mdelaroca/specify-sandbox/web-asset-server/image_client")
   
   # base TNRS api 
   url_tn = "https://tnrsapi.xyz/tnrs_api.php"
   
-  test_taxon = r_dataframe_taxon
+  taxon_frame = tax_frame
   
   
   #test_taxon = read_csv("test_csv.csv")
-  
-  taxon_frame = do.call(data.frame, test_taxon)
-  
-  test_taxon_id = list(index = c(range(length(taxon_frame$barcodes))), 
-                       fullname = taxon_frame$fullname)
-  
-  test_taxon_id = do.call(data.frame, test_taxon_id)
-  
+
   
   headers = list('Accept' = 'application/json', 
                  'Content-Type'='application/json', 'charset'='UTF-8')
   
-  data_json = jsonlite::toJSON(unname(test_taxon_id))
+  data_json = jsonlite::toJSON(unname(taxon_frame))
   
   sources <- "wcvp"
   class <- "wfo"
@@ -75,31 +70,50 @@ process_taxon_resolve <- function(r_dataframe_taxon){
   results[ 1:10, c('Name_submitted', 'match.score', 'Name_matched', 'Taxonomic_status', 
                    'Accepted_name', 'Unmatched_terms')]
   
-  hand_check_match = results %>% filter(Overall_score < .98) %>% 
-                     select('Name_submitted', 'Name_matched', 
-                            'Overall_score', 'Unmatched_terms') %>%
-                      rename('fullname'='Name_submitted')
+  results = results %>% rename('fullname'='Name_submitted')
   
   
+  hand_check_match = results %>% filter(Overall_score < .985) %>% 
+                     select('fullname', 'Name_matched', 
+                            'Overall_score', 'Unmatched_terms')
   
- hand_check_match = left_join(hand_check_match, taxon_frame, by='fullname')
+ hand_check_match = left_join(taxon_frame, hand_check_match, by='fullname')
+ 
+ hand_check_match = hand_check_match %>% filter(!is.na(Overall_score))
 
-  
+
  if(nrow(hand_check_match)>0){
     
-    print("writing spell/mismatch error csv")
+    print("writing spelling/mismatch error csv")
    
     filename = paste0('unmatch_and_typo_', today_date, '.csv')
     
-    write_csv(hand_check_match,file = file.path('unmatched_taxa',filename))
+    write_csv(hand_check_match,file = file.path('taxon_check','unmatched_taxa',filename))
     }
   
   
   
-  # results = results %>% filter(Overall_score > .98) %>% select('Name_submitted', 'Name_matched')
+  results = results %>% filter(Overall_score > .985) %>% select('fullname', 'Name_matched')
   
   return(results)
 }
+
+
+resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
+
+# sink()
+
+#test_taxon = list(barcodes = c(1234, 1235, 1236, 1237),
+                 # fullname = c('Arctostaphylos glandulosa', 
+                               # 'Aesculus californica', 
+                               #  'Impatiens banen', 
+                                # 'Quercus x kinselae'))
+
+#test_frame = do.call(data.frame, test_taxon)
+
+# returnti = process_taxon_resolve(tax_frame = test_frame)
+
+
 
 
 
