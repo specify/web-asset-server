@@ -1,10 +1,6 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
 
 import atexit
-import os
-
-import pandas as pd
-import rpy2.robjects.vectors
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 import time_utils
@@ -16,7 +12,6 @@ from datetime import datetime
 import logging
 from sql_csv_utils import *
 from importer import Importer
-
 
 upload_time = datetime.now()
 
@@ -242,6 +237,9 @@ class DataOnboard(Importer):
 
         self.record_full[string_list] = self.record_full[string_list].astype(str)
 
+        # seperating cf. from taxon names
+
+
 
     # will split file into two files
     # after file is wrangled into clean importable form,
@@ -378,6 +376,17 @@ class DataOnboard(Importer):
 
     # check after getting real dataset, still not final
 
+
+    def drop_columns(self):
+        col_list = ['Genus', 'Species', 'Qualifier', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2',
+                    'Hybrid Rank1', 'Hybrid Epithet 1', 'Hybrid Level',
+                    'collector_first_name1', 'collector_last_name1', 'collector_middle_name1',
+                    'collector_first_name2', 'collector_last_name2', 'collector_middle_name2'
+                    'collector_first_name3', 'collector_last_name3', 'collector_middle_name3'
+                    'collector_first_name4', 'collector_last_name4', 'collector_middle_name4'
+                    'collector_first_name5', 'collector_last_name5', 'collector_middle_name5']
+        self.record_full.drop(col_list)
+
     def populate_sql(self, tab_name, id_col, key_col, match, match_type=str):
         """populate_sql:
                 creates a custom select statement for get one record,
@@ -409,7 +418,8 @@ class DataOnboard(Importer):
 
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
-                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname']
+                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname',
+                       'qualifier', 'name_matched']
         index_list = []
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
@@ -425,6 +435,8 @@ class DataOnboard(Importer):
         self.locality = row[index_list[5]]
         self.full_name = row[index_list[9]]
         self.tax_name = row[index_list[10]]
+        self.qualifier = row[index_list[11]]
+        self.name_matched = row[index_list[12]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
@@ -504,6 +516,8 @@ class DataOnboard(Importer):
 
         # dropping taxon rows with no match
 
+        print(self.record_full)
+
         self.record_full = self.record_full.dropna(subset=['name_matched'])
 
         clean_length = len(self.record_full.index)
@@ -512,6 +526,9 @@ class DataOnboard(Importer):
 
         if records_dropped != 0:
             self.logger.info(f"{records_dropped} rows dropped due to taxon errors")
+
+        self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
+
 
     def create_locality_record(self):
         """create_locality_record:
@@ -870,6 +887,7 @@ class DataOnboard(Importer):
         """
         # the order of operations matters, if you change the order certain variables may overwrite
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
+        print(self.record_full)
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
             self.create_agent_list(row)
@@ -962,6 +980,10 @@ class DataOnboard(Importer):
 
         # starting purge timer
         time_stamper()
+
+        # dropping uneeded columns for upload
+
+        self.drop_columns()
 
         # creating tables
 

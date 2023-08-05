@@ -348,6 +348,7 @@ def unique_ordered_list(input_list):
 
 
 class Timer:
+    """times how long it takes for a block of code to run"""
     def __enter__(self):
         self.start_time = datetime.now()
         return self
@@ -356,6 +357,23 @@ class Timer:
         self.end_time = datetime.now()
 
     def get_duration(self):
-        return self.end_tim - self.start_time
+        return self.end_time - self.start_time
+
+
+
+def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
+    tax_frame['qualifier'] = pd.NA
+
+    cf_mask = tax_frame[tax_col].str.contains(r'cf\.')
+
+    # setting default to species qualifier
+    tax_frame.loc[cf_mask, 'qualifier'] = 'species cf.'
+
+    # if the taxon string starts with cf. it is most likely a genus qualifier
+    cf_genus = tax_frame[tax_col].str.contains(r'^cf\.')
+
+    tax_frame.loc[cf_genus, 'qualifier'] = 'genus cf.'
+
+    return tax_frame
 
 

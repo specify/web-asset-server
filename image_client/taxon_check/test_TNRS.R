@@ -6,7 +6,7 @@ library(taxize)
 library(httr)
 library(jsonlite)
 
-# sink("output.txt")
+sink("output.txt")
 
 process_taxon_resolve <- function(tax_frame){
   
@@ -55,9 +55,7 @@ process_taxon_resolve <- function(tax_frame){
   
   results <- as.data.frame(results_raw)
   
-  
-  # Inspect the results
-  head(results, 10)
+  print(results)
   
   
   # to better compare the output fields
@@ -67,19 +65,26 @@ process_taxon_resolve <- function(tax_frame){
   # Display just the main results fields
   results$match.score <- format(round(as.numeric(results $Overall_score),2), nsmall=2)
   
+  print(results)
+  
   results[ 1:10, c('Name_submitted', 'match.score', 'Name_matched', 'Taxonomic_status', 
                    'Accepted_name', 'Unmatched_terms')]
   
-  results = results %>% rename('fullname'='Name_submitted')
+  results = results %>% rename('fullname'='Name_submitted', 
+                               'name_matched' = 'Name_matched',
+                               'taxonomic_status' = 'Taxonomic_status',
+                               'accepted_name'= 'Accepted_name',
+                               'unmatched_terms'='Unmatched_terms',
+                               'overall_score' = 'Overall_score')
   
-  
-  hand_check_match = results %>% filter(Overall_score < .985) %>% 
-                     select('fullname', 'Name_matched', 
-                            'Overall_score', 'Unmatched_terms')
+
+  hand_check_match = results %>% filter(overall_score < .985) %>% 
+                     select('fullname', 'name_matched', 
+                            'overall_score', 'unmatched_terms')
   
  hand_check_match = left_join(taxon_frame, hand_check_match, by='fullname')
  
- hand_check_match = hand_check_match %>% filter(!is.na(Overall_score))
+ hand_check_match = hand_check_match %>% filter(!is.na(overall_score))
 
 
  if(nrow(hand_check_match)>0){
@@ -93,7 +98,8 @@ process_taxon_resolve <- function(tax_frame){
   
   
   
-  results = results %>% filter(Overall_score > .985) %>% select('fullname', 'Name_matched')
+  results = results %>% filter(overall_score > .99) %>% 
+            select('fullname', 'name_matched', 'overall_score')
   
   return(results)
 }
@@ -101,15 +107,15 @@ process_taxon_resolve <- function(tax_frame){
 
 resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 
-# sink()
+sink()
 
 #test_taxon = list(barcodes = c(1234, 1235, 1236, 1237),
-                 # fullname = c('Arctostaphylos glandulosa', 
-                               # 'Aesculus californica', 
-                               #  'Impatiens banen', 
-                                # 'Quercus x kinselae'))
+                #  fullname = c('cf. Arctostaphylos glandulosa', 
+                   #            'Aesculus cf. californica', 
+                   #           'Impatiens banen', 
+                       #     'Quercus x kinselae'))
 
-#test_frame = do.call(data.frame, test_taxon)
+# test_frame = do.call(data.frame, test_taxon)
 
 # returnti = process_taxon_resolve(tax_frame = test_frame)
 
