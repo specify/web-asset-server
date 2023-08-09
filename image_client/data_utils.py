@@ -229,16 +229,32 @@ def zero_out_barcode(number):
 
 
 def remove_two_index(value_list, column_list):
-    missing_index = []
-    for index, entry in enumerate(value_list):
-        if entry == '<NA>' or entry == '' or pd.isna(entry):
-            value_list.remove(entry)
-            missing_index.append(index)
+    new_value_list = []
+    new_column_list = []
+    for entry, column in zip(value_list, column_list):
+        if isinstance(entry, float) and np.isnan(entry):
+            continue
 
-    column_list = [column_list[i] for i in range(len(column_list)) if i not in missing_index]
+        elif pd.isna(entry):
+            continue
 
-    return value_list, column_list
+        elif entry == '<NA>' or entry == '':
+            continue
 
+        new_value_list.append(entry)
+        new_column_list.append(column)
+
+    return new_value_list, new_column_list
+
+#
+# col_list = ["val1", "val2", "val3", "val4"]
+#
+# val_list = [1, '', pd.NA, np.nan]
+#
+# new_val, new_col = remove_two_index(val_list, col_list)
+#
+# print(new_val)
+# print(new_col)
 
 def write_dict_to_csv(tax_dict, filename):
     with open(filename, mode='w', newline='') as file:
@@ -367,13 +383,20 @@ def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
     cf_mask = tax_frame[tax_col].str.contains(r'cf\.')
 
     # setting default to species qualifier
-    tax_frame.loc[cf_mask, 'qualifier'] = 'species cf.'
+    tax_frame.loc[cf_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_mask, 'Species']
 
     # if the taxon string starts with cf. it is most likely a genus qualifier
     cf_genus = tax_frame[tax_col].str.contains(r'^cf\.')
 
-    tax_frame.loc[cf_genus, 'qualifier'] = 'genus cf.'
+    tax_frame.loc[cf_genus, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_mask, 'Genus']
 
     return tax_frame
 
 
+# tax_frame = {"full_name": ["Fake cf. Fakus", "cf. Fakulan"], "Genus": ["Fake", "Fakulan"], "Species": ["Fakus", pd.NA]}
+#
+# tax_frame = pd.DataFrame(tax_frame)
+#
+# tax_frame = separate_qualifiers(tax_frame=tax_frame, tax_col='full_name')
+#
+# print(tax_frame)

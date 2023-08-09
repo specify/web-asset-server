@@ -1,6 +1,8 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
 
 import atexit
+
+import pandas as pd
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 import time_utils
@@ -38,7 +40,7 @@ class DataOnboard(Importer):
         # new_collector_list is only for adding new agents to agent table.
         # manual taxon list, list of skipped taxons to be manually verified
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'agent_guid_list', 'new_taxon_list', 'agent_guid_list']
+                       'new_taxon_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
@@ -54,7 +56,7 @@ class DataOnboard(Importer):
                      'geography_string', 'GeographyID', 'locality_id',
                      'full_name', 'tax_name', 'locality',
                      'determination_guid', 'collection_ob_id', 'collection_ob_guid',
-                     'name_id', 'author_sci', 'family']
+                     'name_id', 'author_sci', 'family', 'gen_spec_id', 'family_id', 'parent_author']
 
         for param in init_list:
             setattr(self, param, None)
@@ -202,22 +204,115 @@ class DataOnboard(Importer):
         hyb_index = self.record_full.columns.get_loc('Hybrid')
         full_name = ""
         tax_name = ""
+        gen_spec = ""
         if row[hyb_index] is False:
-            columns = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
+            columns1 = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
+            columns2 = ['Genus', 'Species']
         else:
-            columns = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1']
+            columns1 = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1']
+            columns2 = ['Hybrid Genus', 'Hybrid Species']
 
-        for column in columns:
+        for column in columns1:
             index = self.record_full.columns.get_loc(column)
             if pd.notna(row[index]):
                 full_name += f" {row[index]}"
 
+        for column in columns2:
+            index = self.record_full.columns.get_loc(column)
+            if pd.notna(row[index]):
+                gen_spec += f" {row[index]}"
+
+
         full_name = full_name.strip()
+        gen_spec = gen_spec.strip()
         # creating taxon name
         taxon_strings = full_name.split()
         tax_name = taxon_strings[-1]
 
-        return str(full_name), str(tax_name)
+        return str(gen_spec), str(full_name), str(tax_name)
+
+
+    def taxon_assign_defitem(self,taxon_string):
+
+        if " f. " in taxon_string:
+            return 17, 260
+        elif "subf." in taxon_string:
+            return 21, 270
+        elif "subvar." in taxon_string:
+            return 16, 250
+        elif "var." in taxon_string:
+            return 15, 240
+        elif "subsp." in taxon_string:
+            return 14, 230
+        elif len(taxon_string.split()) == 1:
+            return 12, 180
+        else:
+            return 13, 220
+
+
+    def check_single_taxa(self, taxon_name, barcode):
+        """check_single_taxa: designed to take in one taxaname and
+           do a TNRS operation on it to get an author for iterative higher taxa"""
+        taxon_frame = {"barcodes": [barcode], "fullname": [taxon_name]}
+
+        taxon_frame = pd.DataFrame(taxon_frame)
+
+        pandas2ri.activate()
+
+        r_dataframe_tax = pandas2ri.py2rpy(taxon_frame)
+
+        robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
+
+        with open('taxon_check/test_TNRS.R', 'r') as file:
+            r_script = file.read()
+
+        robjects.r(r_script)
+
+        resolved_taxon = robjects.r['resolved_taxa']
+
+        resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
+
+        taxon_list = list(resolved_taxon['accepted_author'])
+
+        self.parent_author = taxon_list[0]
+
+
+    def taxon_check_real(self):
+        bar_tax = self.record_full[['CatalogNumber', 'fullname']]
+
+        pandas2ri.activate()
+
+        r_dataframe_tax = pandas2ri.py2rpy(bar_tax)
+
+        robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
+
+        with open('taxon_check/test_TNRS.R', 'r') as file:
+            r_script = file.read()
+
+        robjects.r(r_script)
+
+        resolved_taxon = robjects.r['resolved_taxa']
+
+        resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
+
+        self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
+
+        upload_length = len(self.record_full.index)
+
+        # dropping taxon rows with no match
+
+        self.record_full = self.record_full.dropna(subset=['name_matched'])
+
+        clean_length = len(self.record_full.index)
+
+        records_dropped = upload_length-clean_length
+
+        if records_dropped != 0:
+            self.logger.info(f"{records_dropped} rows dropped due to taxon errors")
+
+        self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
+
+
 
     def col_clean(self):
         """will reformat and clean dataframe columns until ready for upload.
@@ -230,14 +325,18 @@ class DataOnboard(Importer):
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
                                                           format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
 
-        self.record_full[['fullname', 'taxname']] = self.record_full.apply(self.taxon_concat,
+        self.record_full[['gen_spec', 'fullname', 'taxname']] = self.record_full.apply(self.taxon_concat,
                                                                            axis=1, result_type='expand')
+
         # setting datatypes for columns
         string_list = self.record_full.columns.to_list()
 
         self.record_full[string_list] = self.record_full[string_list].astype(str)
 
-        # seperating cf. from taxon names
+        self.record_full = self.record_full.replace(['', None, 'nan', np.nan], pd.NA)
+
+
+
 
 
 
@@ -338,21 +437,29 @@ class DataOnboard(Importer):
            args:
                 row: a dataframe row containing collector name information
         """
+        self.new_collector_list = []
+        self.full_collector_list = []
+
         column_names = list(self.record_full.columns)
         for i in range(1, 6):
             try:
-                first = column_names.index(f'collector_first_name{i}')
-                middle = column_names.index(f'collector_middle_name{i}')
-                last = column_names.index(f'collector_last_name{i}')
-                # first name title taking priority over last
+                first_index = column_names.index(f'collector_first_name{i}')
+                middle_index = column_names.index(f'collector_middle_name{i}')
+                last_index = column_names.index(f'collector_last_name{i}')
+
+                first = row[first_index]
+                middle = row[middle_index]
+                last = row[last_index]
+
             except ValueError:
                 break
             # need a way to keep ones with nas, but only split titles from real names
-            if not pd.isna(row[first]) or not pd.isna(row[middle]) or not pd.isna(row[last]):
-                first_name, title = assign_titles(first_last='first', name=f"{row[first]}")
-                last_name, title = assign_titles(first_last='last', name=f"{row[last]}")
+            if not pd.isna(first) or not pd.isna(middle) or not pd.isna(last):
+                # first name title taking priority over last
+                first_name, title = assign_titles(first_last='first', name=f"{first}")
+                last_name, title = assign_titles(first_last='last', name=f"{last}")
 
-                middle = row[middle]
+                middle = middle
                 elements = [first_name, last_name, title, middle]
 
                 for index in range(len(elements)):
@@ -370,22 +477,12 @@ class DataOnboard(Importer):
                                   f'collector_middle_initial': middle,
                                   f'collector_last_name': last_name,
                                   f'collector_title': title}
+
                 self.full_collector_list.append(collector_dict)
                 if agent_id is None:
                     self.new_collector_list.append(collector_dict)
 
     # check after getting real dataset, still not final
-
-
-    def drop_columns(self):
-        col_list = ['Genus', 'Species', 'Qualifier', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2',
-                    'Hybrid Rank1', 'Hybrid Epithet 1', 'Hybrid Level',
-                    'collector_first_name1', 'collector_last_name1', 'collector_middle_name1',
-                    'collector_first_name2', 'collector_last_name2', 'collector_middle_name2'
-                    'collector_first_name3', 'collector_last_name3', 'collector_middle_name3'
-                    'collector_first_name4', 'collector_last_name4', 'collector_middle_name4'
-                    'collector_first_name5', 'collector_last_name5', 'collector_middle_name5']
-        self.record_full.drop(col_list)
 
     def populate_sql(self, tab_name, id_col, key_col, match, match_type=str):
         """populate_sql:
@@ -419,14 +516,11 @@ class DataOnboard(Importer):
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
                        'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname',
-                       'qualifier', 'name_matched']
+                       'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author']
         index_list = []
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
             index_list.append(barcode_index)
-        self.new_collector_list = []
-        self.full_collector_list = []
-        self.agent_guid_list = []
         self.barcode = row[index_list[0]].zfill(9)
         self.verbatim_date = row[index_list[1]]
         self.start_date = row[index_list[2]]
@@ -435,13 +529,17 @@ class DataOnboard(Importer):
         self.locality = row[index_list[5]]
         self.full_name = row[index_list[9]]
         self.tax_name = row[index_list[10]]
-        self.qualifier = row[index_list[11]]
-        self.name_matched = row[index_list[12]]
+        self.gen_spec = row[index_list[11]]
+        self.qualifier = row[index_list[12]]
+        self.name_matched = row[index_list[13]]
+        self.genus = row[index_list[14]]
+        self.family_name = row[index_list[15]]
+        self.is_hybrid = row[index_list[16]]
+        self.author = row[index_list[17]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
             setattr(self, guid_string, uuid4())
-
 
         self.geography_string = str(row[index_list[6]]) + ", " + \
                                 str(row[index_list[7]]) + ", " + str(row[index_list[8]])
@@ -451,9 +549,44 @@ class DataOnboard(Importer):
         self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
                                              key_col='LocalityName', match=self.locality)
 
-        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{self.full_name}" AND IsAccepted = true;'''
+    def taxon_get(self, name):
+        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{name}";'''
+        id = self.specify_db_connection.get_one_record(sql)
+        return id
 
-        self.taxon_id = self.specify_db_connection.get_one_record(sql)
+    def populate_taxon(self):
+        """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
+        as genus must be uploaded before species , before subtaxa etc.."""
+
+        self.taxon_list = []
+        self.taxon_id = self.taxon_get(name=self.full_name)
+        # append taxon full name
+        if self.taxon_id is None:
+            self.taxon_list.append(self.full_name)
+            # check base name if base name differs e.g. if var. or subsp.
+            if self.full_name != self.gen_spec:
+                self.gen_spec_id = self.taxon_get(name=self.gen_spec)
+                self.check_single_taxa(taxon_name=self.gen_spec, barcode=self.barcode)
+                # adding base name to taxon_list
+                if self.gen_spec_id is None:
+                    self.taxon_list.append(self.gen_spec)
+
+            # base value for gen spec is set as None so will work either way.
+            # checking for genus id
+            if self.gen_spec_id is None:
+                self.genus_id = self.taxon_get(name=self.genus)
+
+                # adding genus name if missing
+                if self.genus_id is None:
+                    self.taxon_list.append(self.genus)
+
+                    # checking family id
+                    self.family_id = self.taxon_get(name=self.family_name)
+                    # adding family name to list
+                    if self.family_id is None:
+                        self.taxon_list.append(self.family_name)
+        else:
+            pass
 
     def create_table_record(self, sql, is_test=False):
         """create_table_record:
@@ -491,44 +624,6 @@ class DataOnboard(Importer):
                 sys.exit("terminating script")
 
             cursor.close()
-
-    def taxon_check_real(self):
-        bar_tax = self.record_full[['CatalogNumber', 'fullname']]
-
-        pandas2ri.activate()
-
-        r_dataframe_tax = pandas2ri.py2rpy(bar_tax)
-
-        robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
-
-        with open('taxon_check/test_TNRS.R', 'r') as file:
-            r_script = file.read()
-
-        robjects.r(r_script)
-
-        resolved_taxon = robjects.r['resolved_taxa']
-
-        resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
-
-        self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
-
-        upload_length = len(self.record_full.index)
-
-        # dropping taxon rows with no match
-
-        print(self.record_full)
-
-        self.record_full = self.record_full.dropna(subset=['name_matched'])
-
-        clean_length = len(self.record_full.index)
-
-        records_dropped = upload_length-clean_length
-
-        if records_dropped != 0:
-            self.logger.info(f"{records_dropped} rows dropped due to taxon errors")
-
-        self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
-
 
     def create_locality_record(self):
         """create_locality_record:
@@ -672,19 +767,93 @@ class DataOnboard(Importer):
 
     # temporarily creating exception list until reliable taxon protocol
     def create_taxon(self):
+        """create_taxon: populates the taxon table iteratively by adding higher taxa first,
+                            before lower taxa"""
         # for now do not upload
+        parent_list = [self.full_name, self.gen_spec, self.genus, self.family_name]
 
-        # sql not yet created as need to establish protocol propegating higher taxa with vtaxon
-        print("taxon_created!")
+        if self.gen_spec == self.full_name:
+            parent_list.remove(self.gen_spec)
+
+        for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
+
+            taxon_guid = uuid4()
+            rank_name = taxa_rank
+            parent_id = self.taxon_get(name=parent_list[index+1])
+            table = 'taxon'
+            rank_parts = taxa_rank.split()
+            rank_end = rank_parts[-1]
+            author_insert = self.author
+
+            if rank_name != self.family_name:
+                tree_item_id, rank_id = self.taxon_assign_defitem(taxon_string=rank_name)
+            else:
+                rank_id = 140
+                tree_item_id = 11
+
+            if rank_id < 220:
+                author_insert = pd.NA
+
+            # assigning parent_author if needed , for gen_spec
+
+            if rank_id == 220 and self.full_name != self.gen_spec:
+                author_insert = self.parent_author
+
+
+            column_list = ['TimestampCreated',
+                           'TimestampModified',
+                           'Version',
+                           'Author',
+                           'FullName',
+                           'GUID',
+                           'Source',
+                           'IsAccepted',
+                           'IsHybrid',
+                           'Name',
+                           'RankID',
+                           'TaxonTreeDefID',
+                           'ParentID',
+                           'ModifiedByAgentID',
+                           'CreatedByAgentID',
+                           'TaxonTreeDefItemID']
+
+            boolean_value = bool(self.is_hybrid.lower() == "true")
+
+            value_list = [f"{time_utils.get_pst_time_now_string()}",
+                          f"{time_utils.get_pst_time_now_string()}",
+                          1,
+                          author_insert,
+                          f"{rank_name}",
+                          f"{taxon_guid}",
+                          "World Checklist of Vascular Plants 2023",
+                          True,
+                          boolean_value,
+                          f"{rank_end}",
+                          f"{rank_id}",
+                          1,
+                          f"{parent_id}",
+                          f"{self.created_by_agent}",
+                          f"{self.created_by_agent}",
+                          f"{tree_item_id}"
+                          ]
+
+            value_list, column_list = remove_two_index(value_list, column_list)
+
+            sql = create_sql_string(tab_name=table, col_list=column_list,
+                                    val_list=value_list)
+
+            self.create_table_record(sql=sql)
+
+            print("taxon_created!")
 
     def create_collection_object(self):
         """create_collection_object:
                 defines column and value list , runs them as
                 args through create_sql_string and create_table record
                 in order to add new collectionobject record to database.
-         """
+        """
         # will new collecting event ids need to be created ?
-        # repulling collecting event id to relect new record
+        # re-pulling collecting event id to reflect new record
 
         self.collecting_event_id = self.populate_sql(tab_name='collectingevent', id_col='CollectingEventID',
                                                      key_col='GUID', match=self.collecting_event_guid)
@@ -744,7 +913,6 @@ class DataOnboard(Importer):
 
         self.collection_ob_id = self.populate_sql(tab_name='collectionobject', id_col='CollectionObjectID',
                                                   key_col='GUID', match=self.collection_ob_guid)
-
 
         self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
                                           key_col='FullName', match=self.full_name)
@@ -887,30 +1055,27 @@ class DataOnboard(Importer):
         """
         # the order of operations matters, if you change the order certain variables may overwrite
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
-        print(self.record_full)
+
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
             self.create_agent_list(row)
-            pass_taxon = self.check_taxon_real()
-            if pass_taxon is False:
-                self.image_list.remove(f"picturae_img/{self.date_use}/CAS{self.barcode}.JPG")
-                continue
-            else:
-                if pass_taxon is True:
-                    self.create_taxon()
+            self.populate_taxon()
+            if self.taxon_id is None:
+                self.create_taxon()
 
-                if self.locality_id is None:
-                    self.create_locality_record()
-                if len(self.new_collector_list) > 0:
-                    self.create_agent_id()
+            if self.locality_id is None:
+                self.create_locality_record()
 
-                self.create_collectingevent()
+            if len(self.new_collector_list) > 0:
+                self.create_agent_id()
 
-                self.create_collection_object()
+            self.create_collectingevent()
 
-                self.create_determination()
+            self.create_collection_object()
 
-                self.create_collector()
+            self.create_determination()
+
+            self.create_collector()
 
     def upload_attachments(self):
         """upload_attachments:
@@ -961,6 +1126,8 @@ class DataOnboard(Importer):
 
         self.taxon_check_real()
 
+
+
         # checking if barcode record present in database
         self.barcode_has_record()
 
@@ -980,10 +1147,6 @@ class DataOnboard(Importer):
 
         # starting purge timer
         time_stamper()
-
-        # dropping uneeded columns for upload
-
-        self.drop_columns()
 
         # creating tables
 
