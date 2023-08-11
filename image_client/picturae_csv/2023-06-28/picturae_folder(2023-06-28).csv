@@ -1,6 +1,7 @@
 ﻿application_batch,csv_batch,object_type,folder_barcode,specimen_barcode,filed_as_family,barcode_info,path_jpg,Taxon ID,Family,Genus,Species,Qualifier,Author,Rank 1,Epithet 1,Rank 2,Epithet 2,Hybrid,Hybrid Genus,Hybrid Species,Hybrid Rank 1,Hybrid Epithet 1,Hybrid Level,Notes,Feedback
-1,csv_1234,raw_csv,Cover 999999985_1.jpeg,999999985,TRUE,,picturae_img/2023-06-28/CAS999999985.JPG,1092389,Araceae,Armorphophallus,titanum,,(Becc.) Becc.,,,,,FALSE,,,,,,cool sticker,leave this out
+1,csv_1234,raw_csv,Cover 999999985_1.jpeg,999999985,TRUE,,picturae_img/2023-06-28/CAS999999985.JPG,1235,Araceae,Amorphophallus,titanum,,(Becc.) Becc.,,,,,FALSE,,,,,,cool sticker,leave this out
 1,csv_1234,raw_csv,Cover 999999981_1.jpg,999999981,TRUE,,picturae_img/2023-06-28/CAS999999981.JPG,54192,Ericaceae,Arctostaphylos,glandulosa,,Eastw.,,,,,FALSE,,,,,,cool sticker,leave this out
 1,csv_1234,raw_csv,Cover 999999982_1.jpg,999999982,TRUE,,picturae_img/2023-06-28/CAS999999982.JPG,54216,Sapindaceae,Aesculus,californica,,(Spach) Nutt.,,,,,FALSE,,,,,,cool sticker,leave this out
-1,csv_1234,raw_csv,Cover 999999983_1.jpeg,999999983,TRUE,,picturae_img/2023-06-28/CAS999999983.JPG,54159,Lamiaceae,,,,Francis Milner,,,,,TRUE,Monardella , linoides,subsp. ,erecta X australis,,cool sticker,leave this out
+1,csv_1234,raw_csv,Cover 999999983_1.jpeg,999999983,TRUE,,picturae_img/2023-06-28/CAS999999983.JPG,54159,Araceae,,,,Francis Milner,,,,,TRUE,Amorphophallus,adamsensis X titanum,,,,cool sticker,leave this out
 1,csv_1234,raw_csv,Cover 999999984_1.jpeg,999999984,TRUE,,picturae_img/2023-06-28/CAS999999984.JPG,1092389,Pinaceae,Abies,sibirica,,(B.Fedtsh.) Farjon,subsp.,semenovii,,,FALSE,,,,,,cool sticker,leave this out
+1,csv_1234,raw_csv,Cover 999999986_1.jpeg,999999986,TRUE,,picturae_img/2023-06-28/CAS999999986.JPG,213213,Fagaceae,,,,,,,,,TRUE,Quercus × faketest,,,,,cool sticker,leave this out

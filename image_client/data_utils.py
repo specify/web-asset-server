@@ -417,6 +417,20 @@ def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
     return tax_frame
 
 
+def extract_after_subtax(text):
+    patterns = ["subsp\.", "var\.", "subvar\.", "f\.", "subform\."]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            start = match.end()
+            extracted_text = text[start:].strip()
+            return extracted_text
+
+    return None
+
+new_text = extract_after_subtax("Monardella linoides subsp. erecta X fake")
+print(new_text)
 # tax_frame = {"full_name": ["Fake cf. Fakus", "Fakulans fake var. cf. fakinatus"],
 # "Genus": ["Fake", "Fakulans"], "Species": ["Fakus", "fake"], "Hybrid Species": [pd.NA, pd.NA],
 #              "Hybrid Genus": [pd.NA, pd.NA], 'Epithet 1': [pd.NA, 'fakinatus'], 'Hybrid Epithet': [pd.NA, pd.NA]}

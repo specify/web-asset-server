@@ -202,11 +202,19 @@ class DataOnboard(Importer):
 
         """
         hyb_index = self.record_full.columns.get_loc('Hybrid')
+        is_hybrid = row[hyb_index]
+
+        if is_hybrid is True:
+            gen_index = self.record_full.columns.get_loc('Hybrid Genus')
+            genus = row[gen_index]
+        else:
+            gen_index = self.record_full.columns.get_loc('Genus')
+            genus = row[gen_index]
         full_name = ""
         tax_name = ""
         gen_spec = ""
         hybrid_base = ""
-        if row[hyb_index] is False:
+        if is_hybrid is False:
             columns1 = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
             columns2 = ['Genus', 'Species']
         else:
@@ -223,29 +231,30 @@ class DataOnboard(Importer):
             if pd.notna(row[index]):
                 gen_spec += f" {row[index]}"
 
-
         full_name = full_name.strip()
         gen_spec = gen_spec.strip()
         # creating taxon name
         # creating temporary string in order to get tax order
         separate_string = full_name.replace("cf.", "")
         taxon_strings = separate_string.split()
-        print(taxon_strings)
-        tax_name = taxon_strings[-1]
+
+        # changing name variable based on condition
+        if is_hybrid is False:
+            tax_name = taxon_strings[-1]
+        else:
+            if genus == full_name:
+                tax_name = " ".join(taxon_strings[-2:])
+            elif gen_spec == full_name and genus != full_name:
+                tax_name = " ".join(taxon_strings[-3:])
+            else:
+                tax_name = extract_after_subtax(separate_string)
         if row[hyb_index] is True:
             if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
                 hybrid_base = full_name
                 full_name = " ".join(taxon_strings[:2])
-                print(full_name)
-                tax_name = " ".join(taxon_strings[2:])
-                print(tax_name)
             else:
                 hybrid_base = full_name
                 full_name = taxon_strings[0]
-                print(full_name)
-                tax_name = " ".join(taxon_strings[1:])
-                print(tax_name)
-
 
         return str(gen_spec), str(full_name), str(tax_name), str(hybrid_base)
 
@@ -335,7 +344,6 @@ class DataOnboard(Importer):
 
         self.record_full.drop(columns=['hybrid_base'])
 
-        print(self.record_full)
 
         # executing qualifier seperator function
 
@@ -565,14 +573,15 @@ class DataOnboard(Importer):
         self.qualifier = row[index_list[12]]
         self.name_matched = row[index_list[13]]
         self.family_name = row[index_list[15]]
-        self.is_hybrid = row[index_list[16]]
+        self.is_hybrid = eval(row[index_list[16]])
         self.author = row[index_list[17]]
         self.name_matched = row[index_list[18]]
 
         if self.is_hybrid is False:
             self.genus = row[index_list[14]]
+
         else:
-            self.genus = row[19]
+            self.genus = row[index_list[19]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
@@ -594,7 +603,7 @@ class DataOnboard(Importer):
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
         as genus must be uploaded before species , before subtaxa etc.."""
-
+        self.gen_spec_id = None
         self.taxon_list = []
         self.taxon_id = self.taxon_get(name=self.full_name)
         # append taxon full name
@@ -610,10 +619,9 @@ class DataOnboard(Importer):
 
             # base value for gen spec is set as None so will work either way.
             # checking for genus id
-        if self.is_hybrid is False:
-            if self.gen_spec_id is None:
-                self.genus_id = self.taxon_get(name=self.genus)
 
+            if self.gen_spec_id is None and self.is_hybrid is False:
+                self.genus_id = self.taxon_get(name=self.genus)
                 # adding genus name if missing
                 if self.genus_id is None:
                     self.taxon_list.append(self.genus)
@@ -623,14 +631,24 @@ class DataOnboard(Importer):
                     # adding family name to list
                     if self.family_id is None:
                         self.taxon_list.append(self.family_name)
-        if self.is_hybrid is True:
-            if self.gen_spec_id is None and self.genus != self.full_name:
-                self.genus_id = self.taxon_get(name=self.genus)
-            else:
-                self.genus = self.genus.split()[0]
-                self.genus_id = self.taxon_get(name=self.genus)
+            # setting taxon for hybrids
+            if self.is_hybrid is True and self.gen_spec_id is None:
+                # if the genus + species is none, and it is not a genus level cross
+                # get genus
+                if self.genus != self.full_name:
+                    self.genus_id = self.taxon_get(name=self.genus)
+                # if genus level cross
+                elif self.genus == self.full_name:
+                    # self.gen_spec = self.genus
+                    # self.gen_spec_id = self.taxon_get(name=self.gen_spec)
+                    # # setting genus as gen_spec
+                    # if self.gen_spec_id is None:
+                    #     self.taxon_list.append(self.gen_spec)
+                    # changing genus to first substring in genus col
+                    self.genus = self.genus.split()[0]
+                    self.genus_id = self.taxon_get(name=self.genus)
 
-                # adding genus name if missing
+                    # adding genus name if missing
                 if self.genus_id is None:
                     self.taxon_list.append(self.genus)
 
@@ -641,24 +659,8 @@ class DataOnboard(Importer):
                         self.taxon_list.append(self.family_name)
         else:
             pass
-    #
-    # def populate_hybrid(self):
-    #     """populate hybrid: creates a specialized taxon list for hybrid, which checks different rank levels in the taxon,
-    #             as genus must be uploaded before species , before subtaxa etc.."""
-    #
-    #     self.taxon_list = []
-    #     self.taxon_id = self.taxon_get(name=self.full_name)
-    #
-    #     if self.taxon_id is None:
-    #         self.taxon_list.append(self.full_name)
-    #         if self.full_name != self.gen_spec:
-    #
-    #
 
 
-    def check_hybrid(self):
-        first_part, second_part = self.full_name.split('X')
-        # append taxon full name
 
     def create_table_record(self, sql, is_test=False):
         """create_table_record:
@@ -848,13 +850,16 @@ class DataOnboard(Importer):
             parent_list.remove(self.gen_spec)
 
         for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
-
             taxon_guid = uuid4()
             rank_name = taxa_rank
             parent_id = self.taxon_get(name=parent_list[index+1])
             table = 'taxon'
-            rank_parts = taxa_rank.split()
-            rank_end = rank_parts[-1]
+            if taxa_rank == self.full_name:
+                rank_end = self.tax_name
+            else:
+                rank_end = taxa_rank.split()[-1]
+
+            print(rank_end)
             author_insert = self.author
 
             if rank_name != self.family_name:
@@ -871,6 +876,8 @@ class DataOnboard(Importer):
             if rank_id == 220 and self.full_name != self.gen_spec:
                 author_insert = self.parent_author
 
+            if self.is_hybrid is True:
+                author_insert = pd.NA
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
@@ -889,7 +896,6 @@ class DataOnboard(Importer):
                            'CreatedByAgentID',
                            'TaxonTreeDefItemID']
 
-            boolean_value = bool(self.is_hybrid.lower() == "true")
 
             value_list = [f"{time_utils.get_pst_time_now_string()}",
                           f"{time_utils.get_pst_time_now_string()}",
@@ -899,7 +905,7 @@ class DataOnboard(Importer):
                           f"{taxon_guid}",
                           "World Checklist of Vascular Plants 2023",
                           True,
-                          boolean_value,
+                          self.is_hybrid,
                           f"{rank_end}",
                           f"{rank_id}",
                           1,
@@ -1130,12 +1136,8 @@ class DataOnboard(Importer):
 
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
-
             self.create_agent_list(row)
-            if row['Hybrid'] is False:
-                self.populate_taxon()
-            else:
-                self.populate_hybrid()
+            self.populate_taxon()
             if self.taxon_id is None:
                 self.create_taxon()
 
