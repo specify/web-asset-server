@@ -19,6 +19,8 @@ process_taxon_resolve <- function(tax_frame){
   
   taxon_frame = tax_frame
   
+  print(taxon_frame)
+  
   ncol_t = nrow(taxon_frame)
   #test_taxon = read_csv("test_csv.csv")
 
@@ -107,7 +109,7 @@ resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 sink()
 
 # test_taxon = list(barcodes = c(1234),
-               # fullname = c('Abies sibirica subsp. semenovii'))
+               # fullname = c('Monardella linoides subsp. erecta X australis'))
 
 # test_frame = do.call(data.frame, test_taxon)
 

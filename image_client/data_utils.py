@@ -378,25 +378,51 @@ class Timer:
 
 
 def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
+    """seperate_qualifiers: separates out the parsed taxa and the cf qualifier"""
+
     tax_frame['qualifier'] = pd.NA
 
     cf_mask = tax_frame[tax_col].str.contains(r'cf\.')
-
     # setting default to species qualifier
+
     tax_frame.loc[cf_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_mask, 'Species']
+
+    empty_spec_mask = tax_frame['Species'].isna() & cf_mask
+
+    tax_frame.loc[empty_spec_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[empty_spec_mask, 'Hybrid Species']
 
     # if the taxon string starts with cf. it is most likely a genus qualifier
     cf_genus = tax_frame[tax_col].str.contains(r'^cf\.')
 
-    tax_frame.loc[cf_genus, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_mask, 'Genus']
+    tax_frame.loc[cf_genus, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_genus, 'Genus']
+
+    empty_gen_mask = tax_frame['Genus'].isna() & cf_genus
+
+    tax_frame.loc[empty_gen_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[empty_gen_mask, 'Hybrid Genus']
+
+    # executing for subtaxa
+    cf_subtax_mask = tax_frame[tax_col].str.contains(r'cf\.') & \
+                     tax_frame[tax_col].str.contains(r'(var\.|subvar\.|subsp\.| f\.|subf\.)')
+
+
+    tax_frame.loc[cf_subtax_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_subtax_mask, 'Epithet 1']
+
+    cf_empty_subtax = cf_subtax_mask & tax_frame['Epithet 1'].isna()
+
+    tax_frame.loc[cf_empty_subtax, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_empty_subtax, 'Hybrid Epithet 1']
+
+    # removing trailing whitespace
+    tax_frame['qualifier'] = tax_frame['qualifier'].str.strip()
 
     return tax_frame
 
 
-# tax_frame = {"full_name": ["Fake cf. Fakus", "cf. Fakulan"], "Genus": ["Fake", "Fakulan"], "Species": ["Fakus", pd.NA]}
-#
+# tax_frame = {"full_name": ["Fake cf. Fakus", "Fakulans fake var. cf. fakinatus"],
+# "Genus": ["Fake", "Fakulans"], "Species": ["Fakus", "fake"], "Hybrid Species": [pd.NA, pd.NA],
+#              "Hybrid Genus": [pd.NA, pd.NA], 'Epithet 1': [pd.NA, 'fakinatus'], 'Hybrid Epithet': [pd.NA, pd.NA]}
+# #
 # tax_frame = pd.DataFrame(tax_frame)
-#
+# #
 # tax_frame = separate_qualifiers(tax_frame=tax_frame, tax_col='full_name')
-#
+# #
 # print(tax_frame)
