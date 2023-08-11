@@ -1,6 +1,2 @@
-  CatalogNumber                        fullname
-0     999999985         Armorphophallus titanum
-1     999999981       Arctostaphylos glandulosa
-2     999999982            Aesculus californica
-3     999999983             Monardella linoides
-4     999999984 Abies sibirica subsp. semenovii
+   barcodes       fullname
+0 999999984 Abies sibirica
