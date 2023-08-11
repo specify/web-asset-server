@@ -3,8 +3,10 @@ import sys
 import traceback
 import re
 
-from mysql.connector import errorcode
-import mysql.connector
+# from mysql.connector import errorcode
+# import mysql.connector
+import mariadb
+
 
 class DatabaseInconsistentError(Exception):
     pass
@@ -50,23 +52,19 @@ class DbUtils:
             self.logger.debug(f"Connecting to db {self.database_host}...")
 
             try:
-                self.cnx = mysql.connector.connect(user=self.database_user,
+                self.cnx = mariadb.connect(user=self.database_user,
                                                    password=self.database_password,
                                                    host=self.database_host,
                                                    port=self.database_port,
                                                    database=self.database_name)
-            except mysql.connector.Error as err:
-                if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            except mariadb.Error as err:
+                if err.errno == 1045:
                     self.logger.error(f"Starting client...")
-
                     self.logger.error("SQL: Access denied")
-                elif err.errno == errorcode.ER_BAD_DB_ERROR:
+                elif err.errno == 1049:
                     self.logger.error("Database does not exist")
                 else:
                     self.logger.error(err)
-                sys.exit(1)
-            except Exception as err:
-                self.logger.error(f"Unknown exception: {err}")
                 sys.exit(1)
 
             self.logger.info("Db connected")
@@ -105,7 +103,7 @@ class DbUtils:
 
     def get_cursor(self):
         self.connect()
-        return self.cnx.cursor()
+        return self.cnx.cursor(buffered=True)
 
     def execute(self, sql):
         cursor = self.get_cursor()
