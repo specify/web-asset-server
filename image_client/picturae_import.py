@@ -205,6 +205,7 @@ class DataOnboard(Importer):
         full_name = ""
         tax_name = ""
         gen_spec = ""
+        hybrid_base = ""
         if row[hyb_index] is False:
             columns1 = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
             columns2 = ['Genus', 'Species']
@@ -226,10 +227,27 @@ class DataOnboard(Importer):
         full_name = full_name.strip()
         gen_spec = gen_spec.strip()
         # creating taxon name
-        taxon_strings = full_name.split()
+        # creating temporary string in order to get tax order
+        separate_string = full_name.replace("cf.", "")
+        taxon_strings = separate_string.split()
+        print(taxon_strings)
         tax_name = taxon_strings[-1]
+        if row[hyb_index] is True:
+            if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
+                hybrid_base = full_name
+                full_name = " ".join(taxon_strings[:2])
+                print(full_name)
+                tax_name = " ".join(taxon_strings[2:])
+                print(tax_name)
+            else:
+                hybrid_base = full_name
+                full_name = taxon_strings[0]
+                print(full_name)
+                tax_name = " ".join(taxon_strings[1:])
+                print(tax_name)
 
-        return str(gen_spec), str(full_name), str(tax_name)
+
+        return str(gen_spec), str(full_name), str(tax_name), str(hybrid_base)
 
 
     def taxon_assign_defitem(self,taxon_string):
@@ -310,7 +328,19 @@ class DataOnboard(Importer):
         if records_dropped != 0:
             self.logger.info(f"{records_dropped} rows dropped due to taxon errors")
 
+        # re-consolidating hybrid column to fullname and removing hybrid_base column
+        hybrid_mask = self.record_full['hybrid_base'].notna()
+
+        self.record_full.loc[hybrid_mask, 'fullname'] = self.record_full.loc[hybrid_mask, 'hybrid_base']
+
+        self.record_full.drop(columns=['hybrid_base'])
+
+        print(self.record_full)
+
+        # executing qualifier seperator function
+
         self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
+
 
 
 
@@ -325,8 +355,9 @@ class DataOnboard(Importer):
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
                                                           format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
 
-        self.record_full[['gen_spec', 'fullname', 'taxname']] = self.record_full.apply(self.taxon_concat,
-                                                                           axis=1, result_type='expand')
+        self.record_full[['gen_spec', 'fullname',
+                          'taxname', 'hybrid_base']] = self.record_full.apply(self.taxon_concat,
+                                                                              axis=1, result_type='expand')
 
         # setting datatypes for columns
         string_list = self.record_full.columns.to_list()
@@ -516,7 +547,8 @@ class DataOnboard(Importer):
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
                        'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname',
-                       'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author']
+                       'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author',
+                       'name_matched', 'Hybrid Genus']
         index_list = []
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
@@ -532,10 +564,15 @@ class DataOnboard(Importer):
         self.gen_spec = row[index_list[11]]
         self.qualifier = row[index_list[12]]
         self.name_matched = row[index_list[13]]
-        self.genus = row[index_list[14]]
         self.family_name = row[index_list[15]]
         self.is_hybrid = row[index_list[16]]
         self.author = row[index_list[17]]
+        self.name_matched = row[index_list[18]]
+
+        if self.is_hybrid is False:
+            self.genus = row[index_list[14]]
+        else:
+            self.genus = row[19]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
@@ -573,7 +610,24 @@ class DataOnboard(Importer):
 
             # base value for gen spec is set as None so will work either way.
             # checking for genus id
+        if self.is_hybrid is False:
             if self.gen_spec_id is None:
+                self.genus_id = self.taxon_get(name=self.genus)
+
+                # adding genus name if missing
+                if self.genus_id is None:
+                    self.taxon_list.append(self.genus)
+
+                    # checking family id
+                    self.family_id = self.taxon_get(name=self.family_name)
+                    # adding family name to list
+                    if self.family_id is None:
+                        self.taxon_list.append(self.family_name)
+        if self.is_hybrid is True:
+            if self.gen_spec_id is None and self.genus != self.full_name:
+                self.genus_id = self.taxon_get(name=self.genus)
+            else:
+                self.genus = self.genus.split()[0]
                 self.genus_id = self.taxon_get(name=self.genus)
 
                 # adding genus name if missing
@@ -587,6 +641,24 @@ class DataOnboard(Importer):
                         self.taxon_list.append(self.family_name)
         else:
             pass
+    #
+    # def populate_hybrid(self):
+    #     """populate hybrid: creates a specialized taxon list for hybrid, which checks different rank levels in the taxon,
+    #             as genus must be uploaded before species , before subtaxa etc.."""
+    #
+    #     self.taxon_list = []
+    #     self.taxon_id = self.taxon_get(name=self.full_name)
+    #
+    #     if self.taxon_id is None:
+    #         self.taxon_list.append(self.full_name)
+    #         if self.full_name != self.gen_spec:
+    #
+    #
+
+
+    def check_hybrid(self):
+        first_part, second_part = self.full_name.split('X')
+        # append taxon full name
 
     def create_table_record(self, sql, is_test=False):
         """create_table_record:
@@ -1058,8 +1130,12 @@ class DataOnboard(Importer):
 
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
+
             self.create_agent_list(row)
-            self.populate_taxon()
+            if row['Hybrid'] is False:
+                self.populate_taxon()
+            else:
+                self.populate_hybrid()
             if self.taxon_id is None:
                 self.create_taxon()
 
@@ -1125,8 +1201,6 @@ class DataOnboard(Importer):
         self.col_clean()
 
         self.taxon_check_real()
-
-
 
         # checking if barcode record present in database
         self.barcode_has_record()
