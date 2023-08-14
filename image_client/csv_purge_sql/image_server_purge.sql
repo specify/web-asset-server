@@ -1,1 +1,1 @@
-DELETE FROM images WHERE datetime  > (now() - interval 20 day);
+DELETE FROM images WHERE datetime  >= "2023-08-14 13:34:23.691441" and datetime <= "2023-08-14 13:35:01.087562";

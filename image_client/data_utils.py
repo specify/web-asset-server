@@ -342,8 +342,8 @@ def create_timestamps(start_time):
         if csvfile.tell() == 0:
             writer.writeheader()
 
-            writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
-                             'UploadCode': random.randint(100000, 999999)})
+        writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
+                         'UploadCode': random.randint(100000, 999999)})
 
     print(f"The timestamps have been added to '{csv_file_path}'.")
 
@@ -429,8 +429,6 @@ def extract_after_subtax(text):
 
     return None
 
-new_text = extract_after_subtax("Monardella linoides subsp. erecta X fake")
-print(new_text)
 # tax_frame = {"full_name": ["Fake cf. Fakus", "Fakulans fake var. cf. fakinatus"],
 # "Genus": ["Fake", "Fakulans"], "Species": ["Fakus", "fake"], "Hybrid Species": [pd.NA, pd.NA],
 #              "Hybrid Genus": [pd.NA, pd.NA], 'Epithet 1': [pd.NA, 'fakinatus'], 'Hybrid Epithet': [pd.NA, pd.NA]}
