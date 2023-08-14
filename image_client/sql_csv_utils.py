@@ -1,7 +1,5 @@
 import pandas as pd
-from importer import Importer
-import traceback
-import picturae_config
+
 
 # static methods
 def create_name_sql(first_name: str, last_name: str, middle_initial: str, title: str):

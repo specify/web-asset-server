@@ -1,8 +1,7 @@
 """this file will be used to parse the data from Picturae into an uploadable format to Specify"""
-
 import atexit
-
-import pandas as pd
+import traceback
+import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 import time_utils
@@ -24,6 +23,7 @@ def time_stamper():
 
     # at exit run ending timestamp and append timestamp csv
     atexit.register(create_timestamps, start_time=starting_time_stamp)
+
 
 class DataOnboard(Importer):
     """DataOnboard:
@@ -258,8 +258,11 @@ class DataOnboard(Importer):
 
         return str(gen_spec), str(full_name), str(tax_name), str(hybrid_base)
 
-
-    def taxon_assign_defitem(self,taxon_string):
+    def taxon_assign_defitem(self, taxon_string):
+        """taxon_assign_defitme: assigns, taxon rank and treeitemid number,
+            based on subtrings present in taxon name.
+            args:
+                taxon_string: the taxon string or substring, which before assignment"""
 
         if " f. " in taxon_string:
             return 17, 260
@@ -275,7 +278,6 @@ class DataOnboard(Importer):
             return 12, 180
         else:
             return 13, 220
-
 
     def check_single_taxa(self, taxon_name, barcode):
         """check_single_taxa: designed to take in one taxaname and
@@ -303,8 +305,9 @@ class DataOnboard(Importer):
 
         self.parent_author = taxon_list[0]
 
-
     def taxon_check_real(self):
+        """Sends the concatenated taxon column, through TNRS, to match names,
+           with and without spelling mistakes, """
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
         pandas2ri.activate()
@@ -344,13 +347,9 @@ class DataOnboard(Importer):
 
         self.record_full.drop(columns=['hybrid_base'])
 
-
         # executing qualifier seperator function
 
         self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
-
-
-
 
     def col_clean(self):
         """will reformat and clean dataframe columns until ready for upload.
@@ -375,10 +374,6 @@ class DataOnboard(Importer):
         self.record_full = self.record_full.replace(['', None, 'nan', np.nan], pd.NA)
 
 
-
-
-
-
     # will split file into two files
     # after file is wrangled into clean importable form,
     # and QC protocols to follow before import
@@ -386,6 +381,7 @@ class DataOnboard(Importer):
 
     # In my opinion it is faster to make booleans now, and filter later in the process function,
     # but open to alternative solutions
+
 
     def barcode_has_record(self):
         """check if barcode / catalog number already in collectionobject table"""
@@ -602,7 +598,8 @@ class DataOnboard(Importer):
 
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
-        as genus must be uploaded before species , before subtaxa etc.."""
+        as genus must be uploaded before species , before subtaxa etc... has cases for hybrid plants,
+        several techniqeus used t"""
         self.gen_spec_id = None
         self.taxon_list = []
         self.taxon_id = self.taxon_get(name=self.full_name)
@@ -639,12 +636,7 @@ class DataOnboard(Importer):
                     self.genus_id = self.taxon_get(name=self.genus)
                 # if genus level cross
                 elif self.genus == self.full_name:
-                    # self.gen_spec = self.genus
-                    # self.gen_spec_id = self.taxon_get(name=self.gen_spec)
-                    # # setting genus as gen_spec
-                    # if self.gen_spec_id is None:
-                    #     self.taxon_list.append(self.gen_spec)
-                    # changing genus to first substring in genus col
+                    # taking only first genus cross as genus
                     self.genus = self.genus.split()[0]
                     self.genus_id = self.taxon_get(name=self.genus)
 
@@ -789,7 +781,7 @@ class DataOnboard(Importer):
 
             self.create_table_record(sql=sql)
 
-    def create_collectingevent(self):
+    def create_collecting_event(self):
         """create_collectingevent:
                 defines column and value list , runs them as
                 args through create_sql_string and create_table record
@@ -842,7 +834,8 @@ class DataOnboard(Importer):
     # temporarily creating exception list until reliable taxon protocol
     def create_taxon(self):
         """create_taxon: populates the taxon table iteratively by adding higher taxa first,
-                            before lower taxa"""
+                            before lower taxa. Assigns taxa ranks and TaxonTreedefItemID
+        """
         # for now do not upload
         parent_list = [self.full_name, self.gen_spec, self.genus, self.family_name]
 
@@ -1111,6 +1104,10 @@ class DataOnboard(Importer):
         """unhide_files:
                 will directly undo the result of hide_unwanted_files.
                 Removes substring `.hidden_` from all base filenames
+           args:
+                none
+           returns:
+                none
         """
         sla = os.path.sep
         folder_path = f'picturae_img/{self.date_use}{sla}'
@@ -1147,7 +1144,7 @@ class DataOnboard(Importer):
             if len(self.new_collector_list) > 0:
                 self.create_agent_id()
 
-            self.create_collectingevent()
+            self.create_collecting_event()
 
             self.create_collection_object()
 
@@ -1189,6 +1186,12 @@ class DataOnboard(Importer):
     def run_all_methods(self):
         """run_all_methods:
                         self-explanatory function, will run all function in class in sequential manner"""
+
+        # locking users out from the database
+        sql = """ALTER USER 'botanist'@'%'ACCOUNT LOCK;"""
+
+        self.create_table_record(sql)
+
         # create_test_images(list(range(999999981, 999999985)), date_string=self.date_use)
 
         # setting directory
@@ -1240,6 +1243,10 @@ class DataOnboard(Importer):
         # writing time stamps to txt file
 
         self.logger.info("process finished")
+
+        sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
+
+        self.create_table_record(sql)
 
 
 def master_run(date_string):
