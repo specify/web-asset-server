@@ -38,11 +38,10 @@ class CsvDatabase(Importer):
             self.logger.error(f"Connection Error: {e}")
         sql_temp = f'''CREATE TEMPORARY TABLE temp_leaf_nodes AS SELECT TaxonID FROM {database}.taxon WHERE TaxonID
                        NOT IN (SELECT DISTINCT ParentID FROM {database}.taxon
-                       WHERE ParentID IS NOT NULL AND TimestampCreated >= "{timestamp1}" AND TimestampCreated <= "{timestamp2}") 
+                       WHERE ParentID IS NOT NULL) 
                        AND TimestampCreated >= "{timestamp1}" AND TimestampCreated <= "{timestamp2}";'''
 
-        sql_del = f'''DELETE FROM {database}.taxon WHERE TaxonID IN (SELECT TaxonID FROM temp_leaf_nodes) 
-                     AND TimestampCreated >= "{timestamp1}" AND TimestampCreated <= "{timestamp2}";'''
+        sql_del = f'''DELETE FROM {database}.taxon WHERE TaxonID IN (SELECT TaxonID FROM temp_leaf_nodes);'''
 
         sql_drop = f'''DROP TEMPORARY TABLE IF EXISTS temp_leaf_nodes;'''
         rows_affected = 0
