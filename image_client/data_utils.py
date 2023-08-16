@@ -382,37 +382,44 @@ def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
 
     tax_frame['qualifier'] = pd.NA
 
-    cf_mask = tax_frame[tax_col].str.contains(r'cf\.')
+    qual_regex = ['cf.', 'aff.']
+    for qual in qual_regex:
+        cf_mask = tax_frame[tax_col].str.contains(f"{qual}")
+        if len(cf_mask) > 0:
     # setting default to species qualifier
 
-    tax_frame.loc[cf_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_mask, 'Species']
+            tax_frame.loc[cf_mask, 'qualifier'] = qual
 
-    empty_spec_mask = tax_frame['Species'].isna() & cf_mask
+            #empty_spec_mask = tax_frame['Species'].isna() & cf_mask
+            #
+            # tax_frame.loc[empty_spec_mask, 'qualifier'] = tax_frame.loc[empty_spec_mask, 'Hybrid Species']
+            #
+            # # if the taxon string starts with cf. it is most likely a genus qualifier
+            # cf_genus = tax_frame[tax_col].str.contains(f'^{qual}')
+            #
+            # tax_frame.loc[cf_genus, 'qualifier'] = tax_frame.loc[cf_genus, 'Genus']
+            #
+            # empty_gen_mask = tax_frame['Genus'].isna() & cf_genus
+            #
+            # tax_frame.loc[empty_gen_mask, 'qualifier'] = tax_frame.loc[empty_gen_mask, 'Hybrid Genus']
+            #
+            # # executing for subtaxa
+            # cf_subtax_mask = tax_frame[tax_col].str.contains(f'{qual}') & \
+            #                  tax_frame[tax_col].str.contains(r'var\.|subvar\.|subsp\.| f\.|subf\.')
+            #
+            #
+            # tax_frame.loc[cf_subtax_mask, 'qualifier'] = tax_frame.loc[cf_subtax_mask, 'Epithet 1']
+            #
+            # cf_empty_subtax = cf_subtax_mask & tax_frame['Epithet 1'].isna()
+            #
+            # tax_frame.loc[cf_empty_subtax, 'qualifier'] = tax_frame.loc[cf_empty_subtax, 'Hybrid Epithet 1']
 
-    tax_frame.loc[empty_spec_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[empty_spec_mask, 'Hybrid Species']
-
-    # if the taxon string starts with cf. it is most likely a genus qualifier
-    cf_genus = tax_frame[tax_col].str.contains(r'^cf\.')
-
-    tax_frame.loc[cf_genus, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_genus, 'Genus']
-
-    empty_gen_mask = tax_frame['Genus'].isna() & cf_genus
-
-    tax_frame.loc[empty_gen_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[empty_gen_mask, 'Hybrid Genus']
-
-    # executing for subtaxa
-    cf_subtax_mask = tax_frame[tax_col].str.contains(r'cf\.') & \
-                     tax_frame[tax_col].str.contains(r'(var\.|subvar\.|subsp\.| f\.|subf\.)')
-
-
-    tax_frame.loc[cf_subtax_mask, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_subtax_mask, 'Epithet 1']
-
-    cf_empty_subtax = cf_subtax_mask & tax_frame['Epithet 1'].isna()
-
-    tax_frame.loc[cf_empty_subtax, 'qualifier'] = 'cf. ' + tax_frame.loc[cf_empty_subtax, 'Hybrid Epithet 1']
 
     # removing trailing whitespace
     tax_frame['qualifier'] = tax_frame['qualifier'].str.strip()
+
+    tax_frame[tax_col] = tax_frame[tax_col].str.replace(' cf.', '', regex=False)
+    tax_frame[tax_col] = tax_frame[tax_col].str.replace(' aff.', '', regex=False)
 
     return tax_frame
 

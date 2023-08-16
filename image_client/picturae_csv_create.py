@@ -209,7 +209,9 @@ class CsvCreatePicturae(Importer):
             gen_spec = gen_spec.strip()
             # creating taxon name
             # creating temporary string in order to get tax order
-            separate_string = full_name.replace("cf.", "")
+
+            separate_string = full_name.replace(" cf.", "")
+            separate_string = separate_string.replace(" aff.", "")
             taxon_strings = separate_string.split()
 
             # changing name variable based on condition
@@ -220,12 +222,21 @@ class CsvCreatePicturae(Importer):
                     tax_name = " ".join(taxon_strings[-2:])
                 elif gen_spec == full_name and genus != full_name:
                     tax_name = " ".join(taxon_strings[-3:])
+                    tax_name = tax_name.lower()
                 else:
                     tax_name = extract_after_subtax(separate_string)
-            if row[hyb_index] is True:
-                if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
+                    tax_name = tax_name.lower()
+            if is_hybrid is True:
+                if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name) \
+                     and len(taxon_strings) < 8:
                     hybrid_base = full_name
                     full_name = " ".join(taxon_strings[:2])
+                    # will have to revisit this when actual data recieved ,
+                    # although this kind of cross is extremely rare Gen spec var. a x Gen spec var. b
+                elif ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name) \
+                        and len(taxon_strings) >= 8:
+                    hybrid_base = full_name
+                    full_name = taxon_strings[0]
                 else:
                     hybrid_base = full_name
                     full_name = taxon_strings[0]
@@ -274,9 +285,11 @@ class CsvCreatePicturae(Importer):
 
             self.record_full.drop(columns=['hybrid_base'])
 
-            # executing qualifier seperator function
+            # executing qualifier separator function
 
             self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
+
+            print(self.record_full)
 
 
         def col_clean(self):
