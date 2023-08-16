@@ -19,3 +19,5 @@ DELETE FROM casbotany.taxon WHERE TaxonID IN (SELECT TaxonID FROM temp_leaf_node
 
 
 DROP TEMPORARY TABLE IF EXISTS temp_leaf_nodes;
+
+ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;

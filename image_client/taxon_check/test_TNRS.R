@@ -63,10 +63,10 @@ process_taxon_resolve <- function(tax_frame){
   
   # Display just the main results fields
   results$match.score <- format(round(as.numeric(results $Overall_score),2), nsmall=2)
-
   
   results[ 1:10, c('Name_submitted', 'match.score', 'Name_matched', 'Taxonomic_status', 
                    'Accepted_name', 'Unmatched_terms', 'Accepted_name_author')]
+  
   
   results = results %>% rename('fullname'='Name_submitted', 
                                'name_matched' = 'Name_matched',
@@ -77,7 +77,7 @@ process_taxon_resolve <- function(tax_frame){
                                'accepted_author' = 'Accepted_name_author')
   
 
-  hand_check_match = results %>% filter(overall_score < .985) %>% 
+ hand_check_match = results %>% filter(overall_score < .985) %>% 
                      select('fullname', 'name_matched', 
                             'overall_score', 'unmatched_terms')
   
@@ -109,7 +109,7 @@ resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 sink()
 
 # test_taxon = list(barcodes = c(1234),
-               # fullname = c('Monardella linoides subsp. erecta X australis'))
+              # fullname = c('Uvariopsis dicaprio'))
 
 # test_frame = do.call(data.frame, test_taxon)
 

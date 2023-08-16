@@ -1,4 +1,7 @@
-"""this file will be used to parse the data from Picturae into an uploadable format to Specify"""
+"""this takes the csv data from picturae_csv_create, and parses the fields on a row by row basis into new db records,
+    filling in the necessary relational tables, and uploading attached images to image server.
+    Used as part of picturae_project for upload post-imaging, to create records to be updated post OCR and transcription
+"""
 import atexit
 import traceback
 import picturae_config
@@ -13,11 +16,16 @@ from datetime import datetime
 import logging
 from sql_csv_utils import *
 from importer import Importer
+from picturae_csv_create import CsvCreatePicturae
 
 upload_time = datetime.now()
 
 
 def time_stamper():
+    """time_stamper: runs timestamp at beginning of script and at exit,
+                    uses the create_timestamps function from data_utils
+                    to append timestamps with codes to csvs,
+                    for record purging"""
     # marking starting time stamp
     starting_time_stamp = datetime.now()
 
@@ -38,21 +46,17 @@ class DataOnboard(Importer):
         self.logger = logging.getLogger('DataOnboard')
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
-        # manual taxon list, list of skipped taxons to be manually verified
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
                        'new_taxon_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
 
-        self.manual_taxon_dict = {}
         self.no_match_dict = {}
 
         file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
         self.record_full = pd.read_csv(file_path)
-
-
 
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -69,8 +73,9 @@ class DataOnboard(Importer):
 
         self.created_by_agent = 99726
 
-
     def unlock_account(self):
+        """function to be called during unexpected interruption of upload,
+           so DB doesn't accidently remain locked"""
 
         sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
 
@@ -78,7 +83,10 @@ class DataOnboard(Importer):
 
 
     def col_dtypes(self):
-        """just in case csv import changes column dtypes, resetting at top of file"""
+        """just in case csv import changes column dtypes, resetting at top of file,
+            re-standardizing null and nan records to all be pd.NA and
+            evaluate strings into booleans
+        """
         # setting datatypes for columns
         string_list = self.record_full.columns.to_list()
 
@@ -90,9 +98,10 @@ class DataOnboard(Importer):
 
     def taxon_assign_defitem(self, taxon_string):
         """taxon_assign_defitme: assigns, taxon rank and treeitemid number,
-            based on subtrings present in taxon name.
+                                based on subtrings present in taxon name.
             args:
-                taxon_string: the taxon string or substring, which before assignment"""
+                taxon_string: the taxon string or substring, which before assignment
+        """
 
         if " f. " in taxon_string:
             return 17, 260
@@ -111,7 +120,14 @@ class DataOnboard(Importer):
 
     def check_single_taxa(self, taxon_name, barcode):
         """check_single_taxa: designed to take in one taxaname and
-           do a TNRS operation on it to get an author for iterative higher taxa"""
+           do a TNRS operation on it to get an author for iterative higher taxa.
+
+           args:
+                taxon_name: a string of a taxon name, or a parsed genus or family, used to control
+                            for unconfirmed species, and spelling mistakes.
+                barcode: the string barcode of the taxon name associated with each photo.
+                         used to re-merge dataframes after TNRS and keep track of the record in R.
+        """
         taxon_frame = {"barcodes": [barcode], "fullname": [taxon_name]}
 
         taxon_frame = pd.DataFrame(taxon_frame)
@@ -135,11 +151,12 @@ class DataOnboard(Importer):
 
         self.parent_author = taxon_list[0]
 
-
-    # think of finding way to make this function logic not so repetitive
+     # think of finding way to make this function logic not so repetitive
     def create_file_list(self):
-        """creates a list of imagepaths and barcodes for upload,
-        after checking conditions established to prevent overwriting data functions"""
+        """create_file_list: creates a list of imagepaths and barcodes for upload,
+                                after checking conditions established to prevent
+                                overwriting data functions
+        """
         for index, row in self.record_full.iterrows():
             if not row['image_valid']:
                 raise ValueError(f"image {row['image_path']} is not valid ")
@@ -232,6 +249,7 @@ class DataOnboard(Importer):
                 key_col: column on which to match values
                 match: value with which to match key_col
         """
+        sql = ""
         if match_type == str:
             sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
         elif match_type == int:
@@ -295,13 +313,16 @@ class DataOnboard(Importer):
 
     def taxon_get(self, name):
         sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{name}";'''
-        id = self.specify_db_connection.get_one_record(sql)
-        return id
+        result_id = self.specify_db_connection.get_one_record(sql)
+        return result_id
 
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
-        as genus must be uploaded before species , before subtaxa etc... has cases for hybrid plants,
-        several techniqeus used t"""
+                         as genus must be uploaded before species , before subtaxa etc...
+                         has cases for hybrid plants, uses regex to seperate out subtaxa hybrids,
+                          uses parsed lengths to seperate out genus level and species level hybrids.
+                        cf. qualifiers already seperated, so less risk of confounding notations.
+        """
         self.gen_spec_id = None
         self.taxon_list = []
         self.taxon_id = self.taxon_get(name=self.full_name)
@@ -354,8 +375,6 @@ class DataOnboard(Importer):
         else:
             pass
 
-
-
     def create_table_record(self, sql, is_test=False):
         """create_table_record:
                general code for the inserting of a new record into any table on casbotany.
@@ -395,7 +414,8 @@ class DataOnboard(Importer):
 
     def create_locality_record(self):
         """create_locality_record:
-               defines column and value list , runs them as args through create_sql_string and create_table record
+               defines column and value list , runs them as args
+               through create_sql_string and create_table record
                in order to add new locality record to database
         """
 
@@ -554,7 +574,6 @@ class DataOnboard(Importer):
             else:
                 rank_end = taxa_rank.split()[-1]
 
-            print(rank_end)
             author_insert = self.author
 
             if rank_name != self.family_name:
@@ -590,7 +609,6 @@ class DataOnboard(Importer):
                            'ModifiedByAgentID',
                            'CreatedByAgentID',
                            'TaxonTreeDefItemID']
-
 
             value_list = [f"{time_utils.get_pst_time_now_string()}",
                           f"{time_utils.get_pst_time_now_string()}",
@@ -686,10 +704,10 @@ class DataOnboard(Importer):
 
         self.collection_ob_id = self.populate_sql(tab_name='collectionobject', id_col='CollectionObjectID',
                                                   key_col='GUID', match=self.collection_ob_guid)
-
+        print(self.full_name)
         self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
                                           key_col='FullName', match=self.full_name)
-
+        print(self.taxon_id)
         if self.taxon_id is not None:
 
             column_list = ['TimestampCreated',
@@ -699,7 +717,7 @@ class DataOnboard(Importer):
                            # 'DeterminedDate',
                            'DeterminedDatePrecision',
                            'IsCurrent',
-                           # 'Qualifier',
+                           'Qualifier',
                            'GUID',
                            'TaxonID',
                            'CollectionObjectID',
@@ -714,6 +732,7 @@ class DataOnboard(Importer):
                           4,
                           1,
                           True,
+                          f"{self.qualifier}",
                           f"{self.determination_guid}",
                           f"{self.taxon_id}",
                           f"{self.collection_ob_id}",
@@ -908,7 +927,6 @@ class DataOnboard(Importer):
 
         self.create_table_record(sql)
 
-
         # starting purge timer
         time_stamper()
 
@@ -923,8 +941,6 @@ class DataOnboard(Importer):
         # uploading attachments
         self.upload_attachments()
 
-        write_dict_to_csv(tax_dict=self.manual_taxon_dict, filename=f"taxon_check/unmatched_taxa/"
-                          f"manual_taxa_{self.date_use}.csv")
         # writing time stamps to txt file
 
         self.logger.info("process finished")
@@ -934,9 +950,16 @@ class DataOnboard(Importer):
         self.create_table_record(sql)
 
 
-def master_run(date_string):
+def master_run(date_string: str, run_both: bool):
+    # running picturae_csv create and creating instance
+    if run_both is True:
+        csv_create_int = CsvCreatePicturae(date_string=date_string)
+        csv_create_int.run_all()
+        del csv_create_int
+    # running picturae_import instance and running all methods
     dataonboard_int = DataOnboard(date_string=date_string)
     dataonboard_int.run_all_methods()
+    del dataonboard_int
 
 
-master_run(date_string="2023-06-28")
+master_run(date_string="2023-06-28", run_both=True)
