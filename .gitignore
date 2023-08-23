@@ -18,6 +18,7 @@ settings.development.py
 /image_client/server_host_settings.development.py
 /image_client/server_host_settings.production.py
 /image_client/server_host_settings.py
+/image_client/picturae_config.py
 /data
 /env
 *.JPG

@@ -40,6 +40,7 @@ class DataOnboard(Importer):
            specimen sheet records into the casbotany database,
            along with attached images
     """
+
     def __init__(self, date_string):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
@@ -81,10 +82,9 @@ class DataOnboard(Importer):
 
         self.create_table_record(sql)
 
-
     def col_dtypes(self):
         """just in case csv import changes column dtypes, resetting at top of file,
-            re-standardizing null and nan records to all be pd.NA and
+            re-standardizing null and nan records to all be pd.NA() and
             evaluate strings into booleans
         """
         # setting datatypes for columns
@@ -151,7 +151,7 @@ class DataOnboard(Importer):
 
         self.parent_author = taxon_list[0]
 
-     # think of finding way to make this function logic not so repetitive
+    # think of finding way to make this function logic not so repetitive
     def create_file_list(self):
         """create_file_list: creates a list of imagepaths and barcodes for upload,
                                 after checking conditions established to prevent
@@ -222,7 +222,6 @@ class DataOnboard(Importer):
 
                 first_name, last_name, title, middle = elements
 
-
                 sql = create_name_sql(first_name, last_name, middle, title)
 
                 agent_id = self.specify_db_connection.get_one_record(sql)
@@ -273,6 +272,8 @@ class DataOnboard(Importer):
                        'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname',
                        'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author',
                        'name_matched', 'Hybrid Genus']
+
+        # print(self.full_name)
         index_list = []
         for column in column_list:
             barcode_index = self.record_full.columns.get_loc(column)
@@ -318,9 +319,9 @@ class DataOnboard(Importer):
 
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
-                         as genus must be uploaded before species , before subtaxa etc...
-                         has cases for hybrid plants, uses regex to seperate out subtaxa hybrids,
-                          uses parsed lengths to seperate out genus level and species level hybrids.
+                         as genus must be uploaded before species , before sub-taxa etc...
+                         has cases for hybrid plants, uses regex to separate out sub-taxa hybrids,
+                          uses parsed lengths to separate out genus level and species level hybrids.
                         cf. qualifiers already seperated, so less risk of confounding notations.
         """
         self.gen_spec_id = None
@@ -510,7 +511,7 @@ class DataOnboard(Importer):
                 in order to add new collectingevent record to database.
          """
 
-        # repulling locality id to reflect update
+        # re-pulling locality id to reflect update
 
         self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
                                              key_col='LocalityName', match=self.locality)
@@ -567,7 +568,7 @@ class DataOnboard(Importer):
         for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
             taxon_guid = uuid4()
             rank_name = taxa_rank
-            parent_id = self.taxon_get(name=parent_list[index+1])
+            parent_id = self.taxon_get(name=parent_list[index + 1])
             table = 'taxon'
             if taxa_rank == self.full_name:
                 rank_end = self.tax_name
@@ -704,10 +705,9 @@ class DataOnboard(Importer):
 
         self.collection_ob_id = self.populate_sql(tab_name='collectionobject', id_col='CollectionObjectID',
                                                   key_col='GUID', match=self.collection_ob_guid)
-        print(self.full_name)
+
         self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
                                           key_col='FullName', match=self.full_name)
-        print(self.taxon_id)
         if self.taxon_id is not None:
 
             column_list = ['TimestampCreated',
@@ -762,7 +762,6 @@ class DataOnboard(Importer):
         """
         primary_bool = [True, False, False, False, False]
         for index, agent_dict in enumerate(self.full_collector_list):
-
             table = 'collector'
 
             sql = create_name_sql(first_name=agent_dict["collector_first_name"],

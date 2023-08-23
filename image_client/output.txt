@@ -1,2 +1,0 @@
-   barcodes       fullname
-0 999999984 Abies sibirica

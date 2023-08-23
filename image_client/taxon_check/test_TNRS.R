@@ -19,8 +19,6 @@ process_taxon_resolve <- function(tax_frame){
   
   taxon_frame = tax_frame
   
-  print(taxon_frame)
-  
   ncol_t = nrow(taxon_frame)
   #test_taxon = read_csv("test_csv.csv")
 
@@ -75,9 +73,9 @@ process_taxon_resolve <- function(tax_frame){
                                'unmatched_terms'= 'Unmatched_terms',
                                'overall_score' = 'Overall_score',
                                'accepted_author' = 'Accepted_name_author')
-  
 
- hand_check_match = results %>% filter(overall_score < .985) %>% 
+
+ hand_check_match = results %>% filter(overall_score < .99) %>% 
                      select('fullname', 'name_matched', 
                             'overall_score', 'unmatched_terms')
   
@@ -97,7 +95,7 @@ process_taxon_resolve <- function(tax_frame){
   
   
   
-  results = results %>% filter(overall_score > .99) %>% 
+  results = results %>% filter(overall_score >= .99) %>% 
             select('fullname', 'name_matched', 'accepted_author','overall_score')
   
   return(results)
@@ -109,7 +107,7 @@ resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 sink()
 
 # test_taxon = list(barcodes = c(1234),
-              # fullname = c('Uvariopsis dicaprio'))
+                 # fullname = c('Rafflesia arnoldi var. atjehensis'))
 
 # test_frame = do.call(data.frame, test_taxon)
 

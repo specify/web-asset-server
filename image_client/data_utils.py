@@ -418,10 +418,17 @@ def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
     # removing trailing whitespace
     tax_frame['qualifier'] = tax_frame['qualifier'].str.strip()
 
-    tax_frame[tax_col] = tax_frame[tax_col].str.replace(' cf.', '', regex=False)
-    tax_frame[tax_col] = tax_frame[tax_col].str.replace(' aff.', '', regex=False)
+    tax_frame[tax_col] = tax_frame[tax_col].apply(remove_qualifiers)
 
     return tax_frame
+
+def remove_qualifiers(tax_string: str):
+    qual_list = [" cf.", "cf.", "vel aff.", " vel aff.", " aff.", "aff."]
+    for qual_str in qual_list:
+        tax_string = tax_string.replace(qual_str, "")
+
+    return tax_string
+
 
 
 def extract_after_subtax(text):
@@ -435,6 +442,7 @@ def extract_after_subtax(text):
             return extracted_text
 
     return None
+
 
 # tax_frame = {"full_name": ["Fake cf. Fakus", "Fakulans fake var. cf. fakinatus"],
 # "Genus": ["Fake", "Fakulans"], "Species": ["Fakus", "fake"], "Hybrid Species": [pd.NA, pd.NA],
