@@ -1,5 +1,7 @@
 import mysql.connector
 from mysql.connector import errorcode
+from retrying import retry
+
 import settings
 from datetime import datetime
 import logging
@@ -137,14 +139,22 @@ class ImageDb():
         self.cnx.commit()
         cursor.close()
 
+    @retry(retry_on_exception=lambda e: isinstance(e, Exception), stop_max_attempt_number=3)
     def update_redacted(self, internal_filename, is_redacted):
-        cursor = self.get_cursor()
         sql = f"""
         update images set redacted = {is_redacted} where internal_filename = '{internal_filename}' 
         """
-        print(f"updating: {sql}")
+
+        logging.debug(f"updating stop 0: {sql}")
+        cursor = self.get_cursor()
+        logging.debug(f"updating stop 1")
+
         cursor.execute(sql)
+        logging.debug(f"updating stop 2")
+
         self.cnx.commit()
+        logging.debug(f"updating stop 3")
+
         cursor.close()
 
     def get_record(self, where_clause):
