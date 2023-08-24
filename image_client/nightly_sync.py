@@ -54,11 +54,9 @@ def do_import(collection_name,specify_db_connection):
     for (internal_filename, redacted) in cursor:
         found_tuples.append((internal_filename, redacted))
     cursor.close()
-    MAX_RETRIES = 10
     for (internal_filename, redacted) in found_tuples:
         next_record = False
-        retry_count = 0
-        while next_record is False and retry_count < MAX_RETRIES:
+        while next_record is False:
             try:
                 redact(internal_filename, redacted)
                 next_record = True
@@ -70,8 +68,6 @@ def do_import(collection_name,specify_db_connection):
                 print(f"Error, probably sql {e}", file=sys.stderr, flush=True)
                 print(f"exception type: {type(e).__name__}", file=sys.stderr, flush=True)
 
-
-                retry_count += 1
 
     return record_list
 

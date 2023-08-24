@@ -18,10 +18,22 @@ class ImageDb():
         if settings.DEBUG:
             print(msg)
 
+    def retry_if_operational_error(exception):
+        pass
+
+    @retry(retry_on_exception=retry_if_operational_error,
+           exception=mysql.connector.OperationalError,
+           tries=3,
+           backoff=2)
     def get_cursor(self):
-        if self.cnx is None:
-            self.connect()
-        return self.cnx.cursor(buffered=True)
+        try:
+            if self.cnx is None:
+                self.connect()
+            return self.cnx.cursor(buffered=True)
+        except mysql.connector.OperationalError as e:
+            logging.warning("Failed to connect, resetting DB connection and sleeping")
+            self.reset_connection()
+            raise e
 
     def reset_connection(self):
         self.log(f"Resetting connection to {settings.SQL_HOST}")
@@ -37,13 +49,14 @@ class ImageDb():
 
         try:
             self.cnx = mysql.connector.connect(user=settings.SQL_USER,
-                                          password=settings.SQL_PASSWORD,
-                                          host=settings.SQL_HOST,
-                                          port=settings.SQL_PORT,
-                                          database=settings.SQL_DATABASE)
+                                               password=settings.SQL_PASSWORD,
+                                               host=settings.SQL_HOST,
+                                               port=settings.SQL_PORT,
+                                               database=settings.SQL_DATABASE)
         except mysql.connector.Error as err:
             if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-                self.log(f"SQL: Access denied to image server database. host: {settings.SQL_HOST} user: {settings.SQL_USER}")
+                self.log(
+                    f"SQL: Access denied to image server database. host: {settings.SQL_HOST} user: {settings.SQL_USER}")
             elif err.errno == errorcode.ER_BAD_DB_ERROR:
                 self.log("Database does not exist")
             else:
@@ -101,7 +114,6 @@ class ImageDb():
             cursor.execute("ALTER TABLE images ADD COLUMN orig_md5 CHAR(32)")
 
         cursor.close()
-
 
     def create_image_record(self,
                             original_filename,
@@ -242,7 +254,7 @@ class ImageDb():
         record_list = []
         for (
                 id, original_filename, url, universal_url, internal_filename, collection, original_path, notes,
-                redacted, datetime_record,orig_md5) in cursor:
+                redacted, datetime_record, orig_md5) in cursor:
             record_list.append({'id': id,
                                 'original_filename': original_filename,
                                 'url': url,
@@ -272,7 +284,6 @@ class ImageDb():
         record_list = self.get_image_record_by_pattern(md5, 'orig_md5', True, collection)
         return record_list
 
-
     def delete_image_record(self, internal_filename):
         cursor = self.get_cursor()
 
@@ -283,14 +294,12 @@ class ImageDb():
         self.cnx.commit()
         cursor.close()
 
-    def execute(self,sql):
+    def execute(self, sql):
         cursor = self.get_cursor()
         logging.debug(f"SQL: {sql}")
         cursor.execute(sql)
         self.cnx.commit()
         cursor.close()
-
-
 
     def get_collection_list(self):
         cursor = self.get_cursor()
