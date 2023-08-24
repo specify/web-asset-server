@@ -21,8 +21,9 @@ class ImageDb():
     def retry_if_operational_error(exception):
         pass
 
-    @retry(exceptions=mysql.connector.OperationalError,tries=3,
-           backoff=2)
+ 
+    @retry(retry_on_exception=lambda e: isinstance(e, mysql.connector.OperationalError), stop_max_attempt_number=3,
+           wait_exponential_multiplier=2)
     def get_cursor(self):
         try:
             if self.cnx is None:
