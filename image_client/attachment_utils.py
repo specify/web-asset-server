@@ -10,6 +10,21 @@ class AttachmentUtils:
     def __init__(self, db_utils):
         self.db_utils = db_utils
 
+    def get_collectionobjectid_from_filename(self, attachment_location):
+        sql = f"""
+        select cat.CollectionObjectID
+               from attachment as at
+               , collectionobjectattachment as cat
+
+               where at.AttachmentLocation='{attachment_location}'
+        and cat.AttachmentId = at.AttachmentId
+        """
+        coid = self.db_utils.get_one_record(sql)
+        logging.debug(f"Got collectionObjectId: {coid}")
+
+        return coid
+
+
     def get_attachmentid_from_filepath(self, orig_filepath):
         orig_filepath = repr(orig_filepath)
         sql = f"""
@@ -99,11 +114,12 @@ class AttachmentUtils:
         sql = f"select max(ordinal) from collectionobjectattachment where CollectionObjectID={collection_object_id}"
         return self.db_utils.get_one_record(sql)
 
+
     def get_is_attachment_redacted(self, internal_id):
         sql = f"""
-            select a.AttachmentID,a.ispublic  from attachment a 
+            select a.AttachmentID,a.ispublic  from attachment a
             where AttachmentLocation='{internal_id}'
-    
+
             """
         cursor = self.db_utils.get_cursor()
 
@@ -121,6 +137,7 @@ class AttachmentUtils:
             if retval is False or retval == 0:
                 return True
         return False
+    
 
     def get_is_collection_object_redacted(self, collection_object_id):
         sql = f"""SELECT co.YesNo2          AS `CO redact locality`
