@@ -3,14 +3,14 @@ from attachment_utils import AttachmentUtils
 from db_utils import DbUtils
 import botany_importer_config
 import ich_importer_config
-
+import traceback
 import logging
-from time import sleep
 import sys
+from typing import Optional
 
 image_db = None
 botany_importer = None
-attachment_utils = None
+attachment_utils: Optional[AttachmentUtils] = None
 
 
 def get_specify_state(internal_filename):
@@ -97,6 +97,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        traceback.print_exc()
 
 

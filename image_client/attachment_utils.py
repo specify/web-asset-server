@@ -137,7 +137,7 @@ class AttachmentUtils:
             if retval is False or retval == 0:
                 return True
         return False
-    
+
 
     def get_is_collection_object_redacted(self, collection_object_id):
         sql = f"""SELECT co.YesNo2          AS `CO redact locality`
@@ -147,7 +147,6 @@ class AttachmentUtils:
                  LEFT JOIN casbotany.determination de ON co.CollectionObjectID = de.CollectionObjectID AND de.IsCurrent = TRUE
                  LEFT JOIN casbotany.vtaxon2 vt ON de.TaxonID = vt.TaxonID
                  LEFT JOIN casbotany.vtaxon2 vta ON de.PreferredTaxonID = vta.taxonid
-                 LEFT JOIN casbotany.collectionobjectattachment coa ON co.CollectionObjectID = coa.CollectionObjectID
         WHERE co.CollectionObjectID = {collection_object_id};"""
         logging.debug(f"isredacted sql: {sql}")
         cursor = self.db_utils.get_cursor()
