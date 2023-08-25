@@ -21,7 +21,7 @@ class ImageDb():
     def retry_if_operational_error(exception):
         pass
 
- 
+
     @retry(retry_on_exception=lambda e: isinstance(e, mysql.connector.OperationalError), stop_max_attempt_number=3,
            wait_exponential_multiplier=2)
     def get_cursor(self):
