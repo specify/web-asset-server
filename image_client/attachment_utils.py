@@ -148,7 +148,7 @@ class AttachmentUtils:
                  LEFT JOIN casbotany.vtaxon2 vt ON de.TaxonID = vt.TaxonID
                  LEFT JOIN casbotany.vtaxon2 vta ON de.PreferredTaxonID = vta.taxonid
         WHERE co.CollectionObjectID = {collection_object_id};"""
-        logging.debug(f"isredacted sql: {sql}")
+        # logging.debug(f"isredacted sql: {sql}")
         cursor = self.db_utils.get_cursor()
 
         cursor.execute(sql)
