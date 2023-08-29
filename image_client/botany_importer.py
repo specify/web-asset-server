@@ -25,6 +25,7 @@ class BotanyImporter(Importer):
     def __init__(self):
         self.logger = logging.getLogger('Client.BotanyImporter')
         super().__init__(botany_importer_config, "Botany")
+        print("now for the initiation ritual")
 
         # limit is for debugging
         dir_tools = DirTools(self.build_filename_map, limit=None)
@@ -35,6 +36,7 @@ class BotanyImporter(Importer):
         # FILENAME = "bio_importer.bin"
         # if not os.path.exists(FILENAME):
         for cur_dir in botany_importer_config.BOTANY_SCAN_FOLDERS:
+            print("scanning it")
             cur_dir = os.path.join(botany_importer_config.PREFIX, botany_importer_config.BOTANY_PREFIX, cur_dir)
             print(f"Scanning: {cur_dir}")
             dir_tools.process_files_or_directories_recursive(cur_dir)
@@ -48,10 +50,8 @@ class BotanyImporter(Importer):
     def process_loaded_files(self):
         for barcode in self.barcode_map.keys():
             filename_list = []
-
             for cur_filepath in self.barcode_map[barcode]:
                 filename_list.append(cur_filepath)
-            print(filename_list)
             self.process_barcode(barcode, filename_list)
 
     def process_barcode(self, barcode, filepath_list):

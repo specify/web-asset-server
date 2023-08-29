@@ -7,32 +7,15 @@ import traceback
 import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
-import time_utils
 from uuid import uuid4
 from data_utils import *
-from casbotany_sql_lite import *
-from datetime import date
-from datetime import datetime
 import logging
 from sql_csv_utils import *
 from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
+from sql_csv_utils import generate_token
 
-upload_time = datetime.now()
-
-
-def time_stamper():
-    """time_stamper: runs timestamp at beginning of script and at exit,
-                    uses the create_timestamps function from data_utils
-                    to append timestamps with codes to csvs,
-                    for record purging"""
-    # marking starting time stamp
-    starting_time_stamp = datetime.now()
-
-    # at exit run ending timestamp and append timestamp csv
-    atexit.register(create_timestamps, start_time=starting_time_stamp)
-
-
+from picturae_csv_create import starting_time_stamp
 class DataOnboard(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -48,16 +31,18 @@ class DataOnboard(Importer):
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'new_taxon_list']
+                       'taxon_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
 
         self.no_match_dict = {}
 
-        file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
+        self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
-        self.record_full = pd.read_csv(file_path)
+        self.record_full = pd.read_csv(self.file_path)
+
+        self.batch_size = len(self.record_full)
 
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -73,6 +58,39 @@ class DataOnboard(Importer):
             setattr(self, param, None)
 
         self.created_by_agent = 99726
+
+        self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
+
+
+    def run_timestamps(self, batch_size: int):
+        """updating md5 fields for new taxon and taxon mismatch batches"""
+        ending_time_stamp = datetime.now()
+
+        sql = create_timestamps(start_time=starting_time_stamp, end_time=ending_time_stamp,
+                                batch_md5=self.batch_md5, batch_size=batch_size)
+
+        self.create_table_record(sql)
+
+        condition = f'''WHERE TimestampCreated >= "{starting_time_stamp}" 
+                        AND TimestampCreated <= "{ending_time_stamp}";'''
+
+        error_tabs = ['taxa_unmatch', 'picturaetaxa_added']
+        for tab in error_tabs:
+
+            sql = create_update_string(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
+                                       condition=condition)
+            print(sql)
+            self.create_table_record(sql)
+
+
+    def time_stamper(self):
+        """time_stamper: runs timestamp at beginning of script and at exit,
+                        uses the create_timestamps function from data_utils
+                        to append timestamps with codes to csvs,
+                        for record purging"""
+        # marking starting time stamp
+        # at exit run ending timestamp and append timestamp csv
+        atexit.register(self.run_timestamps, batch_size=self.batch_size)
 
     def unlock_account(self):
         """function to be called during unexpected interruption of upload,
@@ -128,7 +146,7 @@ class DataOnboard(Importer):
                 barcode: the string barcode of the taxon name associated with each photo.
                          used to re-merge dataframes after TNRS and keep track of the record in R.
         """
-        taxon_frame = {"barcodes": [barcode], "fullname": [taxon_name]}
+        taxon_frame = {"CatalogNumber": [barcode], "fullname": [taxon_name]}
 
         taxon_frame = pd.DataFrame(taxon_frame)
 
@@ -237,7 +255,7 @@ class DataOnboard(Importer):
 
     # check after getting real dataset, still not final
 
-    def populate_sql(self, tab_name, id_col, key_col, match, match_type=str):
+    def populate_sql(self, tab_name, id_col, key_col, match, match_type="string"):
         """populate_sql:
                 creates a custom select statement for get one record,
                 from which a result can be gotten more seamlessly
@@ -249,10 +267,10 @@ class DataOnboard(Importer):
                 match: value with which to match key_col
         """
         sql = ""
-        if match_type == str:
+        if match_type == "string":
             sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
-        elif match_type == int:
-            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match}'''
+        elif match_type == "integer":
+            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
 
         result = self.specify_db_connection.get_one_record(sql)
 
@@ -376,7 +394,8 @@ class DataOnboard(Importer):
         else:
             pass
 
-    def create_table_record(self, sql, is_test=False):
+
+    def create_table_record(self, sql):
         """create_table_record:
                general code for the inserting of a new record into any table on casbotany.
                creates connection, and runs sql query. cursor.execute with arg multi, to
@@ -386,11 +405,7 @@ class DataOnboard(Importer):
                is_test: set to False as default, if switched to true,
                         uses sql-lite database instead for testing.
         """
-        if is_test is True:
-            connection = sqlite3.connect('cas_botanylite.db')
-            cursor = connection.cursor()
-        else:
-            cursor = self.specify_db_connection.get_cursor()
+        cursor = self.specify_db_connection.get_cursor()
 
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
@@ -399,19 +414,16 @@ class DataOnboard(Importer):
         except Exception as e:
             print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
             self.logger.error(traceback.format_exc())
-        if is_test is True:
-            connection.commit()
-            cursor.close()
-            connection.close()
-        else:
-            try:
-                self.specify_db_connection.commit()
+        try:
+            self.specify_db_connection.commit()
 
-            except Exception as e:
-                self.logger.error(f"sql debug: {e}")
-                sys.exit("terminating script")
+        except Exception as e:
+            self.logger.error(f"sql debug: {e}")
+            sys.exit("terminating script")
 
-            cursor.close()
+        cursor.close()
+
+
 
     def create_locality_record(self):
         """create_locality_record:
@@ -675,7 +687,7 @@ class DataOnboard(Importer):
                       0,
                       4,
                       f"{self.barcode}",
-                      f"{upload_time.strftime('%Y-%m-%d')}",
+                      f"{starting_time_stamp.strftime('%Y-%m-%d')}",
                       1,
                       f"{self.collection_ob_guid}",
                       4,
@@ -872,6 +884,7 @@ class DataOnboard(Importer):
 
             self.create_collector()
 
+
     def upload_attachments(self):
         """upload_attachments:
                 this function calls client tools, in order to add
@@ -896,7 +909,6 @@ class DataOnboard(Importer):
             self.hide_unwanted_files()
 
             os.system('cd /Users/mdelaroca/Documents/sandbox_db/specify-sandbox/web-asset-server/image_client')
-
             os.system('python client_tools.py Botany import')
 
             self.unhide_files()
@@ -927,15 +939,26 @@ class DataOnboard(Importer):
         self.create_table_record(sql)
 
         # starting purge timer
-        time_stamper()
+        self.time_stamper()
 
         # creating tables
 
         self.upload_records()
 
         # creating new taxon list
-        if len(self.new_taxon_list) > 0:
-            write_list_to_csv(f"picturae_csv/{self.date_use}/new_taxa_{date.today()}", self.new_taxon_list)
+        if len(self.taxon_list) > 0:
+            taxa_frame = self.record_full[self.record_full['fullname'].isin(self.taxon_list)]
+            for index, row in taxa_frame.iterrows():
+                catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
+                barcode_result = self.populate_sql(tab_name='picturaetaxa_added',
+                                        id_col='CatalogNumber',
+                                        key_col='CatalogNumber',
+                                        match=row[catalog_number],
+                                        match_type="integer"
+                                        )
+                if barcode_result is None:
+                    sql = create_new_tax(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
+                    self.create_table_record(sql)
 
         # uploading attachments
         self.upload_attachments()
@@ -943,6 +966,8 @@ class DataOnboard(Importer):
         # writing time stamps to txt file
 
         self.logger.info("process finished")
+
+        # unlocking database
 
         sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
 

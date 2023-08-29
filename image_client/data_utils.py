@@ -12,8 +12,13 @@ import csv
 import re
 import os
 from PIL import Image
+import time_utils
 pd.set_option('expand_frame_repr', False)
 
+
+
+def str_to_bool(value):
+    return value.lower() == 'true'
 
 def data_exporter(query_string: str, local_path: str, fromsql: bool):
     """csv_exporter: creates a table in the database using a SQL query, and writes it to a local file.
@@ -315,38 +320,6 @@ def create_test_images(barcode_list: list, date_string: str):
         os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
         print(f"Created directory: {os.path.dirname(expected_image_path)}")
         image.save(expected_image_path)
-
-
-def create_timestamps(start_time):
-    """create_timestamps:
-            uses starting and ending timestamps to create window for sql database purge,
-            adds 10 second buffer on either end to allow sql queries to populate.
-            appends each timestamp record to a csv log.
-        args:
-            start_time: starting time stamp
-            end_time: ending time stamp
-    """
-
-    end_time = datetime.now()
-
-    delt_time = timedelta(seconds=15)
-
-    time_stamp_list = [start_time - delt_time, end_time + delt_time]
-
-    csv_file_path = 'csv_purge_sql/upload_time_stamps.csv'
-
-    with open(csv_file_path, 'a', newline='') as csvfile:
-        fieldnames = ['StartTime', 'EndTime', 'UploadCode']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-        if csvfile.tell() == 0:
-            writer.writeheader()
-
-        writer.writerow({'StartTime': time_stamp_list[0], 'EndTime': time_stamp_list[1],
-                         'UploadCode': random.randint(100000, 999999)})
-
-    print(f"The timestamps have been added to '{csv_file_path}'.")
-
 
 def unique_ordered_list(input_list):
     """unique_ordered_list:

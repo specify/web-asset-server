@@ -43,15 +43,13 @@ def parse_command_line():
     return parser.parse_args()
 
 
-
 def main(args):
 
     if args.subcommand == 'search':
         image_client = ImageClient()
     elif args.subcommand == 'import':
-
         if args.collection == "Botany":
-             BotanyImporter()
+            BotanyImporter()
         elif args.collection == "Ichthyology":
             IchthyologyImporter()
         elif args.collection == "IZ":
@@ -91,6 +89,7 @@ def setup_logging(verbosity: int):
     logger.propagate = False
 
     if verbosity == 0:
+        "setting level"
         logger.setLevel(logging.CRITICAL)
     elif verbosity == 1:
         logger.setLevel(logging.ERROR)
