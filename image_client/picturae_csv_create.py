@@ -1,6 +1,8 @@
 """picturae_csv_create: this file is for wrangling and creating the dataframe
    and csv with the correctly parsed fields for upload, in picturae_import"""
-
+import pandas as pd
+from uuid import uuid4
+import traceback
 import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
@@ -8,32 +10,23 @@ from data_utils import *
 import logging
 from sql_csv_utils import *
 from importer import Importer
+# creating a batch uuid
+from sql_csv_utils import create_unmatch_tab
+batch_uuid = uuid4()
 
+
+starting_time_stamp = datetime.now()
 
 class CsvCreatePicturae(Importer):
     def __init__(self, date_string):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
-        # full collector list is for populating existing and missing agents into collector table
-        # new_collector_list is only for adding new agents to agent table.
-        # manual taxon list, list of skipped taxa to be manually verified
-        empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'new_taxon_list']
-
-        for empty_list in empty_lists:
-            setattr(self, empty_list, [])
-
-        self.manual_taxon_dict = {}
-        self.no_match_dict = {}
 
         # intializing parameters for database upload
-        init_list = ['GeographyID', 'taxon_id', 'barcode',
-                     'verbatim_date', 'start_date', 'end_date',
-                     'collector_number', 'locality', 'collecting_event_guid',
-                     'collecting_event_id', 'locality_guid', 'agent_guid',
-                     'geography_string', 'GeographyID', 'locality_id',
-                     'full_name', 'tax_name', 'locality',
+        init_list = ['taxon_id', 'barcode',
+                     'collector_number', 'collecting_event_guid',
+                     'collecting_event_id',
                      'determination_guid', 'collection_ob_id', 'collection_ob_guid',
                      'name_id', 'author_sci', 'family', 'gen_spec_id', 'family_id', 'parent_author']
 
@@ -243,9 +236,40 @@ class CsvCreatePicturae(Importer):
 
         return str(gen_spec), str(full_name), str(tax_name), str(hybrid_base)
 
+    def create_table_record(self, sql):
+        """create_table_record:
+               general code for the inserting of a new record into any table on casbotany.
+               creates connection, and runs sql query. cursor.execute with arg multi, to
+               handle multi-query commands.
+           args:
+               sql: the verbatim sql string, or multi sql query string to send to database
+               is_test: set to False as default, if switched to true,
+                        uses sql-lite database instead for testing.
+        """
+        cursor = self.specify_db_connection.get_cursor()
+
+        self.logger.info(f'running query: {sql}')
+        self.logger.debug(sql)
+        try:
+            cursor.execute(sql)
+        except Exception as e:
+            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
+            self.logger.error(traceback.format_exc())
+        try:
+            self.specify_db_connection.commit()
+
+        except Exception as e:
+            self.logger.error(f"sql debug: {e}")
+            sys.exit("terminating script")
+
+        cursor.close()
+
+
+
     def taxon_check_real(self):
         """Sends the concatenated taxon column, through TNRS, to match names,
            with and without spelling mistakes, """
+
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
         pandas2ri.activate()
@@ -262,6 +286,30 @@ class CsvCreatePicturae(Importer):
         resolved_taxon = robjects.r['resolved_taxa']
 
         resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
+
+
+        unmatched_taxa = resolved_taxon[resolved_taxon["overall_score"] < .99]
+
+        # writing unmatched taxa to db table taxa_unmatch
+        if len(unmatched_taxa) > 0:
+            print("uploading unmatched taxa")
+            for index, row in unmatched_taxa.iterrows():
+                catalognumber = unmatched_taxa.columns.get_loc("CatalogNumber")
+
+                sql = create_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
+
+                barcode_check = f'''SELECT CatalogNumber FROM casbotany.taxa_unmatch 
+                                    WHERE CatalogNumber = {row[catalognumber]}'''
+
+                sql_result = self.specify_db_connection.get_one_record(barcode_check)
+                if sql_result is None:
+                    self.create_table_record(sql)
+                else:
+                    pass
+
+        resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]
+
+        resolved_taxon = resolved_taxon.drop(columns=["overall_score", "unmatched_terms", "CatalogNumber"])
 
         self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
 
@@ -291,8 +339,6 @@ class CsvCreatePicturae(Importer):
 
         self.record_full['gen_spec'] = self.record_full['gen_spec'].apply(remove_qualifiers)
 
-        print(self.record_full)
-
     def col_clean(self):
         """will reformat and clean dataframe columns until ready for upload.
            **Still need format end-goal
@@ -311,7 +357,12 @@ class CsvCreatePicturae(Importer):
         # setting datatypes for columns
         string_list = self.record_full.columns.to_list()
 
-        self.record_full[string_list] = self.record_full[string_list].astype(str)
+        self.record_full[string_list] = self.record_full[string_list].astype(str)\
+
+
+        # converting hyrid column to true boolean
+
+        self.record_full['Hybrid'] = self.record_full['Hybrid'].apply(str_to_bool)
 
         self.record_full = self.record_full.replace(['', None, 'nan', np.nan], pd.NA)
 

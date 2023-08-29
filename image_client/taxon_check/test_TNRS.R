@@ -19,6 +19,7 @@ process_taxon_resolve <- function(tax_frame){
   
   taxon_frame = tax_frame
   
+  
   ncol_t = nrow(taxon_frame)
   #test_taxon = read_csv("test_csv.csv")
 
@@ -62,9 +63,10 @@ process_taxon_resolve <- function(tax_frame){
   # Display just the main results fields
   results$match.score <- format(round(as.numeric(results $Overall_score),2), nsmall=2)
   
-  results[ 1:10, c('Name_submitted', 'match.score', 'Name_matched', 'Taxonomic_status', 
-                   'Accepted_name', 'Unmatched_terms', 'Accepted_name_author')]
+  results <- results %>% select('Name_submitted', 'Overall_score', 'Name_matched', 'Taxonomic_status', 
+                   'Accepted_name', 'Unmatched_terms', 'Accepted_name_author')
   
+  print(results)
   
   results = results %>% rename('fullname'='Name_submitted', 
                                'name_matched' = 'Name_matched',
@@ -74,52 +76,30 @@ process_taxon_resolve <- function(tax_frame){
                                'overall_score' = 'Overall_score',
                                'accepted_author' = 'Accepted_name_author')
 
-
- hand_check_match = results %>% filter(overall_score < .99) %>% 
-                     select('fullname', 'name_matched', 
-                            'overall_score', 'unmatched_terms')
   
- hand_check_match = left_join(taxon_frame, hand_check_match, by='fullname')
+  results = left_join(taxon_frame, results, by='fullname')
+  
+  print(results)
  
- hand_check_match = hand_check_match %>% filter(!is.na(overall_score))
-
-
- if(nrow(hand_check_match)>0){
-    
-    print("writing spelling/mismatch error csv")
-   
-    filename = paste0('unmatch_and_typo_', today_date, '.csv')
-    
-    write_csv(hand_check_match,file = file.path('taxon_check','unmatched_taxa',filename))
-    }
+  results = results %>% select('fullname', 'name_matched', 'accepted_author',
+                               'overall_score', 
+                               'unmatched_terms', 'CatalogNumber')
   
-  
-  
-  results = results %>% filter(overall_score >= .99) %>% 
-            select('fullname', 'name_matched', 'accepted_author','overall_score')
+  results$overall_score = as.numeric(results$overall_score)
   
   return(results)
 }
-
 
 resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 
 sink()
 
-# test_taxon = list(barcodes = c(1234),
-                 # fullname = c('Rafflesia arnoldi var. atjehensis'))
+# test_taxon = list(CatalogNumber = c(1234),
+                 #  fullname = c('Carpotroche adaojii'))
 
 # test_frame = do.call(data.frame, test_taxon)
 
 # returnti = process_taxon_resolve(tax_frame = test_frame)
-
-
-# test_taxon = list(barcodes= c(999999984), fullname = c('Abies sibirica'))
-
-# test_frame = do.call(data.frame, test_taxon)
-
-# returnti = process_taxon_resolve(tax_frame = test_frame)
-
 
 
 

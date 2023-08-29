@@ -31,10 +31,13 @@ class MissingPathException(Exception):
 
 
 class Importer:
+
     def __init__(self, db_config_class, collection_name):
+        print("initializing beep boop")
         self.logger = logging.getLogger('Client.importer')
         self.collection_name = collection_name
         self.specify_db_connection = SpecifyDb(db_config_class)
+        print("configing db")
         self.image_client = ImageClient()
         self.attachment_utils = AttachmentUtils(self.specify_db_connection)
         self.duplicates_file = open(f'duplicates-{self.collection_name}.txt', 'w')

@@ -9,3 +9,4 @@ class SpecifyDb(DbUtils):
             db_config_class.SPECIFY_DATABASE_PORT,
             db_config_class.SPECIFY_DATABASE_HOST,
             db_config_class.SPECIFY_DATABASE)
+        print("initializing that thing")
