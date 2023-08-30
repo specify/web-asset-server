@@ -24,6 +24,7 @@ class AttachmentUtils:
         logging.debug(f"Got collectionObjectId: {coid}")
 
         return coid
+
     def get_attachmentid_from_filepath(self, orig_filepath):
         orig_filepath = repr(orig_filepath)
         sql = f"""
@@ -113,11 +114,12 @@ class AttachmentUtils:
         sql = f"select max(ordinal) from collectionobjectattachment where CollectionObjectID={collection_object_id}"
         return self.db_utils.get_one_record(sql)
 
+
     def get_is_attachment_redacted(self, internal_id):
         sql = f"""
-            select a.AttachmentID,a.ispublic  from attachment a 
+            select a.AttachmentID,a.ispublic  from attachment a
             where AttachmentLocation='{internal_id}'
-    
+
             """
         cursor = self.db_utils.get_cursor()
 
@@ -136,14 +138,17 @@ class AttachmentUtils:
                 return True
         return False
 
-    def get_is_collection_object_redacted(self, collection_object_id):
-        sql = f"""SELECT co.YesNo1, co.YesNo2, ta.YesNo1, ta.YesNo2, ta.TaxonID
-                  FROM collectionobject as co
-                  LEFT JOIN determination as de ON co.CollectionObjectID = de.CollectionObjectID and de.isCurrent = 1
-                  LEFT JOIN taxon as ta ON de.TaxonID = ta.TaxonID
-                  WHERE co.CollectionObjectID = {collection_object_id};
-        """
 
+    def get_is_collection_object_redacted(self, collection_object_id):
+        sql = f"""SELECT co.YesNo2          AS `CO redact locality`
+             , vt.RedactLocality  AS `taxon_redact_locality`
+             , vta.RedactLocality AS `accepted_taxon_redact_locality`
+        FROM casbotany.collectionobject co
+                 LEFT JOIN casbotany.determination de ON co.CollectionObjectID = de.CollectionObjectID AND de.IsCurrent = TRUE
+                 LEFT JOIN casbotany.vtaxon2 vt ON de.TaxonID = vt.TaxonID
+                 LEFT JOIN casbotany.vtaxon2 vta ON de.PreferredTaxonID = vta.taxonid
+        WHERE co.CollectionObjectID = {collection_object_id};"""
+        # logging.debug(f"isredacted sql: {sql}")
         cursor = self.db_utils.get_cursor()
 
         cursor.execute(sql)
@@ -153,12 +158,12 @@ class AttachmentUtils:
             logging.error(f"Error fetching collection object id: {collection_object_id}\n sql:{sql}")
             raise DatabaseInconsistentError(f"DB error. SQL: {sql}")
 
-        logging.debug(f"Taxonid {retval[-1]}")
-        retval = retval[:4]
+        # logging.debug(f"Taxonid {retval[-1]}")
+        # retval = retval[:4]
         if retval is None:
             logging.warning(f"Warning: No results from: \n\n{sql}\n")
         else:
             for val in retval:
-                if val is True or val == 1:
+                if val is True or val == 1 or val==b'\x01':
                     return True
         return False

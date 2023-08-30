@@ -3,14 +3,19 @@ from attachment_utils import AttachmentUtils
 from db_utils import DbUtils
 import botany_importer_config
 import ich_importer_config
+<<<<<<< HEAD
 from typing import Optional
 
+=======
+import traceback
+>>>>>>> master
 import logging
 import sys
+from typing import Optional
 
 image_db: Optional[ImageDb] = None
 botany_importer = None
-attachment_utils = None
+attachment_utils: Optional[AttachmentUtils] = None
 
 
 def get_specify_state(internal_filename):
@@ -54,11 +59,9 @@ def do_sync(collection_name, specify_db_connection):
     for (internal_filename, redacted) in cursor:
         found_tuples.append((internal_filename, redacted))
     cursor.close()
-    MAX_RETRIES = 10
     for (internal_filename, redacted) in found_tuples:
         next_record = False
-        retry_count = 0
-        while next_record is False and retry_count < MAX_RETRIES:
+        while next_record is False:
             try:
                 redact(internal_filename, redacted)
                 next_record = True
@@ -70,7 +73,10 @@ def do_sync(collection_name, specify_db_connection):
                 print(f"Error, probably sql: \"{e}\"", file=sys.stderr, flush=True)
                 print(f"exception type: {type(e).__name__}", file=sys.stderr, flush=True)
 
+<<<<<<< HEAD
                 retry_count += 1
+=======
+>>>>>>> master
 
     return record_list
 
@@ -101,4 +107,13 @@ def main():
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     main()
+=======
+    try:
+        main()
+    except Exception as e:
+        traceback.print_exc()
+
+
+>>>>>>> master
