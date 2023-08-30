@@ -6,6 +6,7 @@ from datetime import timedelta
 import hmac
 import settings
 
+
 # static methods
 def create_name_sql(first_name: str, last_name: str, middle_initial: str, title: str):
     """create_name_sql: create a custom sql string, based on number of non-na arguments, the

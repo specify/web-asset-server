@@ -2,10 +2,10 @@
 import unittest
 import random
 import shutil
-from picturae_import import *
+from picturae_importer import *
 from faker import Faker
 from datetime import date, timedelta
-from picturae_import import DataOnboard
+from picturae_importer import DataOnboard
 from PIL import Image
 from casbotany_sql_lite import *
 

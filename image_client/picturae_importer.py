@@ -14,9 +14,10 @@ from sql_csv_utils import *
 from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
 from sql_csv_utils import generate_token
+from botany_importer import BotanyImporter
 
 from picturae_csv_create import starting_time_stamp
-class DataOnboard(Importer):
+class PicturaeImporter(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
            and upload a csv file containing transcribed
@@ -24,10 +25,10 @@ class DataOnboard(Importer):
            along with attached images
     """
 
-    def __init__(self, date_string):
-        super().__init__(picturae_config, "Botany")
+    def __init__(self, date_string, paths):
+        super().__init__(paths, "Botany")
         self.date_use = date_string
-        self.logger = logging.getLogger('DataOnboard')
+        self.logger = logging.getLogger('PicturaeImporter')
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
@@ -61,6 +62,10 @@ class DataOnboard(Importer):
 
         self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
+        CsvCreatePicturae(self.date_use)
+
+        self.run_all_methods()
+
 
     def run_timestamps(self, batch_size: int):
         """updating md5 fields for new taxon and taxon mismatch batches"""
@@ -79,7 +84,6 @@ class DataOnboard(Importer):
 
             sql = create_update_string(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
                                        condition=condition)
-            print(sql)
             self.create_table_record(sql)
 
 
@@ -196,11 +200,13 @@ class DataOnboard(Importer):
                 self.logger.warning(f"image {row['image_path']} "
                                     f"already in database, appending record")
                 self.barcode_list.append(row['CatalogNumber'])
-
+            # create case so that if two duplicate rows , but with different images, upload both images,
+            # but not both rows
             else:
                 self.image_list.append(row['image_path'])
                 self.barcode_list.append(row['CatalogNumber'])
-
+                self.barcode_list = list(set(self.barcode_list))
+                self.image_list = list(set(self.image_list))
     def create_agent_list(self, row):
         """create_agent_list:
                 creates a list of collectors that will be checked and added to agent/collector tables.
@@ -861,7 +867,12 @@ class DataOnboard(Importer):
                 new table records related
         """
         # the order of operations matters, if you change the order certain variables may overwrite
+
+
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
+
+        self.record_full = self.record_full.drop_duplicates(subset=['CatalogNumber'])
+
 
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
@@ -894,6 +905,7 @@ class DataOnboard(Importer):
         """
         filename = "botany_importer_config.py"
 
+
         with open(filename, 'r') as file:
             # Read the contents of the file
             content = file.read()
@@ -908,8 +920,7 @@ class DataOnboard(Importer):
         try:
             self.hide_unwanted_files()
 
-            os.system('cd /Users/mdelaroca/Documents/sandbox_db/specify-sandbox/web-asset-server/image_client')
-            os.system('python client_tools.py Botany import')
+            BotanyImporter(paths=picturae_config)
 
             self.unhide_files()
         except Exception as e:
@@ -934,7 +945,9 @@ class DataOnboard(Importer):
 
         # locking users out from the database
 
-        sql = """ALTER USER 'botanist'@'%'ACCOUNT LOCK;"""
+        sql = """UPDATE mysql.user
+                 SET account_locked = 'Y'
+                 WHERE user != 'botanist' AND host = '%';"""
 
         self.create_table_record(sql)
 
@@ -969,21 +982,8 @@ class DataOnboard(Importer):
 
         # unlocking database
 
-        sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
+        sql = """UPDATE mysql.user
+                 SET account_locked = 'n'
+                 WHERE user != 'botanist' AND host = '%';"""
 
         self.create_table_record(sql)
-
-
-def master_run(date_string: str, run_both: bool):
-    # running picturae_csv create and creating instance
-    if run_both is True:
-        csv_create_int = CsvCreatePicturae(date_string=date_string)
-        csv_create_int.run_all()
-        del csv_create_int
-    # running picturae_import instance and running all methods
-    dataonboard_int = DataOnboard(date_string=date_string)
-    dataonboard_int.run_all_methods()
-    del dataonboard_int
-
-
-master_run(date_string="2023-06-28", run_both=True)

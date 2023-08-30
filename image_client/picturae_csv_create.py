@@ -33,6 +33,8 @@ class CsvCreatePicturae(Importer):
         for param in init_list:
             setattr(self, param, None)
 
+        self.run_all()
+
     def file_present(self):
         """file_present:
            checks if correct filepath in working directory,
@@ -100,11 +102,14 @@ class CsvCreatePicturae(Importer):
 
             common_columns.remove('specimen_barcode')
 
+            common_columns.remove('path_jpg')
+
             spec_csv = spec_csv.drop(common_columns, axis=1)
 
             # completing merge on barcode
+
             self.record_full = pd.merge(fold_csv, spec_csv,
-                                        on='specimen_barcode', how='inner')
+                                        on=('specimen_barcode', 'path_jpg'), how='inner')
 
         else:
             raise ValueError("Barcode Columns do not match!")
@@ -389,9 +394,9 @@ class CsvCreatePicturae(Importer):
         for index, row in self.record_full.iterrows():
             file_name = os.path.basename(row['image_path'])
             file_name = file_name.lower()
-            file_name = file_name.rsplit(".", 1)[0]
-            sql = f'''select title from casbotany.attachment
-                      where title = "{file_name}";'''
+            # file_name = file_name.rsplit(".", 1)[0]
+            sql = f'''select origFilename from casbotany.attachment
+                      where origFilename = "{file_name}";'''
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:
                 self.record_full.loc[index, 'image_present'] = False
@@ -450,12 +455,3 @@ class CsvCreatePicturae(Importer):
 
         # writing csv for inspection and upload
         self.write_upload_csv()
-
-
-def master_run(date_string):
-    csv_create_int = CsvCreatePicturae(date_string=date_string)
-
-    csv_create_int.run_all()
-
-
-master_run(date_string="2023-06-28")
