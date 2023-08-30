@@ -2,7 +2,3 @@
 1 Rafflesia arnoldi             1 Rafflesia arnoldi         Accepted
       Accepted_name Unmatched_terms Accepted_name_author
 1 Rafflesia arnoldi                                R.Br.
-  CatalogNumber          fullname overall_score      name_matched
-1     999999984 Rafflesia arnoldi             1 Rafflesia arnoldi
-  taxonomic_status     accepted_name unmatched_terms accepted_author
-1         Accepted Rafflesia arnoldi                           R.Br.

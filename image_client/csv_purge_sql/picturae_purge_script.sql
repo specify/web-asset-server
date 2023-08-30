@@ -22,6 +22,11 @@ DROP TEMPORARY TABLE IF EXISTS temp_leaf_nodes;
 
 ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;
 
+UPDATE mysql.user
+SET account_locked = 'n'
+WHERE user != 'botanist' AND host = '%';
+
+
 #
 # show processlist;
 #

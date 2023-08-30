@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+import botany_importer_config
+import picturae_config
+import datetime
 import logging
 import collection_definitions
 from botany_importer import BotanyImporter
+from picturae_importer import PicturaeImporter
 from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
@@ -49,7 +53,9 @@ def main(args):
         image_client = ImageClient()
     elif args.subcommand == 'import':
         if args.collection == "Botany":
-            BotanyImporter()
+            BotanyImporter(paths=botany_importer_config)
+        elif args.collection == 'PIC':
+            PicturaeImporter(date_string="2023-06-28", paths=picturae_config)
         elif args.collection == "Ichthyology":
             IchthyologyImporter()
         elif args.collection == "IZ":

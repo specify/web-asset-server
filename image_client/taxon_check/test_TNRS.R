@@ -2,9 +2,10 @@ library(tidyverse)
 library(taxize)
 library(reticulate)
 library(TNRS)
-library(taxize)
 library(httr)
 library(jsonlite)
+
+Sys.setenv(LANG = "en")
 
 sink("output.txt")
 
@@ -17,8 +18,7 @@ process_taxon_resolve <- function(tax_frame){
   # base TNRS api 
   url_tn = "https://tnrsapi.xyz/tnrs_api.php"
   
-  taxon_frame = tax_frame
-  
+  taxon_frame = tax_frame %>% distinct()
   
   ncol_t = nrow(taxon_frame)
   #test_taxon = read_csv("test_csv.csv")
@@ -58,7 +58,9 @@ process_taxon_resolve <- function(tax_frame){
   
   # to better compare the output fields
   results.t <- as.data.frame( t( results[,1:ncol(results)] ) )
+  
   results.t[,ncol_t,drop =FALSE]
+  
   
   # Display just the main results fields
   results$match.score <- format(round(as.numeric(results $Overall_score),2), nsmall=2)
@@ -78,8 +80,6 @@ process_taxon_resolve <- function(tax_frame){
 
   
   results = left_join(taxon_frame, results, by='fullname')
-  
-  print(results)
  
   results = results %>% select('fullname', 'name_matched', 'accepted_author',
                                'overall_score', 
@@ -94,10 +94,10 @@ resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 
 sink()
 
-# test_taxon = list(CatalogNumber = c(1234),
-                 #  fullname = c('Carpotroche adaojii'))
+#test_taxon = list(CatalogNumber = c(1234, 1234),
+              #    fullname = c('Quercus', 'Quercus'))
 
-# test_frame = do.call(data.frame, test_taxon)
+#test_frame = do.call(data.frame, test_taxon)
 
 # returnti = process_taxon_resolve(tax_frame = test_frame)
 

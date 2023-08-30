@@ -22,11 +22,9 @@ from dir_tools import DirTools
 class BotanyImporter(Importer):
 
 
-    def __init__(self):
+    def __init__(self, paths):
         self.logger = logging.getLogger('Client.BotanyImporter')
-        super().__init__(botany_importer_config, "Botany")
-        print("now for the initiation ritual")
-
+        super().__init__(paths, "Botany")
         # limit is for debugging
         dir_tools = DirTools(self.build_filename_map, limit=None)
         self.barcode_map = {}
@@ -35,9 +33,8 @@ class BotanyImporter(Importer):
 
         # FILENAME = "bio_importer.bin"
         # if not os.path.exists(FILENAME):
-        for cur_dir in botany_importer_config.BOTANY_SCAN_FOLDERS:
-            print("scanning it")
-            cur_dir = os.path.join(botany_importer_config.PREFIX, botany_importer_config.BOTANY_PREFIX, cur_dir)
+        for cur_dir in paths.SCAN_FOLDERS:
+            cur_dir = os.path.join(paths.DIR, paths.PREFIX, cur_dir)
             print(f"Scanning: {cur_dir}")
             dir_tools.process_files_or_directories_recursive(cur_dir)
 
@@ -61,6 +58,7 @@ class BotanyImporter(Importer):
         self.logger.debug(f"Barcode: {barcode}")
         sql = f"select CollectionObjectID from casbotany.collectionobject where CatalogNumber={barcode};"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
+        print(collection_object_id)
         force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
