@@ -20,38 +20,6 @@ pd.set_option('expand_frame_repr', False)
 def str_to_bool(value):
     return value.lower() == 'true'
 
-def data_exporter(query_string: str, local_path: str, fromsql: bool):
-    """csv_exporter: creates a table in the database using a SQL query, and writes it to a local file.
-    args:
-        query_string: mysql query that needs to be written,
-        use semicolons to split queries, and triple single quotes for a multiline query
-        local_path: destination of file
-    returns:
-        data file into desired directory
-    """
-    if fromsql is True:
-        connection = psq.connect(host='localhost', user='botanist',
-                                 password="password", database="casbotany")
-
-        query = query_string
-
-        cursor = connection.cursor()
-        cursor.execute(query)
-        result = cursor.fetchall()
-        connection.close()
-
-        with open(local_path, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow([i[0] for i in cursor.description])
-            writer.writerows(result)
-    else:
-        pass
-
-    df_init: pd.DataFrame = pd.read_csv(local_path)
-
-    return df_init
-
-
 def write_list_to_csv(file_path, data_list):
     with open(file_path, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
