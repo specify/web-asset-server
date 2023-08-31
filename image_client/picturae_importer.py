@@ -125,16 +125,17 @@ class PicturaeImporter(Importer):
                 taxon_string: the taxon string or substring, which before assignment
         """
 
-        if " f. " in taxon_string:
+
+        if "subsp." in taxon_string:
+            return 14, 230
+        elif "var." in taxon_string:
+            return 15, 240
+        elif "subvar." in taxon_string:
+            return 16, 250
+        elif " f. " in taxon_string:
             return 17, 260
         elif "subf." in taxon_string:
             return 21, 270
-        elif "subvar." in taxon_string:
-            return 16, 250
-        elif "var." in taxon_string:
-            return 15, 240
-        elif "subsp." in taxon_string:
-            return 14, 230
         elif len(taxon_string.split()) == 1:
             return 12, 180
         else:
@@ -341,6 +342,7 @@ class PicturaeImporter(Importer):
         result_id = self.specify_db_connection.get_one_record(sql)
         return result_id
 
+    # this process will be simplified to reflect new (8/31) changes in picturae_csv_create.py
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
                          as genus must be uploaded before species , before sub-taxa etc...
@@ -898,12 +900,12 @@ class PicturaeImporter(Importer):
 
     def upload_attachments(self):
         """upload_attachments:
-                this function calls client tools, in order to add
-                attachments in image list. Updates date in
-                botany_importer_config to ensure prefix is
+                this function runs Botany importer
+                Updates date in
+                picturae_config to ensure prefix is
                 updated for correct filepath
         """
-        filename = "botany_importer_config.py"
+        filename = "picurae_config.py"
 
 
         with open(filename, 'r') as file:

@@ -69,7 +69,7 @@ class CsvDatabase(Importer):
                                  in which the original upload script was run,
             uses log of sql uploads to retrieve record by randomly generated 6 digit upload code.
         """
-        time_stamp_csv = pd.read_csv('csv_purge_sql/upload_time_stamps.csv')
+        time_stamp_csv = pd.read_csv('test_csv_purge_sql/upload_time_stamps.csv')
 
         selected_row = time_stamp_csv[time_stamp_csv['UploadCode'] == number]
 
