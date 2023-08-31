@@ -1,4 +1,0 @@
-     Name_submitted Overall_score      Name_matched Taxonomic_status
-1 Rafflesia arnoldi             1 Rafflesia arnoldi         Accepted
-      Accepted_name Unmatched_terms Accepted_name_author
-1 Rafflesia arnoldi                                R.Br.

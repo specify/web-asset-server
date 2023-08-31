@@ -1,5 +1,5 @@
 """picturae_csv_create: this file is for wrangling and creating the dataframe
-   and csv with the correctly parsed fields for upload, in picturae_import"""
+   and csv with the parsed fields required for upload, in picturae_import"""
 import pandas as pd
 from uuid import uuid4
 import traceback
@@ -10,8 +10,9 @@ from data_utils import *
 import logging
 from sql_csv_utils import *
 from importer import Importer
-# creating a batch uuid
 from sql_csv_utils import create_unmatch_tab
+
+# creating a batch uuid
 batch_uuid = uuid4()
 
 
@@ -178,34 +179,32 @@ class CsvCreatePicturae(Importer):
 
         full_name = ""
         tax_name = ""
+        first_intra = ""
         gen_spec = ""
         hybrid_base = ""
 
-        if is_hybrid is True:
-            gen_index = self.record_full.columns.get_loc('Hybrid Genus')
-            genus = row[gen_index]
-        else:
-            gen_index = self.record_full.columns.get_loc('Genus')
-            genus = row[gen_index]
+        gen_index = self.record_full.columns.get_loc('Genus')
+        genus = row[gen_index]
 
-        if is_hybrid is False:
-            columns1 = ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2']
-            columns2 = ['Genus', 'Species']
-        else:
-            columns1 = ['Hybrid Genus', 'Hybrid Species', 'Hybrid Rank 1', 'Hybrid Epithet 1']
-            columns2 = ['Hybrid Genus', 'Hybrid Species']
+        column_sets = [
+            ['Genus', 'Species', 'Rank 1', 'Epithet 1', 'Rank 2', 'Epithet 2'],
+            ['Genus', 'Species', 'Rank 1', 'Epithet 1'],
+            ['Genus', 'Species']
+        ]
 
-        for column in columns1:
-            index = self.record_full.columns.get_loc(column)
-            if pd.notna(row[index]):
-                full_name += f" {row[index]}"
-
-        for column in columns2:
-            index = self.record_full.columns.get_loc(column)
-            if pd.notna(row[index]):
-                gen_spec += f" {row[index]}"
+        for columns in column_sets:
+            for column in columns:
+                index = self.record_full.columns.get_loc(column)
+                if pd.notna(row[index]):
+                    if columns == column_sets[0]:
+                        full_name += f" {row[index]}"
+                    elif columns == column_sets[1]:
+                        first_intra += f" {row[index]}"
+                    elif columns == column_sets[2]:
+                        gen_spec += f" {row[index]}"
 
         full_name = full_name.strip()
+        first_intra = first_intra.strip()
         gen_spec = gen_spec.strip()
         # creating taxon name
         # creating temporary string in order to get tax order
@@ -216,30 +215,38 @@ class CsvCreatePicturae(Importer):
         if is_hybrid is False:
             tax_name = taxon_strings[-1]
         else:
-            if genus == full_name:
-                tax_name = " ".join(taxon_strings[-2:])
-            elif gen_spec == full_name and genus != full_name:
-                tax_name = " ".join(taxon_strings[-3:])
-                tax_name = tax_name.lower()
+            if gen_spec == full_name:
+                if len(gen_spec) <= 3:
+                    tax_name = " ".join(taxon_strings[-2:])
+                    tax_name = tax_name.lower()
+                # for dealing with fully written out species crosses
+                else:
+                    tax_name = " ".join(taxon_strings[-3:])
+                    tax_name = tax_name.lower()
             else:
                 tax_name = extract_after_subtax(separate_string)
+                if len(first_intra) < len(full_name):
+                    tax_name = extract_after_subtax(tax_name)
                 tax_name = tax_name.lower()
         if is_hybrid is True:
-            if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name) \
-                 and len(taxon_strings) < 8:
-                hybrid_base = full_name
-                full_name = " ".join(taxon_strings[:2])
-                # will have to revisit this when actual data recieved ,
-                # although this kind of cross is extremely rare Gen spec var. a x Gen spec var. b
-            elif ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name) \
-                    and len(taxon_strings) >= 8:
-                hybrid_base = full_name
-                full_name = taxon_strings[0]
-            else:
-                hybrid_base = full_name
-                full_name = taxon_strings[0]
+            if first_intra == full_name:
+                if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
+                    hybrid_base = full_name
+                    full_name = " ".join(taxon_strings[:2])
+                else:
+                    hybrid_base = full_name
+                    full_name = taxon_strings[0]
+                    if full_name != genus:
+                        full_name = taxon_strings[-1]
+            elif first_intra != full_name and (len(first_intra) < len(full_name)):
+                if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
+                    hybrid_base = full_name
+                    full_name = " ".join(taxon_strings[:4])
+                else:
+                    pass
 
-        return str(gen_spec), str(full_name), str(tax_name), str(hybrid_base)
+
+        return str(gen_spec), str(full_name), str(first_intra), str(tax_name), str(hybrid_base)
 
     def create_table_record(self, sql):
         """create_table_record:
@@ -345,27 +352,29 @@ class CsvCreatePicturae(Importer):
         self.record_full['gen_spec'] = self.record_full['gen_spec'].apply(remove_qualifiers)
 
     def col_clean(self):
-        """will reformat and clean dataframe columns until ready for upload.
-           **Still need format end-goal
+        """parses and cleans dataframe columns until ready for upload.
+            runs dependent functions taxon concat and
         """
         self.record_full['verbatim_date'] = self.record_full['verbatim_date'].apply(replace_apostrophes)
         self.record_full['locality'] = self.record_full['locality'].apply(replace_apostrophes)
         date_col_list = ['start_date', 'end_date']
+        # changing date formate to Y month day
         for col_string in date_col_list:
             self.record_full[col_string] = pd.to_datetime(self.record_full[col_string],
                                                           format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
-
+        # parsing taxon columns
         self.record_full[['gen_spec', 'fullname',
+                          'first_intra',
                           'taxname', 'hybrid_base']] = self.record_full.apply(self.taxon_concat,
                                                                               axis=1, result_type='expand')
 
         # setting datatypes for columns
         string_list = self.record_full.columns.to_list()
 
-        self.record_full[string_list] = self.record_full[string_list].astype(str)\
+        self.record_full[string_list] = self.record_full[string_list].astype(str)
 
 
-        # converting hyrid column to true boolean
+        # converting hybrid column to true boolean
 
         self.record_full['Hybrid'] = self.record_full['Hybrid'].apply(str_to_bool)
 
@@ -440,6 +449,8 @@ class CsvCreatePicturae(Importer):
         # cleaning data
         self.col_clean()
 
+        print(self.record_full)
+
         self.taxon_check_real()
 
         # checking if barcode record present in database
@@ -455,3 +466,10 @@ class CsvCreatePicturae(Importer):
 
         # writing csv for inspection and upload
         self.write_upload_csv()
+
+
+def test_run():
+    CsvCreatePicturae(date_string="2023-06-28")
+
+
+test_run()
