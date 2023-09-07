@@ -17,6 +17,7 @@ from sql_csv_utils import generate_token
 from botany_importer import BotanyImporter
 
 from picturae_csv_create import starting_time_stamp
+
 class PicturaeImporter(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -25,9 +26,14 @@ class PicturaeImporter(Importer):
            along with attached images
     """
 
-    def __init__(self, date_string, paths):
-        super().__init__(paths, "Botany")
-        self.date_use = date_string
+    def __init__(self, paths, date_string=None):
+        super().__init__(picturae_config, "Botany")
+
+        if date_string is None:
+            self.date_use = get_max_subdirectory_date("picturae_csv")
+        else:
+            self.date_use = date_string
+
         self.logger = logging.getLogger('PicturaeImporter')
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
@@ -38,6 +44,9 @@ class PicturaeImporter(Importer):
             setattr(self, empty_list, [])
 
         self.no_match_dict = {}
+
+        # running csv create
+        CsvCreatePicturae(date_string=self.date_use)
 
         self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
@@ -62,7 +71,7 @@ class PicturaeImporter(Importer):
 
         self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
-        CsvCreatePicturae(self.date_use)
+        self.paths = paths
 
         self.run_all_methods()
 
@@ -82,7 +91,7 @@ class PicturaeImporter(Importer):
         error_tabs = ['taxa_unmatch', 'picturaetaxa_added']
         for tab in error_tabs:
 
-            sql = create_update_string(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
+            sql = create_update_statement(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
                                        condition=condition)
             self.create_table_record(sql)
 
@@ -124,22 +133,28 @@ class PicturaeImporter(Importer):
             args:
                 taxon_string: the taxon string or substring, which before assignment
         """
-
-
+        def_tree = 13
+        rank_id = 220
         if "subsp." in taxon_string:
-            return 14, 230
-        elif "var." in taxon_string:
-            return 15, 240
-        elif "subvar." in taxon_string:
-            return 16, 250
-        elif " f. " in taxon_string:
-            return 17, 260
-        elif "subf." in taxon_string:
-            return 21, 270
-        elif len(taxon_string.split()) == 1:
-            return 12, 180
-        else:
-            return 13, 220
+            def_tree = 14
+            rank_id = 230
+        if "var." in taxon_string:
+            def_tree = 15
+            rank_id = 240
+        if "subvar." in taxon_string:
+            def_tree = 16
+            rank_id = 250
+        if " f. " in taxon_string:
+            def_tree = 17
+            rank_id = 260
+        if "subf." in taxon_string:
+            def_tree = 21
+            rank_id = 270
+        if len(taxon_string.split()) == 1:
+            def_tree = 12
+            rank_id = 180
+
+        return def_tree, rank_id
 
     def check_single_taxa(self, taxon_name, barcode):
         """check_single_taxa: designed to take in one taxaname and
@@ -161,7 +176,7 @@ class PicturaeImporter(Importer):
 
         robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
 
-        with open('taxon_check/test_TNRS.R', 'r') as file:
+        with open('taxon_check/R_TNRS.R', 'r') as file:
             r_script = file.read()
 
         robjects.r(r_script)
@@ -247,7 +262,7 @@ class PicturaeImporter(Importer):
 
                 first_name, last_name, title, middle = elements
 
-                sql = create_name_sql(first_name, last_name, middle, title)
+                sql = check_agent_name_sql(first_name, last_name, middle, title)
 
                 agent_id = self.specify_db_connection.get_one_record(sql)
 
@@ -294,10 +309,9 @@ class PicturaeImporter(Importer):
 
         """
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
-                       'end_date', 'collector_number', 'locality', 'county', 'state', 'country', 'fullname', 'taxname',
+                       'end_date', 'collector_number', 'locality', 'fullname', 'taxname',
                        'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author',
-                       'name_matched', 'Hybrid Genus']
-
+                       'name_matched', 'first_intra', 'county', 'state', 'country']
         # print(self.full_name)
         index_list = []
         for column in column_list:
@@ -309,36 +323,33 @@ class PicturaeImporter(Importer):
         self.end_date = row[index_list[3]]
         self.collector_number = row[index_list[4]]
         self.locality = row[index_list[5]]
-        self.full_name = row[index_list[9]]
-        self.tax_name = row[index_list[10]]
-        self.gen_spec = row[index_list[11]]
-        self.qualifier = row[index_list[12]]
-        self.name_matched = row[index_list[13]]
-        self.family_name = row[index_list[15]]
-        self.is_hybrid = row[index_list[16]]
-        self.author = row[index_list[17]]
-        self.name_matched = row[index_list[18]]
-
-        if self.is_hybrid is False:
-            self.genus = row[index_list[14]]
-
-        else:
-            self.genus = row[index_list[19]]
+        self.full_name = row[index_list[6]]
+        self.tax_name = row[index_list[7]]
+        self.gen_spec = row[index_list[8]]
+        self.qualifier = row[index_list[9]]
+        self.name_matched = row[index_list[10]]
+        self.genus = row[index_list[11]]
+        self.family_name = row[index_list[12]]
+        self.is_hybrid = row[index_list[13]]
+        self.author = row[index_list[14]]
+        self.name_matched = row[index_list[15]]
+        self.first_intra = row[index_list[16]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
             setattr(self, guid_string, uuid4())
 
-        self.geography_string = str(row[index_list[6]]) + ", " + \
-                                str(row[index_list[7]]) + ", " + str(row[index_list[8]])
+        self.geography_string = str(row[index_list[17]]) + ", " + \
+                                str(row[index_list[18]]) + ", " + str(row[index_list[19]])
 
         self.GeographyID = self.populate_sql(tab_name='geography', id_col='GeographyID',
                                              key_col='FullName', match=self.geography_string)
+
         self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
                                              key_col='LocalityName', match=self.locality)
 
     def taxon_get(self, name):
-        sql = f'''SELECT TaxonID FROM taxon WHERE FullName = "{name}";'''
+        sql = f'''SELECT TaxonID FROM casbotany.taxon WHERE FullName = "{name}";'''
         result_id = self.specify_db_connection.get_one_record(sql)
         return result_id
 
@@ -357,6 +368,11 @@ class PicturaeImporter(Importer):
         if self.taxon_id is None:
             self.taxon_list.append(self.full_name)
             # check base name if base name differs e.g. if var. or subsp.
+            if self.full_name != self.first_intra and self.first_intra != self.gen_spec:
+                self.first_intra_id = self.taxon_get(name=self.first_intra)
+                if self.first_intra_id is None:
+                    self.taxon_list.append(self.gen_spec)
+
             if self.full_name != self.gen_spec:
                 self.gen_spec_id = self.taxon_get(name=self.gen_spec)
                 self.check_single_taxa(taxon_name=self.gen_spec, barcode=self.barcode)
@@ -366,39 +382,16 @@ class PicturaeImporter(Importer):
 
             # base value for gen spec is set as None so will work either way.
             # checking for genus id
-
-            if self.gen_spec_id is None and self.is_hybrid is False:
                 self.genus_id = self.taxon_get(name=self.genus)
                 # adding genus name if missing
                 if self.genus_id is None:
                     self.taxon_list.append(self.genus)
 
                     # checking family id
-                    self.family_id = self.taxon_get(name=self.family_name)
-                    # adding family name to list
-                    if self.family_id is None:
-                        self.taxon_list.append(self.family_name)
-            # setting taxon for hybrids
-            if self.is_hybrid is True and self.gen_spec_id is None:
-                # if the genus + species is none, and it is not a genus level cross
-                # get genus
-                if self.genus != self.full_name:
-                    self.genus_id = self.taxon_get(name=self.genus)
-                # if genus level cross
-                elif self.genus == self.full_name:
-                    # taking only first genus cross as genus
-                    self.genus = self.genus.split()[0]
-                    self.genus_id = self.taxon_get(name=self.genus)
-
-                    # adding genus name if missing
-                if self.genus_id is None:
-                    self.taxon_list.append(self.genus)
-
-                    # checking family id
-                    self.family_id = self.taxon_get(name=self.family_name)
-                    # adding family name to list
-                    if self.family_id is None:
-                        self.taxon_list.append(self.family_name)
+                    # self.family_id = self.taxon_get(name=self.family_name)
+                    # # adding family name to list
+                    # if self.family_id is None:
+                    #     self.taxon_list.append(self.family_name)
         else:
             pass
 
@@ -470,7 +463,7 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_sql_string(tab_name=table, col_list=column_list,
+        sql = create_insert_statement(tab_name=table, col_list=column_list,
                                 val_list=value_list)
 
         self.create_table_record(sql=sql)
@@ -519,7 +512,7 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             values, columns = remove_two_index(values, columns)
 
-            sql = create_sql_string(tab_name=table, col_list=columns,
+            sql = create_insert_statement(tab_name=table, col_list=columns,
                                     val_list=values)
 
             self.create_table_record(sql=sql)
@@ -569,7 +562,7 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_sql_string(tab_name=table, col_list=column_list,
+        sql = create_insert_statement(tab_name=table, col_list=column_list,
                                 val_list=value_list)
 
         self.create_table_record(sql=sql)
@@ -580,11 +573,8 @@ class PicturaeImporter(Importer):
                             before lower taxa. Assigns taxa ranks and TaxonTreedefItemID
         """
         # for now do not upload
-        parent_list = [self.full_name, self.gen_spec, self.genus, self.family_name]
-
-        if self.gen_spec == self.full_name:
-            parent_list.remove(self.gen_spec)
-
+        parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
+        parent_list = unique_ordered_list(parent_list)
         for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
             taxon_guid = uuid4()
             rank_name = taxa_rank
@@ -613,6 +603,7 @@ class PicturaeImporter(Importer):
 
             if self.is_hybrid is True:
                 author_insert = pd.NA
+
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
@@ -651,7 +642,7 @@ class PicturaeImporter(Importer):
 
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_sql_string(tab_name=table, col_list=column_list,
+            sql = create_insert_statement(tab_name=table, col_list=column_list,
                                     val_list=value_list)
 
             self.create_table_record(sql=sql)
@@ -708,7 +699,7 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_sql_string(tab_name=table, col_list=column_list,
+        sql = create_insert_statement(tab_name=table, col_list=column_list,
                                 val_list=value_list)
 
         self.create_table_record(sql=sql)
@@ -764,7 +755,7 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_sql_string(tab_name=table, col_list=column_list,
+            sql = create_insert_statement(tab_name=table, col_list=column_list,
                                     val_list=value_list)
             self.create_table_record(sql)
 
@@ -784,10 +775,10 @@ class PicturaeImporter(Importer):
         for index, agent_dict in enumerate(self.full_collector_list):
             table = 'collector'
 
-            sql = create_name_sql(first_name=agent_dict["collector_first_name"],
-                                  last_name=agent_dict["collector_last_name"],
-                                  middle_initial=agent_dict["collector_middle_initial"],
-                                  title=agent_dict["collector_title"])
+            sql = check_agent_name_sql(first_name=agent_dict["collector_first_name"],
+                                        last_name=agent_dict["collector_last_name"],
+                                        middle_initial=agent_dict["collector_middle_initial"],
+                                        title=agent_dict["collector_title"])
 
             agent_id = self.specify_db_connection.get_one_record(sql=sql)
 
@@ -816,7 +807,7 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_sql_string(tab_name=table, col_list=column_list,
+            sql = create_insert_statement(tab_name=table, col_list=column_list,
                                     val_list=value_list)
 
             self.create_table_record(sql)
@@ -905,15 +896,17 @@ class PicturaeImporter(Importer):
                 picturae_config to ensure prefix is
                 updated for correct filepath
         """
-        filename = "picurae_config.py"
+        filename = "picturae_config.py"
+
+        latest_date = r'\1"' + self.date_use + r'"\n'
 
 
         with open(filename, 'r') as file:
             # Read the contents of the file
             content = file.read()
-        date_rep = self.date_use
+
         # Replace the string
-        new_content = re.sub(r'\bdate_str = \w*\b', date_rep, content)
+        new_content = re.sub(r'(date_str = )(.*?)\n', latest_date, content)
 
         with open(filename, 'w') as file:
             # Write the modified content back to the file
@@ -922,7 +915,7 @@ class PicturaeImporter(Importer):
         try:
             self.hide_unwanted_files()
 
-            BotanyImporter(paths=picturae_config)
+            BotanyImporter(paths=self.paths, config=picturae_config)
 
             self.unhide_files()
         except Exception as e:
@@ -972,7 +965,7 @@ class PicturaeImporter(Importer):
                                         match_type="integer"
                                         )
                 if barcode_result is None:
-                    sql = create_new_tax(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
+                    sql = create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
                     self.create_table_record(sql)
 
         # uploading attachments

@@ -146,11 +146,6 @@ class BotanyImporterTests(unittest.TestCase):
         self.assertNotEqual(new_list, test_list)
 
 
-    # def test_process_loaded:
-    #
-    # def test_process_barcode(self):
-    # self.botany_importer.process_barcode()
-
     def tearDown(self):
         """deletes test files"""
         test_dir = self.generate_test_directory()

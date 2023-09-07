@@ -3,6 +3,8 @@ import argparse
 import botany_importer_config
 import picturae_config
 import datetime
+from data_utils import str_to_bool
+import os
 import logging
 import collection_definitions
 from botany_importer import BotanyImporter
@@ -44,6 +46,8 @@ def parse_command_line():
 
     search_parser.add_argument('term')
 
+    parser.add_argument('date', help='date to use')
+
     return parser.parse_args()
 
 
@@ -53,9 +57,29 @@ def main(args):
         image_client = ImageClient()
     elif args.subcommand == 'import':
         if args.collection == "Botany":
-            BotanyImporter(paths=botany_importer_config)
-        elif args.collection == 'PIC':
-            PicturaeImporter(date_string="2023-06-28", paths=picturae_config)
+            # get paths here
+            paths = []
+            for cur_dir in botany_importer_config.BOTANY_SCAN_FOLDERS:
+                paths.append(os.path.join(botany_importer_config.PREFIX,
+                                          botany_importer_config.BOTANY_PREFIX,
+                                          cur_dir))
+                print(f"Scanning: {cur_dir}")
+
+            BotanyImporter(paths=paths, config=botany_importer_config)
+        elif args.collection == 'Botany_PIC':
+            #get paths here
+            paths = []
+            for cur_dir in picturae_config.PIC_SCAN_FOLDERS:
+                paths.append(os.path.join(picturae_config.PREFIX,
+                                          picturae_config.PIC_PREFIX,
+                                          cur_dir))
+                print(f"Scanning: {cur_dir}")
+            date_override = args.date
+            if date_override is not None:
+                PicturaeImporter(paths=paths, date_string=date_override)
+            else:
+                PicturaeImporter(paths=paths)
+
         elif args.collection == "Ichthyology":
             IchthyologyImporter()
         elif args.collection == "IZ":

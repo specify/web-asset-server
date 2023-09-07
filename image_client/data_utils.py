@@ -1,30 +1,29 @@
 """Docstring: This is a utility file, outlining various useful functions to be used
-   for herbology related tasks
+   for botany related data related tasks
 """
 from datetime import datetime
-from datetime import timedelta
-import random
 import sys
 import numpy as np
 import pandas as pd
-import pymysql as psq
 import csv
 import re
 import os
 from PIL import Image
-import time_utils
 pd.set_option('expand_frame_repr', False)
 
 
+# String and numeric reformating tools
 
-def str_to_bool(value):
+def str_to_bool(value: str):
+    """str_to_bool: will take a column with string 'True' & 'False' and convert to true booleans.
+                    Most useful when used with .apply function
+
+        args:
+            value: string value to convert to boolean
+        returns:
+            boolean conversion of string value.
+    """
     return value.lower() == 'true'
-
-def write_list_to_csv(file_path, data_list):
-    with open(file_path, 'w', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(["FullName"])
-        csv_writer.writerows(data_list)
 
 
 def remove_non_numerics(string: str):
@@ -45,6 +44,19 @@ def replace_apostrophes(string: str):
     """
     # using double quotes on one and single on the other is actually important this time
     return re.sub("'", '"', string)
+
+
+def move_first_substring(string: str, n_char: int):
+    """move_first_substring: will move first n letters from beginning to end of string
+       args:
+            string: any string
+        returns:
+            string: a string the first n characters moved to end
+        """
+    if len(string) <= n_char:
+        return string
+    else:
+        return string[n_char+1:] + string[0:n_char+1]
 
 
 def assign_titles(first_last, name: str):
@@ -78,34 +90,6 @@ def assign_titles(first_last, name: str):
         new_name = name
 
     return new_name, title
-#
-#
-# new_name, title = assign_titles(first_last='last', name="morton Jr.")
-# print(new_name)
-# print(title)
-
-
-def string_converter(df: pd.DataFrame, column: str, option: str):
-    """function to turn string with decimal points into string or int with no decimals
-       args:
-            df: dataframe to modify
-            column: string name of column to modify
-            option: end result output
-        returns:
-            df: a dataframe with the modified column
-    """
-    if option == "str":
-        df[column] = df[column].fillna(0)
-        df[column] = pd.to_numeric(df[column], errors='coerce')
-        df[column] = df[column].astype(int).astype(str)
-        return df
-    elif option == "int":
-        df[column] = df[column].fillna(0)
-        df[column] = pd.to_numeric(df[column], errors='coerce')
-        df[column] = df[column].astype(int)
-        return df
-    else:
-        return "Invalid input"
 
 
 def roman_to_int(string):
@@ -146,7 +130,29 @@ def roman_to_int(string):
     return output
 
 
-# will be expanded to handle both directions
+def string_converter(df: pd.DataFrame, column: str, option: str):
+    """function to turn string with decimal points into string or int with no decimals
+       args:
+            df: dataframe to modify
+            column: string name of column to modify
+            option: end result output
+        returns:
+            df: a dataframe with the modified column
+    """
+    if option == "str":
+        df[column] = df[column].fillna(0)
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+        df[column] = df[column].astype(int).astype(str)
+        return df
+    elif option == "int":
+        df[column] = df[column].fillna(0)
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+        df[column] = df[column].astype(int)
+        return df
+    else:
+        return "Invalid input"
+
+
 def switch_date_format(df: pd.DataFrame, date_col: str, format_to: str):
     """switch_date_format: changes dates from m/d/y, to d/m/y, or vice versa
         args:
@@ -165,19 +171,6 @@ def switch_date_format(df: pd.DataFrame, date_col: str, format_to: str):
         print('not valid format')
 
     return df
-
-
-def move_first_substring(string: str, n_char: int):
-    """move_first_substring: will move first n letters from beginning to end of string
-       args:
-            string: any string
-        returns:
-            string: a string the first n characters moved to end
-        """
-    if len(string) <= n_char:
-        return string
-    else:
-        return string[n_char+1:] + string[0:n_char+1]
 
 
 def to_decimal_degrees(coord: str, num_digits: int):
@@ -201,6 +194,98 @@ def zero_out_barcode(number):
     return str(number).zfill(9)
 
 
+# taxon parsing tools, tools that modify or parse taxon columns and info,
+def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
+    """seperate_qualifiers: separates out the parsed taxa and the cf qualifier into new columns
+                            qualifier to be stored in new 'qualifier' column.
+        args:
+            tax_frame: dataframe containing taxon string column, from which qualifiers need to be parsed
+            tax_col: the name of the tax column which we want to parse.
+        returns:
+            tax_frame: a dataframe with new qualifier column parsed from tax column.
+        """
+
+    tax_frame['qualifier'] = pd.NA
+
+    qual_regex = ['cf.', 'aff.', 'vel aff.']
+    for qual in qual_regex:
+        cf_mask = tax_frame[tax_col].str.contains(f"{qual}")
+        if len(cf_mask) > 0:
+        # setting default to species qualifier
+            tax_frame.loc[cf_mask, 'qualifier'] = qual
+
+    # removing trailing whitespace
+    tax_frame['qualifier'] = tax_frame['qualifier'].str.strip()
+
+    tax_frame[tax_col] = tax_frame[tax_col].apply(remove_qualifiers)
+
+    return tax_frame
+
+
+def remove_qualifiers(tax_string: str):
+    """remove_qualifiers: removes qualifiers such as cf. or aff. from any taxon string.
+        args:
+            tax_string: string of taxon name , which one wants to remove qualifiers from.
+        returns:
+            tax_string: a string without qualifier substrings present.
+    """
+    qual_list = [" cf.", "cf.", "vel aff.", " vel aff.", " aff.", "aff."]
+    for qual_str in qual_list:
+        tax_string = tax_string.replace(qual_str, "")
+
+    return tax_string
+
+
+def extract_after_subtax(text):
+    """extract_after_subtax: will take any substring after a subtaxa/intrataxa rank pattern,
+        and stores it in a variable. Useful for parsing taxon names
+        args:
+            text: the verbatim taxon name that will be parsed.
+        returns:
+            extracted_text: substring after subtaxa rank"""
+    patterns = ["subsp\.", "var\.", "subvar\.", "f\.", "subform\."]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            start = match.end()
+            extracted_text = text[start:].strip()
+            return extracted_text
+
+    return None
+
+
+# list and dictionary tools: these tools change the ordering or formatting of lists and dictionaries
+
+def write_list_to_csv(file_path: str, data_list: list, col_name: str):
+    """write_list_to_csv: writes a list of information to a csv column.
+
+        args:
+            file_path: destination for csv file
+            data_list: list to write to csv
+            col_name: column name in which list data will be stored
+    """
+    with open(file_path, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow([col_name])
+        csv_writer.writerows(data_list)
+
+
+def unique_ordered_list(input_list):
+    """unique_ordered_list:
+            takes a list and selects only unique elements,
+            while preserving order
+        args:
+            input_list: list which will be made to have
+                        only unique elements.
+    """
+    unique_elements = []
+    for element in input_list:
+        if element not in unique_elements:
+            unique_elements.append(element)
+    return unique_elements
+
+
 def remove_two_index(value_list, column_list):
     new_value_list = []
     new_column_list = []
@@ -219,41 +304,7 @@ def remove_two_index(value_list, column_list):
 
     return new_value_list, new_column_list
 
-#
-# col_list = ["val1", "val2", "val3", "val4"]
-#
-# val_list = [1, '', pd.NA, np.nan]
-#
-# new_val, new_col = remove_two_index(val_list, col_list)
-#
-# print(new_val)
-# print(new_col)
-
-def write_dict_to_csv(tax_dict, filename):
-    with open(filename, mode='w', newline='') as file:
-        fieldnames = ['Barcode', 'FullName', 'AcceptedName']
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-
-        writer.writeheader()
-        for barcode, info in tax_dict.items():
-            row = {'Barcode': barcode, 'FullName': info['FullName'], 'AcceptedName': info['AcceptedName']}
-            writer.writerow(row)
-
-
-def cont_prompter():
-    """cont_prompter:
-            placed critical step after database checks, prompts users to
-            confirm in order to continue. Allows user to check logger texts to make sure
-            no unwanted data is being uploaded.
-    """
-    while True:
-        user_input = input("Do you want to continue? (y/n): ")
-        if user_input.lower() == "y":
-            break
-        elif user_input.lower() == "n":
-            sys.exit("Script terminated by user.")
-        else:
-            print("Invalid input. Please enter 'y' or 'n'.")
+# directory tools will modify directories, and parse directory info
 
 
 def to_current_directory():
@@ -289,23 +340,48 @@ def create_test_images(barcode_list: list, date_string: str):
         print(f"Created directory: {os.path.dirname(expected_image_path)}")
         image.save(expected_image_path)
 
-def unique_ordered_list(input_list):
-    """unique_ordered_list:
-            takes a list and selects only unique elements,
-            while preserving order
+
+def get_max_subdirectory_date(parent_directory: str):
+    """get_max_subdirectory_date: lists every subdirectory in a directory, presuming data is organized by date, in any
+                                dash divided fomrat Y-M-D, D-M-Y etc..., pulls the largest date from the list.
+                                Useful for updating config files and functions with dependent date variables
         args:
-            input_list: list which will be made to have
-                        only unique elements.
+            parent_directory: the directory from which we want to list subdirectories with max date."""
+    subdirect = [d for d in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, d))]
+    latest_date = None
+    for date in subdirect:
+        try:
+            date = datetime.strptime(date, "%Y-%m-%d")
+            if latest_date is None or date > latest_date:
+                latest_date = date
+        except ValueError:
+            continue
+    return latest_date
+
+# process tools: tools that will time or prompt running processes
+
+
+def cont_prompter():
+    """cont_prompter:
+            placed critical step after database checks, prompts users to
+            confirm in order to continue. Allows user to check logger texts to make sure
+            no unwanted data is being uploaded.
     """
-    unique_elements = []
-    for element in input_list:
-        if element not in unique_elements:
-            unique_elements.append(element)
-    return unique_elements
+    while True:
+        user_input = input("Do you want to continue? (y/n): ")
+        if user_input.lower() == "y":
+            break
+        elif user_input.lower() == "n":
+            sys.exit("Script terminated by user.")
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
 
 
 class Timer:
-    """times how long it takes for a block of code to run"""
+    """Timer: class that times how long it takes for a block of code to run. Put at top of file
+                set to run at exit
+        returns:
+            duration: endtime - startime, duration of code block run"""
     def __enter__(self):
         self.start_time = datetime.now()
         return self
@@ -315,82 +391,3 @@ class Timer:
 
     def get_duration(self):
         return self.end_time - self.start_time
-
-
-
-def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
-    """seperate_qualifiers: separates out the parsed taxa and the cf qualifier"""
-
-    tax_frame['qualifier'] = pd.NA
-
-    qual_regex = ['cf.', 'aff.']
-    for qual in qual_regex:
-        cf_mask = tax_frame[tax_col].str.contains(f"{qual}")
-        if len(cf_mask) > 0:
-    # setting default to species qualifier
-
-            tax_frame.loc[cf_mask, 'qualifier'] = qual
-
-            #empty_spec_mask = tax_frame['Species'].isna() & cf_mask
-            #
-            # tax_frame.loc[empty_spec_mask, 'qualifier'] = tax_frame.loc[empty_spec_mask, 'Hybrid Species']
-            #
-            # # if the taxon string starts with cf. it is most likely a genus qualifier
-            # cf_genus = tax_frame[tax_col].str.contains(f'^{qual}')
-            #
-            # tax_frame.loc[cf_genus, 'qualifier'] = tax_frame.loc[cf_genus, 'Genus']
-            #
-            # empty_gen_mask = tax_frame['Genus'].isna() & cf_genus
-            #
-            # tax_frame.loc[empty_gen_mask, 'qualifier'] = tax_frame.loc[empty_gen_mask, 'Hybrid Genus']
-            #
-            # # executing for subtaxa
-            # cf_subtax_mask = tax_frame[tax_col].str.contains(f'{qual}') & \
-            #                  tax_frame[tax_col].str.contains(r'var\.|subvar\.|subsp\.| f\.|subf\.')
-            #
-            #
-            # tax_frame.loc[cf_subtax_mask, 'qualifier'] = tax_frame.loc[cf_subtax_mask, 'Epithet 1']
-            #
-            # cf_empty_subtax = cf_subtax_mask & tax_frame['Epithet 1'].isna()
-            #
-            # tax_frame.loc[cf_empty_subtax, 'qualifier'] = tax_frame.loc[cf_empty_subtax, 'Hybrid Epithet 1']
-
-
-    # removing trailing whitespace
-    tax_frame['qualifier'] = tax_frame['qualifier'].str.strip()
-
-    tax_frame[tax_col] = tax_frame[tax_col].apply(remove_qualifiers)
-
-    return tax_frame
-
-def remove_qualifiers(tax_string: str):
-    qual_list = [" cf.", "cf.", "vel aff.", " vel aff.", " aff.", "aff."]
-    for qual_str in qual_list:
-        tax_string = tax_string.replace(qual_str, "")
-
-    return tax_string
-
-
-
-def extract_after_subtax(text):
-    patterns = ["subsp\.", "var\.", "subvar\.", "f\.", "subform\."]
-
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            start = match.end()
-            extracted_text = text[start:].strip()
-            return extracted_text
-
-    return None
-
-
-# tax_frame = {"full_name": ["Fake cf. Fakus", "Fakulans fake var. cf. fakinatus"],
-# "Genus": ["Fake", "Fakulans"], "Species": ["Fakus", "fake"], "Hybrid Species": [pd.NA, pd.NA],
-#              "Hybrid Genus": [pd.NA, pd.NA], 'Epithet 1': [pd.NA, 'fakinatus'], 'Hybrid Epithet': [pd.NA, pd.NA]}
-# #
-# tax_frame = pd.DataFrame(tax_frame)
-# #
-# tax_frame = separate_qualifiers(tax_frame=tax_frame, tax_col='full_name')
-# #
-# print(tax_frame)

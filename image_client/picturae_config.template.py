@@ -5,13 +5,14 @@ SPECIFY_DATABASE = 'redacted'
 USER = 'redacted'
 PASSWORD = 'redacted'
 
+PIC_REGEX = '(CAS|cas)[0-9]*([\-_])*[0-9a-zA-Z]?.(JPG|jpg|jpeg|TIFF|tif)'
+
+PROCESS = 'PIC'
 
 sla = os.path.sep
 # config paths files
-date_str = "2023-06-28"
+date_str = None
 
-PREFIX = f'picturae_img{sla}'
-
-SCAN_FOLDERS = [f'PIC_{date_str}']
-
-DIR = "/Users/mdelaroca/Documents/sandbox_db/specify-sandbox/web-asset-server/image_client/"
+PIC_PREFIX = f'picturae_img{sla}'
+PIC_SCAN_FOLDERS = [f'PIC_{date_str}']
+PREFIX = f"web-asset-server{sla}image_client{sla}"

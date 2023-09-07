@@ -1,3 +1,6 @@
+output.txt
+.Rhistory
+.RData
 *.csv
 .Rhistory
 .RData

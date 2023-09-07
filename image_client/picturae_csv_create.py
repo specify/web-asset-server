@@ -1,5 +1,8 @@
 """picturae_csv_create: this file is for wrangling and creating the dataframe
-   and csv with the parsed fields required for upload, in picturae_import"""
+   and csv with the parsed fields required for upload, in picturae_import.
+   Uses TNRS (Taxonomic Name Resolution Service) in taxon_check/test_TNRS.R
+   to catch spelling mistakes, mis-transcribed taxa.
+   Source for taxon names at IPNI (International Plant Names Index): https://www.ipni.org/ """
 import pandas as pd
 from uuid import uuid4
 import traceback
@@ -17,6 +20,7 @@ batch_uuid = uuid4()
 
 
 starting_time_stamp = datetime.now()
+
 
 class CsvCreatePicturae(Importer):
     def __init__(self, date_string):
@@ -116,7 +120,7 @@ class CsvCreatePicturae(Importer):
             raise ValueError("Barcode Columns do not match!")
 
     def csv_colnames(self):
-        """csv_colnames: function to be used to rename columns to specify standards. includes csv)_
+        """csv_colnames: function to be used to rename columns to DB standards.
            args:
                 none"""
         # remove columns !! review when real dataset received
@@ -177,6 +181,7 @@ class CsvCreatePicturae(Importer):
         hyb_index = self.record_full.columns.get_loc('Hybrid')
         is_hybrid = row[hyb_index]
 
+        # defining empty strings for parsed taxon substrings
         full_name = ""
         tax_name = ""
         first_intra = ""
@@ -207,10 +212,9 @@ class CsvCreatePicturae(Importer):
         first_intra = first_intra.strip()
         gen_spec = gen_spec.strip()
         # creating taxon name
-        # creating temporary string in order to get tax order
+        # creating temporary string in order to parse taxon names without qualifiers
         separate_string = remove_qualifiers(full_name)
         taxon_strings = separate_string.split()
-
         # changing name variable based on condition
         if is_hybrid is False:
             tax_name = taxon_strings[-1]
@@ -238,13 +242,13 @@ class CsvCreatePicturae(Importer):
                     full_name = taxon_strings[0]
                     if full_name != genus:
                         full_name = taxon_strings[-1]
-            elif first_intra != full_name and (len(first_intra) < len(full_name)):
+
+            elif len(first_intra) != len(full_name):
                 if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
                     hybrid_base = full_name
                     full_name = " ".join(taxon_strings[:4])
                 else:
                     pass
-
 
         return str(gen_spec), str(full_name), str(first_intra), str(tax_name), str(hybrid_base)
 
@@ -279,8 +283,11 @@ class CsvCreatePicturae(Importer):
 
 
     def taxon_check_real(self):
-        """Sends the concatenated taxon column, through TNRS, to match names,
-           with and without spelling mistakes, """
+        """taxon_check_real:
+           Sends the concatenated taxon column, through TNRS, to match names,
+           with and without spelling mistakes, only checks base name
+           for hybrids as IPNI does not work well with hybrids
+           """
 
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
@@ -290,7 +297,7 @@ class CsvCreatePicturae(Importer):
 
         robjects.globalenv['r_dataframe_taxon'] = r_dataframe_tax
 
-        with open('taxon_check/test_TNRS.R', 'r') as file:
+        with open('taxon_check/R_TNRS.R', 'r') as file:
             r_script = file.read()
 
         robjects.r(r_script)
@@ -299,7 +306,7 @@ class CsvCreatePicturae(Importer):
 
         resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
 
-
+        # filtering out taxa without exact matches , saving to db table
         unmatched_taxa = resolved_taxon[resolved_taxon["overall_score"] < .99]
 
         # writing unmatched taxa to db table taxa_unmatch
@@ -313,16 +320,20 @@ class CsvCreatePicturae(Importer):
                 barcode_check = f'''SELECT CatalogNumber FROM casbotany.taxa_unmatch 
                                     WHERE CatalogNumber = {row[catalognumber]}'''
 
+                # checking if unmatched taxa's barcode already on unmatch_taxa table
                 sql_result = self.specify_db_connection.get_one_record(barcode_check)
                 if sql_result is None:
                     self.create_table_record(sql)
                 else:
                     pass
 
+        # filtering out taxa with tnrs scores lower than .99 (basically exact match)
         resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]
 
-        resolved_taxon = resolved_taxon.drop(columns=["overall_score", "unmatched_terms", "CatalogNumber"])
+        # dropping uneccessary columns
 
+        resolved_taxon = resolved_taxon.drop(columns=["overall_score", "unmatched_terms", "CatalogNumber"])
+        # merging columns on full name
         self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
 
         upload_length = len(self.record_full.index)
@@ -343,10 +354,9 @@ class CsvCreatePicturae(Importer):
 
         self.record_full.loc[hybrid_mask, 'fullname'] = self.record_full.loc[hybrid_mask, 'hybrid_base']
 
-        self.record_full.drop(columns=['hybrid_base'])
+        self.record_full = self.record_full.drop(columns=['hybrid_base'])
 
         # executing qualifier separator function
-
         self.record_full = separate_qualifiers(self.record_full, tax_col='fullname')
 
         self.record_full['gen_spec'] = self.record_full['gen_spec'].apply(remove_qualifiers)
@@ -373,7 +383,6 @@ class CsvCreatePicturae(Importer):
 
         self.record_full[string_list] = self.record_full[string_list].astype(str)
 
-
         # converting hybrid column to true boolean
 
         self.record_full['Hybrid'] = self.record_full['Hybrid'].apply(str_to_bool)
@@ -398,7 +407,7 @@ class CsvCreatePicturae(Importer):
                 self.record_full.loc[index, 'barcode_present'] = True
 
     def image_has_record(self):
-        """checks if image name/barcode already on attachments table"""
+        """checks if image name/barcode already in attachments table"""
         self.record_full['image_present'] = None
         for index, row in self.record_full.iterrows():
             file_name = os.path.basename(row['image_path'])
@@ -413,7 +422,8 @@ class CsvCreatePicturae(Importer):
                 self.record_full.loc[index, 'image_present'] = True
 
     def check_barcode_match(self):
-        """checks if filepath barcode matches catalog number barcode"""
+        """checks if filepath barcode matches catalog number barcode
+            just in case merge between folder and speciment level data was incorrect"""
         self.record_full['file_path_digits'] = self.record_full['image_path'].apply(
             lambda path: self.get_first_digits_from_filepath(path, field_size=9)
         )
@@ -431,6 +441,9 @@ class CsvCreatePicturae(Importer):
         self.record_full['image_valid'] = self.record_full['image_path'].apply(self.check_for_valid_image)
 
     def write_upload_csv(self):
+        """write_upload_csv: writes a copy of csv to PIC upload
+            allows for manual review before uploading.
+           """
         file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
         self.record_full.to_csv(file_path, index=False)
@@ -448,9 +461,7 @@ class CsvCreatePicturae(Importer):
         self.csv_colnames()
         # cleaning data
         self.col_clean()
-
-        print(self.record_full)
-
+        # running taxa through TNRS
         self.taxon_check_real()
 
         # checking if barcode record present in database
@@ -468,8 +479,7 @@ class CsvCreatePicturae(Importer):
         self.write_upload_csv()
 
 
-def test_run():
-    CsvCreatePicturae(date_string="2023-06-28")
-
-
-test_run()
+# def full_run():
+#     CsvCreatePicturae(date_string="2023-06-28")
+#
+# full_run()
