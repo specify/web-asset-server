@@ -215,23 +215,24 @@ class CsvCreatePicturae(Importer):
         # creating temporary string in order to parse taxon names without qualifiers
         separate_string = remove_qualifiers(full_name)
         taxon_strings = separate_string.split()
+
+        second_epithet_in = row[self.record_full.columns.get_loc('Epithet 2')]
+        first_epithet_in = row[self.record_full.columns.get_loc('Epithet 1')]
+        spec_in = row[self.record_full.columns.get_loc('Species')]
+        genus_in = row[self.record_full.columns.get_loc('Genus')]
         # changing name variable based on condition
-        if is_hybrid is False:
-            tax_name = taxon_strings[-1]
+
+        if not pd.isna(second_epithet_in):
+            tax_name = remove_qualifiers(second_epithet_in)
+        elif not pd.isna(first_epithet_in):
+            tax_name = remove_qualifiers(first_epithet_in)
+        elif not pd.isna(spec_in):
+            tax_name = remove_qualifiers(spec_in)
+        elif not pd.isna(genus_in):
+            tax_name = remove_qualifiers(genus_in)
         else:
-            if gen_spec == full_name:
-                if len(gen_spec) <= 3:
-                    tax_name = " ".join(taxon_strings[-2:])
-                    tax_name = tax_name.lower()
-                # for dealing with fully written out species crosses
-                else:
-                    tax_name = " ".join(taxon_strings[-3:])
-                    tax_name = tax_name.lower()
-            else:
-                tax_name = extract_after_subtax(separate_string)
-                if len(first_intra) < len(full_name):
-                    tax_name = extract_after_subtax(tax_name)
-                tax_name = tax_name.lower()
+            return ValueError('missing taxon in row')
+
         if is_hybrid is True:
             if first_intra == full_name:
                 if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
