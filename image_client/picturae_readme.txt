@@ -6,8 +6,8 @@ setup:
       2. install all packages from the requirements.txt file
       2. run the picturae_DDL to create the required error tracking tables in the database
       3. (optional) install R to enable r2py package to work properly
-      4. in order to run picturae_importer from the command line run with example date 2023-06-28:
-         'python image_client/client_tools.py Botany_PIC import 2023-06-28'
+      4. in order to run picturae_importer from the command line run with example date 2023-06-28 after option -d flag:
+         " python image_client/client_tools.py -d 2023-06-28 Botany_PIC import"
 
         if no date argument picturae_import will use the image/ csv folder name with the latest date.
 

@@ -46,7 +46,7 @@ def parse_command_line():
 
     search_parser.add_argument('term')
 
-    parser.add_argument('--date', help='date to use', nargs='?', default=None)
+    parser.add_argument('-d', '--date', nargs="?", help='date to use', default=None)
 
     return parser.parse_args()
 
@@ -68,7 +68,6 @@ def main(args):
             BotanyImporter(paths=paths, config=botany_importer_config)
         elif args.collection == 'Botany_PIC':
             date_override = args.date
-            print(args.date)
             # default is to get date of most recent folder in csv folder
             if date_override is None:
                 date_override = get_max_subdirectory_date("image_client/picturae_csv")
