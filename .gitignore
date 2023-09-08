@@ -27,3 +27,4 @@ settings.development.py
 /env
 *.JPG
 *.TIF
+*/.hidden_.hidden_*
