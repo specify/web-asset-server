@@ -95,6 +95,7 @@ class BotanyImporter(Importer):
         self.logger.debug(f"Adding filename to mappings set: {filename}   barcode: {barcode}")
         if barcode not in self.barcode_map:
             self.barcode_map[barcode] = [full_path]
+        else:
             self.barcode_map[barcode].append(full_path)
 
 

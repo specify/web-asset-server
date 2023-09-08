@@ -1,13 +1,10 @@
 import logging
 import sys
 import traceback
-import sqlite3
 import re
 
-# from mysql.connector import errorcode
-# import mysql.connector
-import mariadb
-
+from mysql.connector import errorcode
+import mysql.connector
 
 class DatabaseInconsistentError(Exception):
     pass
@@ -48,24 +45,28 @@ class DbUtils:
         self.connect()
 
     def connect(self):
+
         if self.cnx is None:
             self.logger.debug(f"Connecting to db {self.database_host}...")
 
             try:
-                self.cnx = mariadb.connect(user=self.database_user,
-                                           password=self.database_password,
-                                           host=self.database_host,
-                                           port=self.database_port,
-                                           database=self.database_name)
-            except mariadb.Error as err:
-                print(f"MariaDB threw an error: {err}")
-                if err.errno == 1045:
+                self.cnx = mysql.connector.connect(user=self.database_user,
+                                                   password=self.database_password,
+                                                   host=self.database_host,
+                                                   port=self.database_port,
+                                                   database=self.database_name)
+            except mysql.connector.Error as err:
+                if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
                     self.logger.error(f"Starting client...")
+
                     self.logger.error("SQL: Access denied")
-                elif err.errno == 1049:
+                elif err.errno == errorcode.ER_BAD_DB_ERROR:
                     self.logger.error("Database does not exist")
                 else:
                     self.logger.error(err)
+                sys.exit(1)
+            except Exception as err:
+                self.logger.error(f"Unknown exception: {err}")
                 sys.exit(1)
 
             self.logger.info("Db connected")
@@ -73,13 +74,12 @@ class DbUtils:
             pass
             # self.logger.debug(f"Already connected db {self.database_host}...")
 
-    # delarocamcas changed to buffered = True, so will work inside forloops
+
+
+    # added buffered = true so will work properly with forloops
     def get_one_record(self, sql):
         self.connect()
         cursor = self.cnx.cursor(buffered=True)
-        # print(self.database_host)
-        # print(self.database_name)
-        # print(self.database_port)
         try:
             cursor.execute(sql)
             retval = cursor.fetchone()
@@ -97,37 +97,6 @@ class DbUtils:
         cursor.close()
         return retval
 
-    def create_record(self, sql):
-        """used to run insert, update and create commands in mysql within DB"""
-        self.connect()
-        cursor = self.cnx.cursor(buffered=True)
-
-        try:
-            cursor.execute(sql)
-
-        except Exception as e:
-            print(f"Exception thrown while processing sql: {sql}\n{e}\n", file=sys.stderr, flush=True)
-            self.logger.error(traceback.format_exc())
-
-        cursor.close()
-
-    def test_connector(self, sql):
-        """create_table_record:
-               general code for testing queries against sql lite DB
-           args:
-               sql: the verbatim sql string, or multi sql query string to send to sql lite database
-        """
-        connection = sqlite3.connect('cas_botanylite.db')
-        cursor = connection.cursor()
-        try:
-            cursor.execute(sql)
-        except Exception as e:
-            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
-            self.logger.error(traceback.format_exc())
-        connection.commit()
-        cursor.close()
-        connection.close()
-
     def get_records(self, query):
         cursor = self.get_cursor()
         cursor.execute(query)
@@ -138,9 +107,9 @@ class DbUtils:
 
     def get_cursor(self):
         self.connect()
-        return self.cnx.cursor(buffered=True)
+        return self.cnx.cursor()
 
-    def execute(self, sql):
+    def execute(self,sql):
         cursor = self.get_cursor()
         self.logger.debug(f"SQL: {sql}")
         cursor.execute(sql)

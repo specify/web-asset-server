@@ -290,7 +290,7 @@ def fileget():
     log (f"fileget {request.query.filename}")
     image_db=get_image_db()
     records = image_db.get_image_record_by_internal_filename(request.query.filename)
-    log (f"Fileget compelte")
+    log (f"Fileget complete")
     if len(records) < 1:
         log(f"Record not found: {request.query.filename}")
         response.content_type = 'text/plain; charset=utf-8'
@@ -337,7 +337,7 @@ def fileupload_options():
 @require_token('store')
 def fileupload():
     """Accept original file uploads and store them in the proper
-    attchment subdirectory.
+    attachment subdirectory.
     """
     image_db=get_image_db()
     start_save = time.time()
@@ -378,7 +378,7 @@ def fileupload():
     orig_md5 = None
     datetime_now = datetime.utcnow()
     if 'original_filename' in request.forms.keys():
-        log("original filnname field set")
+        log("original filename field set")
         original_filename = request.forms['original_filename']
     else:
         log("original filename field is not set")

@@ -3,7 +3,6 @@
    Uses TNRS (Taxonomic Name Resolution Service) in taxon_check/test_TNRS.R
    to catch spelling mistakes, mis-transcribed taxa.
    Source for taxon names at IPNI (International Plant Names Index): https://www.ipni.org/ """
-import pandas as pd
 from uuid import uuid4
 import traceback
 import picturae_config
@@ -243,7 +242,7 @@ class CsvCreatePicturae(Importer):
 
         if is_hybrid is True:
             if first_intra == full_name:
-                if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
+                if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
                     hybrid_base = full_name
                     full_name = " ".join(taxon_strings[:2])
                 else:
@@ -253,7 +252,7 @@ class CsvCreatePicturae(Importer):
                         full_name = taxon_strings[-1]
 
             elif len(first_intra) != len(full_name):
-                if ("var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name):
+                if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
                     hybrid_base = full_name
                     full_name = " ".join(taxon_strings[:4])
                 else:
@@ -288,8 +287,6 @@ class CsvCreatePicturae(Importer):
             sys.exit("terminating script")
 
         cursor.close()
-
-
 
     def taxon_check_real(self):
         """taxon_check_real:

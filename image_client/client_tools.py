@@ -3,7 +3,7 @@ import argparse
 import botany_importer_config
 import picturae_config
 import datetime
-from taxon_parse_utils import str_to_bool
+from csv_import_utils import rewrite_config_date
 import os
 import logging
 import collection_definitions
@@ -68,13 +68,15 @@ def main(args):
             BotanyImporter(paths=paths, config=botany_importer_config)
         elif args.collection == 'Botany_PIC':
             #get paths here
+            date_override = args.date
+            if date_override is not None:
+                rewrite_config_date(date_override, filepath="image_client/picturae_config.py")
             paths = []
             for cur_dir in picturae_config.PIC_SCAN_FOLDERS:
                 paths.append(os.path.join(picturae_config.PREFIX,
                                           picturae_config.PIC_PREFIX,
                                           cur_dir))
                 print(f"Scanning: {cur_dir}")
-            date_override = args.date
             if date_override is not None:
                 PicturaeImporter(paths=paths, date_string=date_override)
             else:

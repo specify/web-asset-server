@@ -20,6 +20,7 @@ from botany_importer import BotanyImporter
 
 from picturae_csv_create import starting_time_stamp
 
+
 class PicturaeImporter(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -107,6 +108,7 @@ class PicturaeImporter(Importer):
         # at exit run ending timestamp and append timestamp csv
         atexit.register(self.run_timestamps, batch_size=self.batch_size)
 
+
     def unlock_account(self):
         """function to be called during unexpected interruption of upload,
            so DB doesn't accidently remain locked"""
@@ -114,6 +116,7 @@ class PicturaeImporter(Importer):
         sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
 
         self.create_table_record(sql)
+
 
     def col_dtypes(self):
         """just in case csv import changes column dtypes, resetting at top of file,
@@ -128,6 +131,7 @@ class PicturaeImporter(Importer):
         self.record_full = self.record_full.replace({'True': True, 'False': False})
 
         self.record_full = self.record_full.replace(['', None, 'nan', np.nan], pd.NA)
+
 
     def taxon_assign_defitem(self, taxon_string):
         """taxon_assign_defitme: assigns, taxon rank and treeitemid number,
@@ -157,6 +161,7 @@ class PicturaeImporter(Importer):
             rank_id = 180
 
         return def_tree, rank_id
+
 
     def check_single_taxa(self, taxon_name, barcode):
         """check_single_taxa: designed to take in one taxaname and
@@ -190,6 +195,7 @@ class PicturaeImporter(Importer):
         taxon_list = list(resolved_taxon['accepted_author'])
 
         self.parent_author = taxon_list[0]
+
 
     # think of finding way to make this function logic not so repetitive
     def create_file_list(self):
@@ -225,6 +231,8 @@ class PicturaeImporter(Importer):
                 self.barcode_list.append(row['CatalogNumber'])
                 self.barcode_list = list(set(self.barcode_list))
                 self.image_list = list(set(self.image_list))
+
+
     def create_agent_list(self, row):
         """create_agent_list:
                 creates a list of collectors that will be checked and added to agent/collector tables.
@@ -279,6 +287,7 @@ class PicturaeImporter(Importer):
 
     # check after getting real dataset, still not final
 
+
     def populate_sql(self, tab_name, id_col, key_col, match, match_type="string"):
         """populate_sql:
                 creates a custom select statement for get one record,
@@ -299,6 +308,7 @@ class PicturaeImporter(Importer):
         result = self.specify_db_connection.get_one_record(sql)
 
         return result
+
 
     def populate_fields(self, row):
         """populate_fields:
@@ -354,6 +364,7 @@ class PicturaeImporter(Importer):
         sql = f'''SELECT TaxonID FROM {picturae_config.SPECIFY_DATABASE}.taxon WHERE FullName = "{name}";'''
         result_id = self.specify_db_connection.get_one_record(sql)
         return result_id
+
 
     # this process will be simplified to reflect new (8/31) changes in picturae_csv_create.py
     def populate_taxon(self):
@@ -427,7 +438,6 @@ class PicturaeImporter(Importer):
         cursor.close()
 
 
-
     def create_locality_record(self):
         """create_locality_record:
                defines column and value list , runs them as args
@@ -466,9 +476,10 @@ class PicturaeImporter(Importer):
         value_list, column_list = remove_two_index(value_list, column_list)
 
         sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                val_list=value_list)
+                                      val_list=value_list)
 
         self.create_table_record(sql=sql)
+
 
     def create_agent_id(self):
         """create_agent_id:
@@ -518,6 +529,7 @@ class PicturaeImporter(Importer):
                                     val_list=values)
 
             self.create_table_record(sql=sql)
+
 
     def create_collecting_event(self):
         """create_collectingevent:
@@ -653,6 +665,7 @@ class PicturaeImporter(Importer):
 
             print("taxon_created!")
 
+
     def create_collection_object(self):
         """create_collection_object:
                 defines column and value list , runs them as
@@ -707,6 +720,7 @@ class PicturaeImporter(Importer):
                                 val_list=value_list)
 
         self.create_table_record(sql=sql)
+
 
     def create_determination(self):
         """create_determination:
@@ -767,6 +781,7 @@ class PicturaeImporter(Importer):
             self.logger.error(f"failed to add determination , missing taxon for {self.full_name}")
             sys.exit()
 
+
     def create_collector(self):
         """create_collector:
                 adds collector to collector table, after
@@ -817,6 +832,7 @@ class PicturaeImporter(Importer):
 
             self.create_table_record(sql)
 
+
     def hide_unwanted_files(self):
         """hide_unwanted_files:
                function to hide files inside of images folder,
@@ -835,6 +851,7 @@ class PicturaeImporter(Importer):
                 new_file_name = f".hidden_{file_name}"
                 new_file_path = os.path.join(folder_path, new_file_name)
                 os.rename(file_path, new_file_path)
+
 
     def unhide_files(self):
         """unhide_files:
@@ -855,6 +872,7 @@ class PicturaeImporter(Importer):
                 new_file_path = os.path.join(folder_path, file_name)
                 os.rename(new_file_path, old_file_path)
 
+
     def upload_records(self):
         """upload_records:
                an ensemble function made up of all row level, and database functions,
@@ -866,11 +884,9 @@ class PicturaeImporter(Importer):
         """
         # the order of operations matters, if you change the order certain variables may overwrite
 
-
         self.record_full = self.record_full[self.record_full['CatalogNumber'].isin(self.barcode_list)]
 
         self.record_full = self.record_full.drop_duplicates(subset=['CatalogNumber'])
-
 
         for index, row in self.record_full.iterrows():
             self.populate_fields(row)
@@ -901,22 +917,6 @@ class PicturaeImporter(Importer):
                 picturae_config to ensure prefix is
                 updated for correct filepath
         """
-        filename = "picturae_config.py"
-
-        latest_date = r'\1"' + self.date_use + r'"\n'
-
-
-        with open(filename, 'r') as file:
-            # Read the contents of the file
-            content = file.read()
-
-        # Replace the string
-        new_content = re.sub(r'(date_str = )(.*?)\n', latest_date, content)
-
-        with open(filename, 'w') as file:
-            # Write the modified content back to the file
-            file.write(new_content)
-
         try:
             self.hide_unwanted_files()
 
@@ -925,6 +925,7 @@ class PicturaeImporter(Importer):
             self.unhide_files()
         except Exception as e:
             self.logger.error(f"{e}")
+
 
     def run_all_methods(self):
         """run_all_methods:
@@ -947,7 +948,7 @@ class PicturaeImporter(Importer):
 
         sql = f"""UPDATE mysql.user
                  SET account_locked = 'Y'
-                 WHERE user != {picturae_config.USER} AND host = '%';"""
+                 WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
         self.create_table_record(sql)
 
@@ -958,7 +959,7 @@ class PicturaeImporter(Importer):
 
         self.upload_records()
 
-        # creating new taxon list
+        # creating new taxon list (should think of way to shorten this)
         if len(self.taxon_list) > 0:
             taxa_frame = self.record_full[self.record_full['fullname'].isin(self.taxon_list)]
             for index, row in taxa_frame.iterrows():
@@ -984,6 +985,6 @@ class PicturaeImporter(Importer):
 
         sql = f"""UPDATE mysql.user
                  SET account_locked = 'n'
-                 WHERE user != {picturae_config.USER} AND host = '%';"""
+                 WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
         self.create_table_record(sql)
