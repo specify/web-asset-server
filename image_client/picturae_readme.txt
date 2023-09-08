@@ -32,7 +32,12 @@ file list:
                           picturae_batch: tracks each upload with timestamps and MD5 code,
                                            can be used for purging or troubleshooting.
 
-    data_utils: .py file which contains functions import for parsing lists, strings and datetime
+    string_utils: .py file which contains functions import for parsing strings and integers
+
+    taxon_parse_utils: .py file for parsing qualifiers and taxonomic nomenclature
+
+    picturae_upload_utils: .py file for functions that modify working folders, and modify lists ,
+                            dictionaries used for upload
 
     sql_csv_utils: .py file which contains functions used to quickly parse sql statements for insert/update/select
 

@@ -3,7 +3,7 @@ import argparse
 import botany_importer_config
 import picturae_config
 import datetime
-from csv_import_utils import rewrite_config_date
+from picturae_import_utils import rewrite_config_date
 import os
 import logging
 import collection_definitions

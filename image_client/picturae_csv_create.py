@@ -10,7 +10,7 @@ from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 import logging
 from taxon_parse_utils import *
-from csv_import_utils import *
+from picturae_import_utils import *
 from string_utils import *
 from importer import Importer
 from sql_csv_utils import create_unmatch_tab

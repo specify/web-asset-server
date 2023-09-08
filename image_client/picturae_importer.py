@@ -8,8 +8,7 @@ import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from uuid import uuid4
-from taxon_parse_utils import *
-from csv_import_utils import *
+from picturae_import_utils import *
 import logging
 from string_utils import *
 from sql_csv_utils import *
