@@ -8,8 +8,10 @@ import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from uuid import uuid4
-from data_utils import *
+from taxon_parse_utils import *
+from csv_import_utils import *
 import logging
+from string_utils import *
 from sql_csv_utils import *
 from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
@@ -349,7 +351,7 @@ class PicturaeImporter(Importer):
                                              key_col='LocalityName', match=self.locality)
 
     def taxon_get(self, name):
-        sql = f'''SELECT TaxonID FROM casbotany.taxon WHERE FullName = "{name}";'''
+        sql = f'''SELECT TaxonID FROM {picturae_config.SPECIFY_DATABASE}.taxon WHERE FullName = "{name}";'''
         result_id = self.specify_db_connection.get_one_record(sql)
         return result_id
 
@@ -645,7 +647,7 @@ class PicturaeImporter(Importer):
             value_list, column_list = remove_two_index(value_list, column_list)
 
             sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                    val_list=value_list)
+                                          val_list=value_list)
 
             self.create_table_record(sql=sql)
 
@@ -758,7 +760,7 @@ class PicturaeImporter(Importer):
             value_list, column_list = remove_two_index(value_list, column_list)
 
             sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                    val_list=value_list)
+                                          val_list=value_list)
             self.create_table_record(sql)
 
         else:
@@ -811,7 +813,7 @@ class PicturaeImporter(Importer):
             value_list, column_list = remove_two_index(value_list, column_list)
 
             sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                    val_list=value_list)
+                                          val_list=value_list)
 
             self.create_table_record(sql)
 
@@ -943,9 +945,9 @@ class PicturaeImporter(Importer):
 
         # locking users out from the database
 
-        sql = """UPDATE mysql.user
+        sql = f"""UPDATE mysql.user
                  SET account_locked = 'Y'
-                 WHERE user != 'botanist' AND host = '%';"""
+                 WHERE user != {picturae_config.USER} AND host = '%';"""
 
         self.create_table_record(sql)
 
@@ -962,11 +964,11 @@ class PicturaeImporter(Importer):
             for index, row in taxa_frame.iterrows():
                 catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
                 barcode_result = self.populate_sql(tab_name='picturaetaxa_added',
-                                        id_col='CatalogNumber',
-                                        key_col='CatalogNumber',
-                                        match=row[catalog_number],
-                                        match_type="integer"
-                                        )
+                                                   id_col='CatalogNumber',
+                                                   key_col='CatalogNumber',
+                                                   match=row[catalog_number],
+                                                   match_type="integer"
+                                                   )
                 if barcode_result is None:
                     sql = create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
                     self.create_table_record(sql)
@@ -980,8 +982,8 @@ class PicturaeImporter(Importer):
 
         # unlocking database
 
-        sql = """UPDATE mysql.user
+        sql = f"""UPDATE mysql.user
                  SET account_locked = 'n'
-                 WHERE user != 'botanist' AND host = '%';"""
+                 WHERE user != {picturae_config.USER} AND host = '%';"""
 
         self.create_table_record(sql)

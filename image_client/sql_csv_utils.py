@@ -1,5 +1,5 @@
 import pandas as pd
-from data_utils import remove_two_index
+from csv_import_utils import remove_two_index
 import time_utils
 from datetime import datetime
 from datetime import timedelta
@@ -48,7 +48,7 @@ def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, t
     return sql
 
 
-def create_insert_statement(col_list, val_list, tab_name):
+def create_insert_statement(col_list: list, val_list: list, tab_name: str):
     """create_sql_string:
            creates a new sql insert statement given a list of db columns,
            and values to input.
@@ -118,7 +118,7 @@ def create_update_statement(tab_name: str, col_list: list, val_list: list, condi
 
     update_string = update_string[:-1]
 
-    sql = f'''UPDATE casbotany.{tab_name}''' + update_string + ' ' + condition
+    sql = f'''UPDATE {tab_name}''' + update_string + ' ' + condition
 
     return sql
 

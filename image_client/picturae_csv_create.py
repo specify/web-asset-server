@@ -9,9 +9,10 @@ import traceback
 import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
-from data_utils import *
 import logging
-from sql_csv_utils import *
+from taxon_parse_utils import *
+from csv_import_utils import *
+from string_utils import *
 from importer import Importer
 from sql_csv_utils import create_unmatch_tab
 
@@ -325,7 +326,7 @@ class CsvCreatePicturae(Importer):
 
                 sql = create_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
 
-                barcode_check = f'''SELECT CatalogNumber FROM casbotany.taxa_unmatch 
+                barcode_check = f'''SELECT CatalogNumber FROM taxa_unmatch 
                                     WHERE CatalogNumber = {row[catalognumber]}'''
 
                 # checking if unmatched taxa's barcode already on unmatch_taxa table
@@ -406,7 +407,7 @@ class CsvCreatePicturae(Importer):
         for index, row in self.record_full.iterrows():
             barcode = os.path.basename(row['CatalogNumber'])
             barcode = barcode.zfill(9)
-            sql = f'''select CatalogNumber from casbotany.collectionobject
+            sql = f'''select CatalogNumber from collectionobject
                       where CatalogNumber = {barcode};'''
             db_barcode = self.specify_db_connection.get_one_record(sql)
             if db_barcode is None:
@@ -421,7 +422,7 @@ class CsvCreatePicturae(Importer):
             file_name = os.path.basename(row['image_path'])
             file_name = file_name.lower()
             # file_name = file_name.rsplit(".", 1)[0]
-            sql = f'''select origFilename from casbotany.attachment
+            sql = f'''select origFilename from attachment
                       where origFilename = "{file_name}";'''
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:

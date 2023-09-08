@@ -3,7 +3,7 @@ import argparse
 import botany_importer_config
 import picturae_config
 import datetime
-from data_utils import str_to_bool
+from taxon_parse_utils import str_to_bool
 import os
 import logging
 import collection_definitions

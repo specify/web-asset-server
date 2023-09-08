@@ -58,8 +58,7 @@ class DbUtils:
                                            port=self.database_port,
                                            database=self.database_name)
             except mariadb.Error as err:
-                print("oh no! error")
-                print(err)
+                print(f"MariaDB threw an error: {err}")
                 if err.errno == 1045:
                     self.logger.error(f"Starting client...")
                     self.logger.error("SQL: Access denied")
