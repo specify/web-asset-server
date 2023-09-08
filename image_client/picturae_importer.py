@@ -474,7 +474,7 @@ class PicturaeImporter(Importer):
                 args through create_sql_string and create_table record
                 in order to add new agent record to database.
                 Includes a forloop to cycle through multiple collectors.
-         """
+        """
         table = 'agent'
         for name_dict in self.new_collector_list:
             self.agent_guid = uuid4()
@@ -567,10 +567,12 @@ class PicturaeImporter(Importer):
 
         self.create_table_record(sql=sql)
 
-    # temporarily creating exception list until reliable taxon protocol
+
     def create_taxon(self):
         """create_taxon: populates the taxon table iteratively by adding higher taxa first,
-                            before lower taxa. Assigns taxa ranks and TaxonTreedefItemID
+                            before lower taxa. Assigns taxa ranks and TaxonTreedefItemID.
+                        Using parent list in order to populate parent ids, by using the parsed
+                        rank levels of each taxon name.
         """
         # for now do not upload
         parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
@@ -765,7 +767,8 @@ class PicturaeImporter(Importer):
 
     def create_collector(self):
         """create_collector:
-                adds collector to collector table, after pulling collection object, agent codes.
+                adds collector to collector table, after
+                pulling collection object, agent codes.
            args:
                 none
            returns:
@@ -815,8 +818,8 @@ class PicturaeImporter(Importer):
     def hide_unwanted_files(self):
         """hide_unwanted_files:
                function to hide files inside of images folder,
-               to filter out images not in images_list. Adds a substring '.hidden_'
-               in front of base file name.
+               to filter out images not in images_list.
+               Adds a substring '.hidden_' in front of base file name.
            args:
                 none
            returns:
@@ -923,8 +926,8 @@ class PicturaeImporter(Importer):
 
     def run_all_methods(self):
         """run_all_methods:
-                        self-explanatory function, will run all function in class in sequential manner"""
-
+                        self-explanatory function, will run all methods in class in sequential manner"""
+        # code to create test images for test image uploads
         # create_test_images(list(range(999999981, 999999985)), date_string=self.date_use)
 
         # setting directory

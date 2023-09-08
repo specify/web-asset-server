@@ -187,11 +187,9 @@ def allow_cross_origin(func):
 
 def resolve_file(filename, collection, type, scale):
     """Inspect the request object to determine the file being requested.
-    If the request is for a thumbnail and it has not been generated, do
-    so before returning.
-accession_copy
-    Returns the relative path to the requested file in the base
-    attachments directory.
+    If the request is for a thumbnail , and it has not been generated, do
+    so before returning accession_copy.
+    Returns the relative path to the requested file in the base attachments directory.
     """
 
     thumb_p = (type == "T")

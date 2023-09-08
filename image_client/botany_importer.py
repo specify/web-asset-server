@@ -53,7 +53,7 @@ class BotanyImporter(Importer):
             self.logger.debug(f"No barcode; skipping")
             return
         self.logger.debug(f"Barcode: {barcode}")
-        sql = f"select CollectionObjectID from casbotany.collectionobject where CatalogNumber={barcode};"
+        sql = f"select CollectionObjectID from collectionobject where CatalogNumber={barcode};"
         collection_object_id = self.specify_db_connection.get_one_record(sql)
         force_redacted = False
         if collection_object_id is None:
@@ -126,7 +126,7 @@ class BotanyImporter(Importer):
 
         cursor.close()
 
-        sql = f"select CollectingEventID from casbotany.collectingevent where GUID='{collecting_event_guid}';"
+        sql = f"select CollectingEventID from collectingevent where GUID='{collecting_event_guid}';"
         collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
         cursor = self.specify_db_connection.get_cursor()

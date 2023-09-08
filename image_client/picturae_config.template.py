@@ -7,8 +7,6 @@ PASSWORD = 'redacted'
 
 PIC_REGEX = '(CAS|cas)[0-9]*([\-_])*[0-9a-zA-Z]?.(JPG|jpg|jpeg|TIFF|tif)'
 
-PROCESS = 'PIC'
-
 sla = os.path.sep
 # config paths files
 date_str = None

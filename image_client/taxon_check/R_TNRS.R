@@ -5,11 +5,18 @@ library(TNRS)
 library(httr)
 library(jsonlite)
 
+# setting language to english and sinking output text, 
+# to not print out excessive text
+
 Sys.setenv(LANG = "en")
 
-# sink("output.txt")
+sink("output.txt")
 
 process_taxon_resolve <- function(tax_frame){
+  ## this function passes taxonomic nomenclature through the TNRS api,
+  ## to check for spelling errors and invalid taxonomic names
+  ## IPNI does have a limited base of hybrid taxon, 
+  ## so be cautious when checking hybridized taxonomic names
   
   today_date <- format(Sys.Date(), "%Y-%m-%d")
   
@@ -21,14 +28,14 @@ process_taxon_resolve <- function(tax_frame){
   taxon_frame = tax_frame %>% distinct()
   
   ncol_t = nrow(taxon_frame)
-  
-  #test_taxon = read_csv("test_csv.csv")
 
   
   headers = list('Accept' = 'application/json', 
                  'Content-Type'='application/json', 'charset'='UTF-8')
   
   data_json = jsonlite::toJSON(unname(taxon_frame))
+  
+  # sources as WCVP aka IPNI sponsored by KEW gardens/harvard herbarium
   
   sources <- "wcvp"
   class <- "wfo"
@@ -80,18 +87,21 @@ process_taxon_resolve <- function(tax_frame){
   
   results = left_join(taxon_frame, results, by='fullname')
  
+  # paring down columns before ingest into python
+  
   results = results %>% select('fullname', 'name_matched', 'accepted_author',
                                'overall_score', 
                                'unmatched_terms', 'CatalogNumber')
   
   results$overall_score = as.numeric(results$overall_score)
   
+  # returning results
   return(results)
 }
 
 resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 
-#sink()
+sink()
 
 #test_taxon = list(CatalogNumber = c(1234, 1234),
               #    fullname = c('Quercus', 'Quercus'))

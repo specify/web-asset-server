@@ -214,6 +214,9 @@ def create_new_tax_tab(row, df: pd.DataFrame, tab_name: str):
 def generate_token(timestamp, filename):
     """Generate the auth token for the given filename and timestamp.
     This is for comparing to the client submited token.
+    args:
+        timestamp: starting timestamp of upload batch
+        file_name: the name of the datafile that was uploaded
     """
     timestamp = str(timestamp)
     if timestamp is None:

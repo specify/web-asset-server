@@ -1,33 +1,0 @@
-  barcodes                  fullname
-1     1234 Arctostaphylos glandulosa
-2     1235      Aesculus californica
-3     1236           Impatiens banen
-4     1237        Quercus x kinselae
-         fullname Name_matched Overall_score Unmatched_terms
-1 Impatiens banen    Impatiens           0.5           banen
-[1] "writing spell/mismatch error csv"
-[1mwrote[0m [32m1.00TB[0m in [36m 0s[0m, [32m55.92PB/s[0m                                                                                 barcodes                  fullname
-1     1234 Arctostaphylos glandulosa
-2     1235      Aesculus californica
-3     1236           Impatiens banen
-4     1237        Quercus x kinselae
-         fullname Name_matched Overall_score Unmatched_terms
-1 Impatiens banen    Impatiens           0.5           banen
-[1] "writing spell/mismatch error csv"
-[1mwrote[0m [32m1.00TB[0m in [36m 0s[0m, [32m246.72PB/s[0m                                                                                 barcodes                  fullname
-1     1234 Arctostaphylos glandulosa
-2     1235      Aesculus californica
-3     1236           Impatiens banen
-4     1237        Quercus x kinselae
-         fullname Name_matched Overall_score Unmatched_terms
-1 Impatiens banen    Impatiens           0.5           banen
-[1] "writing spell/mismatch error csv"
-[1mwrote[0m [32m1.00TB[0m in [36m 0s[0m, [32m55.92PB/s[0m                                                                                 barcodes                  fullname
-1     1234 Arctostaphylos glandulosa
-2     1235      Aesculus californica
-3     1236           Impatiens banen
-4     1237        Quercus x kinselae
-         fullname Name_matched Overall_score Unmatched_terms
-1 Impatiens banen    Impatiens           0.5           banen
-[1] "writing spell/mismatch error csv"
-[1mwrote[0m [32m1.00TB[0m in [36m 0s[0m, [32m167.77PB/s[0m                                                                               

@@ -107,14 +107,21 @@ class CsvCreatePicturae(Importer):
 
             common_columns.remove('specimen_barcode')
 
-            common_columns.remove('path_jpg')
-
             spec_csv = spec_csv.drop(common_columns, axis=1)
 
             # completing merge on barcode
 
             self.record_full = pd.merge(fold_csv, spec_csv,
-                                        on=('specimen_barcode', 'path_jpg'), how='inner')
+                                        on='specimen_barcode', how='inner')
+
+            merge_len = len(self.record_full)
+
+            self.record_full = self.record_full.drop_duplicates()
+
+            unique_len = len(self.record_full)
+
+            if merge_len > unique_len:
+                raise ValueError(f"merge produced {merge_len-unique_len} duplicate records")
 
         else:
             raise ValueError("Barcode Columns do not match!")
@@ -364,7 +371,7 @@ class CsvCreatePicturae(Importer):
 
     def col_clean(self):
         """parses and cleans dataframe columns until ready for upload.
-            runs dependent functions taxon concat and
+            runs dependent function taxon concat
         """
         self.record_full['verbatim_date'] = self.record_full['verbatim_date'].apply(replace_apostrophes)
         self.record_full['locality'] = self.record_full['locality'].apply(replace_apostrophes)
@@ -424,7 +431,7 @@ class CsvCreatePicturae(Importer):
 
     def check_barcode_match(self):
         """checks if filepath barcode matches catalog number barcode
-            just in case merge between folder and speciment level data was incorrect"""
+            just in case merge between folder and specimen level data was not clean"""
         self.record_full['file_path_digits'] = self.record_full['image_path'].apply(
             lambda path: self.get_first_digits_from_filepath(path, field_size=9)
         )
@@ -444,7 +451,7 @@ class CsvCreatePicturae(Importer):
     def write_upload_csv(self):
         """write_upload_csv: writes a copy of csv to PIC upload
             allows for manual review before uploading.
-           """
+        """
         file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
         self.record_full.to_csv(file_path, index=False)
@@ -452,6 +459,7 @@ class CsvCreatePicturae(Importer):
         print(f'DataFrame has been saved to csv as: {file_path}')
 
     def run_all(self):
+        """run_all: runs all methods in the class in order"""
         # setting directory
         to_current_directory()
         # verifying file presence
@@ -481,6 +489,8 @@ class CsvCreatePicturae(Importer):
 
 
 # def full_run():
+#     """testing function to run just the first piece o
+#           f the upload process""
 #     CsvCreatePicturae(date_string="2023-06-28")
 #
 # full_run()

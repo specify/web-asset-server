@@ -3,12 +3,7 @@ from attachment_utils import AttachmentUtils
 from db_utils import DbUtils
 import botany_importer_config
 import ich_importer_config
-<<<<<<< HEAD
-from typing import Optional
-
-=======
 import traceback
->>>>>>> master
 import logging
 import sys
 from typing import Optional
@@ -73,11 +68,6 @@ def do_sync(collection_name, specify_db_connection):
                 print(f"Error, probably sql: \"{e}\"", file=sys.stderr, flush=True)
                 print(f"exception type: {type(e).__name__}", file=sys.stderr, flush=True)
 
-<<<<<<< HEAD
-                retry_count += 1
-=======
->>>>>>> master
-
     return record_list
 
 
@@ -107,13 +97,8 @@ def main():
 
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    main()
-=======
     try:
         main()
     except Exception as e:
         traceback.print_exc()
 
-
->>>>>>> master

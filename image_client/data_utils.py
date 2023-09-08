@@ -43,7 +43,7 @@ def replace_apostrophes(string: str):
         re.sub: a string with all apostrophes replaces by double quotes
     """
     # using double quotes on one and single on the other is actually important this time
-    return re.sub("'", '"', string)
+    return re.sub("'", "''", string)
 
 
 def move_first_substring(string: str, n_char: int):
@@ -321,7 +321,7 @@ def to_current_directory():
     os.chdir(directory)
 
 
-def create_test_images(barcode_list: list, date_string: str):
+def create_test_images(barcode_list: list, date_string: str, color: str):
     """create_test_images:
             creates a number of standard test images in a range of barcodes,
             and with a specific date string
@@ -331,16 +331,17 @@ def create_test_images(barcode_list: list, date_string: str):
             date_string: a date string , with which to name directory
                          in which to create and store the dummy images
     """
-    image = Image.new('RGB', (200, 200), color='red')
+    image = Image.new('RGB', (200, 200), color=color)
 
     barcode_list = barcode_list
     for barcode in barcode_list:
-        expected_image_path = f"picturae_img/{date_string}/CAS{barcode}.JPG"
+        expected_image_path = f"picturae_img/PIC_{date_string}/CAS{barcode}.JPG"
         os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
         print(f"Created directory: {os.path.dirname(expected_image_path)}")
         image.save(expected_image_path)
 
-
+# create_test_images(barcode_list=[999999975, 999999971, 999999972, 999999973, 999999974, 999999976, 999999977],
+#                    date_string="2023-09-07", color='green')
 def get_max_subdirectory_date(parent_directory: str):
     """get_max_subdirectory_date: lists every subdirectory in a directory, presuming data is organized by date, in any
                                 dash divided fomrat Y-M-D, D-M-Y etc..., pulls the largest date from the list.

@@ -1,6 +1,8 @@
-output.txt
-.Rhistory
-.RData
+/image_client/taxon_check/output.txt
+/image_client/taxon_check/.Rhistory
+/image_client/taxon_check/.RData
+/image_client/.RData
+/image_client/.Rhistory
 *.csv
 .Rhistory
 .RData
