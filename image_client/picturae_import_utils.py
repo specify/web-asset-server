@@ -12,26 +12,6 @@ import re
 
 
 # import list tools
-def rewrite_config_date(date:str, filepath:str):
-    """used to rewrite date_str in config files for picturae_importer
-    args:
-        date: the date string in YYYY-MM-DD format to sub into config file.
-        filepath: path to config file which you want to change"""
-    filename = filepath
-
-    latest_date = r'\1"' + date + r'"\n'
-
-    with open(filename, 'r') as file:
-        # Read the contents of the file
-        content = file.read()
-
-    # Replace the string
-    new_content = re.sub(r'(date_str = )(.*?)\n', latest_date, content)
-
-    with open(filename, 'w') as file:
-        # Write the modified content back to the file
-        file.write(new_content)
-
 
 def unique_ordered_list(input_list):
     """unique_ordered_list:
@@ -101,6 +81,7 @@ def create_test_images(barcode_list: list, date_string: str, color: str):
         print(f"Created directory: {os.path.dirname(expected_image_path)}")
         image.save(expected_image_path)
 
+
 def get_max_subdirectory_date(parent_directory: str):
     """get_max_subdirectory_date: lists every subdirectory in a directory, presuming data is organized by date, in any
                                 dash divided fomrat Y-M-D, D-M-Y etc..., pulls the largest date from the list.
@@ -116,7 +97,11 @@ def get_max_subdirectory_date(parent_directory: str):
                 latest_date = date
         except ValueError:
             continue
-    return latest_date
+
+    if latest_date is not None:
+        return latest_date.strftime("%Y-%m-%d")
+    else:
+        return None
 
 
 def cont_prompter():

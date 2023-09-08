@@ -31,10 +31,7 @@ class PicturaeImporter(Importer):
     def __init__(self, paths, date_string=None):
         super().__init__(picturae_config, "Botany")
 
-        if date_string is None:
-            self.date_use = get_max_subdirectory_date("picturae_csv")
-        else:
-            self.date_use = date_string
+        self.date_use = date_string
 
         self.logger = logging.getLogger('PicturaeImporter')
         # full collector list is for populating existing and missing agents into collector table
