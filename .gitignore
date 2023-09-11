@@ -1,4 +1,4 @@
-*/dummy_cleaner.py
+**/dummy_cleaner.py
 *.DS_Store
 /image_client/duplicates-Botany.txt
 *.csv
@@ -7,9 +7,9 @@
 */output.txt
 *.Rhistory
 *-Botany.txt
-*/iz_importer_config.py
+**/iz_importer_config.py
 /unmatched_taxa/*
-/image_client/test_csv_purge_sql/picturae_purge_script.sql
+**/picturae_purge_script.sql
 *.pyc
 .idea
 venv
