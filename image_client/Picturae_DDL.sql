@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS  picturae_batch (batchID INTEGER PRIMARY KEY AUTO_INC
                                             EndTimeStamp TEXT NOT NULL,
                                             batch_size INTEGER);
 
-# DROP TABLE casbotany.picturaetaxa_added;
+# DROP TABLE picturaetaxa_added;
 #
-# DROP TABLE casbotany.picturae_batch;
+# DROP TABLE picturae_batch;
 #
-# DROP TABLE casbotany.taxa_unmatch;
+# DROP TABLE taxa_unmatch;
 

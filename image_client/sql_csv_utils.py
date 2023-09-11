@@ -13,7 +13,7 @@ import sys
 # static methods
 def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, title: str):
     """create_name_sql: create a custom sql string, based on number of non-na arguments, the
-                        casbotany database does not recognize empty strings '' and NA as equivalent.
+                        database does not recognize empty strings '' and NA as equivalent.
                         Has conditional to ensure the first statement always starts with WHERE
         args:
             first_name: first name of agent
@@ -51,7 +51,7 @@ def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, t
     return sql
 
 
-def populate_sql(connection, tab_name, id_col, key_col, match, match_type="string"):
+def get_one_match(connection, tab_name, id_col, key_col, match, match_type="string"):
     """populate_sql:
             creates a custom select statement for get one record,
             from which a result can be gotten more seamlessly
@@ -93,9 +93,9 @@ def create_insert_statement(col_list: list, val_list: list, tab_name: str):
 
     return sql
 
-def create_table_record(connection, logger_int , sql):
+def insert_table_record(connection, logger_int , sql):
     """create_table_record:
-           general code for the inserting of a new record into any table on casbotany.
+           general code for the inserting of a new record into any table on database,
            creates connection, and runs sql query. cursor.execute with arg multi, to
            handle multi-query commands.
        args:
@@ -121,12 +121,12 @@ def create_table_record(connection, logger_int , sql):
 
     cursor.close()
 
-def create_timestamps(start_time: datetime, end_time: datetime,
+def create_batch_record(start_time: datetime, end_time: datetime,
                       batch_size: int, batch_md5: str):
     """create_timestamps:
             uses starting and ending timestamps to create window for sql database purge,
             adds 10 second buffer on either end to allow sql queries to populate.
-            appends each timestamp record in casbotany.batch.
+            appends each timestamp record in picturae_batch table.
         args:
             start_time: starting time stamp
             end_time: ending time stamp
@@ -152,6 +152,7 @@ def create_timestamps(start_time: datetime, end_time: datetime,
                   f"{time_stamp_list[1]}",
                   f"{batch_size}"
                   ]
+
     value_list, column_list = remove_two_index(value_list, column_list)
 
     sql = create_insert_statement(val_list=value_list, col_list=column_list, tab_name="picturae_batch")
@@ -178,9 +179,10 @@ def create_update_statement(tab_name: str, col_list: list, val_list: list, condi
 
     return sql
 
-def create_unmatch_tab(row ,df, tab_name: str):
-    """create_unmatch_tab: function used to create
-        table with unmatched TNRS taxas in casbotany DB,
+def create_tnrs_unmatch_tab(row ,df, tab_name: str):
+    """create_unmatch_tab: function used to insert
+        unmatched TNRS taxas into the
+        taxa_unmatch table on the Database,
         so that a more trained eye can diagnose,
         and resolve some of the edge cases.
 
@@ -223,7 +225,7 @@ def create_unmatch_tab(row ,df, tab_name: str):
     return sql
 
 
-def new_taxa_record(taxon_list, connection, logger_int, df: pd.DataFrame):
+def insert_taxa_added_record(taxon_list, connection, logger_int, df: pd.DataFrame):
     """new_taxa_record: creates record level data for any new taxa added to the database,
                         populates useful table for qc and troubleshooting
     args:
@@ -235,16 +237,16 @@ def new_taxa_record(taxon_list, connection, logger_int, df: pd.DataFrame):
     taxa_frame = df[df['fullname'].isin(taxon_list)]
     for index, row in taxa_frame.iterrows():
         catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
-        barcode_result = populate_sql(connection,
-                                      tab_name='picturaetaxa_added',
-                                      id_col='CatalogNumber',
-                                      key_col='CatalogNumber',
-                                      match=row[catalog_number],
-                                      match_type="integer"
+        barcode_result = get_one_match(connection,
+                                       tab_name='picturaetaxa_added',
+                                       id_col='CatalogNumber',
+                                       key_col='CatalogNumber',
+                                       match=row[catalog_number],
+                                       match_type="integer"
                                       )
         if barcode_result is None:
             sql = create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
-            create_table_record(connection, logger_int=logger_int, sql=sql)
+            insert_table_record(connection, logger_int=logger_int, sql=sql)
 
 
 
@@ -287,7 +289,6 @@ def create_new_tax_tab(row, df: pd.DataFrame, tab_name: str):
                                   val_list=val_list)
 
     return sql
-
 
 
 

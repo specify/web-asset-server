@@ -269,13 +269,13 @@ class CsvCreatePicturae(Importer):
         for index, row in unmatched_taxa.iterrows():
             catalognumber = unmatched_taxa.columns.get_loc("CatalogNumber")
 
-            sql = create_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
+            sql = create_tnrs_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
 
-            sql_result = populate_sql(connection=self.specify_db_connection, tab_name='taxa_unmatch',
+            sql_result = get_one_match(connection=self.specify_db_connection, tab_name='taxa_unmatch',
                                       id_col='CatalogNumber', key_col='CatalogNumber',
                                       match=row[catalognumber], match_type='integer')
             if sql_result is None:
-                create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+                insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
             else:
                 pass
 
