@@ -88,8 +88,6 @@ def main(args):
             IchthyologyImporter()
         elif args.collection == "IZ":
             IzImporter()
-            IzImporter()
-            IzImporter()
     elif args.subcommand == 'purge':
         logger.debug("Purge!")
 
@@ -98,8 +96,6 @@ def main(args):
             purger.purge()
     else:
         print(f"Unknown command: {args.subcommand}")
-
-
 
 
 

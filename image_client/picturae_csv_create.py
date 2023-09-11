@@ -4,10 +4,6 @@
    to catch spelling mistakes, mis-transcribed taxa.
    Source for taxon names at IPNI (International Plant Names Index): https://www.ipni.org/ """
 from uuid import uuid4
-import traceback
-
-import pandas as pd
-
 import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
@@ -16,7 +12,7 @@ from taxon_parse_utils import *
 from picturae_import_utils import *
 from string_utils import *
 from importer import Importer
-from sql_csv_utils import create_unmatch_tab
+from sql_csv_utils import *
 
 # creating a batch uuid
 batch_uuid = uuid4()
@@ -140,8 +136,6 @@ class CsvCreatePicturae(Importer):
 
         self.record_full = self.record_full.drop(columns=cols_drop)
 
-        # self.record_full = self.record_full.dropna(axis=1, how='all')
-
         # some of these are just placeholders for now
 
         col_dict = {'Country': 'country',
@@ -263,35 +257,6 @@ class CsvCreatePicturae(Importer):
 
         return str(gen_spec), str(full_name), str(first_intra), str(tax_name), str(hybrid_base)
 
-    def create_table_record(self, sql):
-        """create_table_record:
-               general code for the inserting of a new record into any table on casbotany.
-               creates connection, and runs sql query. cursor.execute with arg multi, to
-               handle multi-query commands.
-           args:
-               sql: the verbatim sql string, or multi sql query string to send to database
-               is_test: set to False as default, if switched to true,
-                        uses sql-lite database instead for testing.
-        """
-        cursor = self.specify_db_connection.get_cursor()
-
-        self.logger.info(f'running query: {sql}')
-        self.logger.debug(sql)
-        try:
-            cursor.execute(sql)
-        except Exception as e:
-            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
-            self.logger.error(traceback.format_exc())
-        try:
-            self.specify_db_connection.commit()
-
-        except Exception as e:
-            self.logger.error(f"sql debug: {e}")
-            sys.exit("terminating script")
-
-        cursor.close()
-
-
 
     def taxon_unmatch_create(self, unmatched_taxa: pd.DataFrame):
         """taxon_unmatch_create: creates sql query for creating new records in taxa unmatch,
@@ -306,13 +271,11 @@ class CsvCreatePicturae(Importer):
 
             sql = create_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
 
-            barcode_check = f'''SELECT CatalogNumber FROM taxa_unmatch 
-                                WHERE CatalogNumber = {row[catalognumber]}'''
-
-            # checking if unmatched taxa's barcode already on unmatch_taxa table
-            sql_result = self.specify_db_connection.get_one_record(barcode_check)
+            sql_result = populate_sql(connection=self.specify_db_connection, tab_name='taxa_unmatch',
+                                      id_col='CatalogNumber', key_col='CatalogNumber',
+                                      match=row[catalognumber], match_type='integer')
             if sql_result is None:
-                self.create_table_record(sql)
+                create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
             else:
                 pass
 

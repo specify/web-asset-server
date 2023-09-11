@@ -3,7 +3,6 @@
     Used as part of picturae_project for upload post-imaging, to create records to be updated post OCR and transcription
 """
 import atexit
-import traceback
 import picturae_config
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
@@ -11,10 +10,9 @@ from uuid import uuid4
 from picturae_import_utils import *
 import logging
 from string_utils import *
-from sql_csv_utils import *
 from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
-from sql_csv_utils import generate_token
+from sql_csv_utils import *
 from botany_importer import BotanyImporter
 
 from picturae_csv_create import starting_time_stamp
@@ -66,7 +64,7 @@ class PicturaeImporter(Importer):
         for param in init_list:
             setattr(self, param, None)
 
-        self.created_by_agent = 99726
+        self.created_by_agent = picturae_config.agent_number
 
         self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
@@ -82,7 +80,7 @@ class PicturaeImporter(Importer):
         sql = create_timestamps(start_time=starting_time_stamp, end_time=ending_time_stamp,
                                 batch_md5=self.batch_md5, batch_size=batch_size)
 
-        self.create_table_record(sql)
+        create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
         condition = f'''WHERE TimestampCreated >= "{starting_time_stamp}" 
                         AND TimestampCreated <= "{ending_time_stamp}";'''
@@ -91,8 +89,8 @@ class PicturaeImporter(Importer):
         for tab in error_tabs:
 
             sql = create_update_statement(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
-                                       condition=condition)
-            self.create_table_record(sql)
+                                          condition=condition)
+            create_table_record(connection=self.specify_db_connection, sql=sql)
 
 
     def time_stamper(self):
@@ -278,26 +276,7 @@ class PicturaeImporter(Importer):
     # check after getting real dataset, still not final
 
 
-    def populate_sql(self, tab_name, id_col, key_col, match, match_type="string"):
-        """populate_sql:
-                creates a custom select statement for get one record,
-                from which a result can be gotten more seamlessly
-                without having to rewrite the sql variable every time
-           args:
-                tab_name: the name of the table to select
-                id_col: the name of the column in which the unique id is stored
-                key_col: column on which to match values
-                match: value with which to match key_col
-        """
-        sql = ""
-        if match_type == "string":
-            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
-        elif match_type == "integer":
-            sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
-
-        result = self.specify_db_connection.get_one_record(sql)
-
-        return result
+    # proposed solution move it to importer , but I think that migh be iffy. This function relies
 
 
     def populate_fields(self, row):
@@ -344,19 +323,17 @@ class PicturaeImporter(Importer):
         self.geography_string = str(row[index_list[17]]) + ", " + \
                                 str(row[index_list[18]]) + ", " + str(row[index_list[19]])
 
-        self.GeographyID = self.populate_sql(tab_name='geography', id_col='GeographyID',
-                                             key_col='FullName', match=self.geography_string)
+        self.GeographyID = populate_sql(self.specify_db_connection, tab_name='geography', id_col='GeographyID',
+                                        key_col='FullName', match=self.geography_string)
 
-        self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
-                                             key_col='LocalityName', match=self.locality)
+        self.locality_id = populate_sql(self.specify_db_connection, tab_name='locality', id_col='LocalityID',
+                                        key_col='LocalityName', match=self.locality)
 
-    def taxon_get(self, name):
+    def taxon_get(self, name, connection):
         sql = f'''SELECT TaxonID FROM {picturae_config.SPECIFY_DATABASE}.taxon WHERE FullName = "{name}";'''
         result_id = self.specify_db_connection.get_one_record(sql)
         return result_id
 
-
-    # this process will be simplified to reflect new (8/31) changes in picturae_csv_create.py
     def populate_taxon(self):
         """populate taxon: creates a taxon list, which checks different rank levels in the taxon,
                          as genus must be uploaded before species , before sub-taxa etc...
@@ -398,36 +375,6 @@ class PicturaeImporter(Importer):
         else:
             pass
 
-
-    def create_table_record(self, sql):
-        """create_table_record:
-               general code for the inserting of a new record into any table on casbotany.
-               creates connection, and runs sql query. cursor.execute with arg multi, to
-               handle multi-query commands.
-           args:
-               sql: the verbatim sql string, or multi sql query string to send to database
-               is_test: set to False as default, if switched to true,
-                        uses sql-lite database instead for testing.
-        """
-        cursor = self.specify_db_connection.get_cursor()
-
-        self.logger.info(f'running query: {sql}')
-        self.logger.debug(sql)
-        try:
-            cursor.execute(sql)
-        except Exception as e:
-            print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
-            self.logger.error(traceback.format_exc())
-        try:
-            self.specify_db_connection.commit()
-
-        except Exception as e:
-            self.logger.error(f"sql debug: {e}")
-            sys.exit("terminating script")
-
-        cursor.close()
-
-
     def create_locality_record(self):
         """create_locality_record:
                defines column and value list , runs them as args
@@ -468,7 +415,7 @@ class PicturaeImporter(Importer):
         sql = create_insert_statement(tab_name=table, col_list=column_list,
                                       val_list=value_list)
 
-        self.create_table_record(sql=sql)
+        create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
 
     def create_agent_id(self):
@@ -518,7 +465,7 @@ class PicturaeImporter(Importer):
             sql = create_insert_statement(tab_name=table, col_list=columns,
                                     val_list=values)
 
-            self.create_table_record(sql=sql)
+            create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
 
     def create_collecting_event(self):
@@ -530,8 +477,8 @@ class PicturaeImporter(Importer):
 
         # re-pulling locality id to reflect update
 
-        self.locality_id = self.populate_sql(tab_name='locality', id_col='LocalityID',
-                                             key_col='LocalityName', match=self.locality)
+        self.locality_id = populate_sql(self.specify_db_connection, tab_name='locality', id_col='LocalityID',
+                                        key_col='LocalityName', match=self.locality)
 
         table = 'collectingevent'
 
@@ -569,7 +516,7 @@ class PicturaeImporter(Importer):
         sql = create_insert_statement(tab_name=table, col_list=column_list,
                                 val_list=value_list)
 
-        self.create_table_record(sql=sql)
+        create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
 
     def create_taxon(self):
@@ -651,7 +598,7 @@ class PicturaeImporter(Importer):
             sql = create_insert_statement(tab_name=table, col_list=column_list,
                                           val_list=value_list)
 
-            self.create_table_record(sql=sql)
+            create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
             print("taxon_created!")
 
@@ -665,8 +612,9 @@ class PicturaeImporter(Importer):
         # will new collecting event ids need to be created ?
         # re-pulling collecting event id to reflect new record
 
-        self.collecting_event_id = self.populate_sql(tab_name='collectingevent', id_col='CollectingEventID',
-                                                     key_col='GUID', match=self.collecting_event_guid)
+        self.collecting_event_id = populate_sql(self.specify_db_connection, tab_name='collectingevent',
+                                                id_col='CollectingEventID',
+                                                key_col='GUID', match=self.collecting_event_guid)
 
         table = 'collectionobject'
 
@@ -709,7 +657,7 @@ class PicturaeImporter(Importer):
         sql = create_insert_statement(tab_name=table, col_list=column_list,
                                 val_list=value_list)
 
-        self.create_table_record(sql=sql)
+        create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
 
     def create_determination(self):
@@ -722,10 +670,10 @@ class PicturaeImporter(Importer):
         """
         table = 'determination'
 
-        self.collection_ob_id = self.populate_sql(tab_name='collectionobject', id_col='CollectionObjectID',
-                                                  key_col='GUID', match=self.collection_ob_guid)
+        self.collection_ob_id = populate_sql(self.specify_db_connection, tab_name='collectionobject', id_col='CollectionObjectID',
+                                             key_col='GUID', match=self.collection_ob_guid)
 
-        self.taxon_id = self.populate_sql(tab_name='taxon', id_col='TaxonID',
+        self.taxon_id = populate_sql(self.specify_db_connection,tab_name='taxon', id_col='TaxonID',
                                           key_col='FullName', match=self.full_name)
         if self.taxon_id is not None:
 
@@ -765,7 +713,7 @@ class PicturaeImporter(Importer):
 
             sql = create_insert_statement(tab_name=table, col_list=column_list,
                                           val_list=value_list)
-            self.create_table_record(sql)
+            create_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)
 
         else:
             self.logger.error(f"failed to add determination , missing taxon for {self.full_name}")
@@ -820,7 +768,7 @@ class PicturaeImporter(Importer):
             sql = create_insert_statement(tab_name=table, col_list=column_list,
                                           val_list=value_list)
 
-            self.create_table_record(sql)
+            create_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
 
     def hide_unwanted_files(self):
@@ -917,6 +865,7 @@ class PicturaeImporter(Importer):
             self.logger.error(f"{e}")
 
 
+
     def run_all_methods(self):
         """run_all_methods:
                         self-explanatory function, will run all methods in class in sequential manner"""
@@ -940,7 +889,7 @@ class PicturaeImporter(Importer):
                  SET account_locked = 'Y'
                  WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
-        self.create_table_record(sql)
+        create_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)
 
         # starting purge timer
         self.time_stamper()
@@ -951,18 +900,8 @@ class PicturaeImporter(Importer):
 
         # creating new taxon list (should think of way to shorten this)
         if len(self.taxon_list) > 0:
-            taxa_frame = self.record_full[self.record_full['fullname'].isin(self.taxon_list)]
-            for index, row in taxa_frame.iterrows():
-                catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
-                barcode_result = self.populate_sql(tab_name='picturaetaxa_added',
-                                                   id_col='CatalogNumber',
-                                                   key_col='CatalogNumber',
-                                                   match=row[catalog_number],
-                                                   match_type="integer"
-                                                   )
-                if barcode_result is None:
-                    sql = create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
-                    self.create_table_record(sql)
+            new_taxa_record(taxon_list=self.taxon_list, connection=self.specify_db_connection,
+                            logger_int=self.logger, df=self.record_full)
 
         # uploading attachments
         self.upload_attachments()
@@ -977,4 +916,4 @@ class PicturaeImporter(Importer):
                  SET account_locked = 'n'
                  WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
-        self.create_table_record(sql)
+        create_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)

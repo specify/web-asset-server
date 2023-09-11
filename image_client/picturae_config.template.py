@@ -14,3 +14,6 @@ date_str = None
 PIC_PREFIX = f'picturae_img{sla}'
 PIC_SCAN_FOLDERS = [f'PIC_{date_str}']
 PREFIX = f"web-asset-server{sla}image_client{sla}"
+
+# number for created by agent field , check your agent id on the agent table
+agent_number = 123456

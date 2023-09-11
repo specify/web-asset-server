@@ -1,3 +1,5 @@
+import traceback
+
 import pandas as pd
 from picturae_import_utils import remove_two_index
 import time_utils
@@ -5,6 +7,7 @@ from datetime import datetime
 from datetime import timedelta
 import hmac
 import settings
+import sys
 
 
 # static methods
@@ -48,6 +51,31 @@ def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, t
     return sql
 
 
+def populate_sql(connection, tab_name, id_col, key_col, match, match_type="string"):
+    """populate_sql:
+            creates a custom select statement for get one record,
+            from which a result can be gotten more seamlessly
+            without having to rewrite the sql variable every time
+       args:
+            tab_name: the name of the table to select
+            id_col: the name of the column in which the unique id is stored
+            key_col: column on which to match values
+            match: value with which to match key_col
+            match_type: "string" or "integer", optional with default as "string"
+                        puts quotes around sql terms or not depending on data type
+    """
+    sql = ""
+    if match_type == "string":
+        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
+    elif match_type == "integer":
+        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
+
+    result = connection.get_one_record(sql)
+
+    return result
+
+
+
 def create_insert_statement(col_list: list, val_list: list, tab_name: str):
     """create_sql_string:
            creates a new sql insert statement given a list of db columns,
@@ -64,6 +92,34 @@ def create_insert_statement(col_list: list, val_list: list, tab_name: str):
     sql = f'''INSERT INTO {tab_name} ({column_list}) VALUES({value_list});'''
 
     return sql
+
+def create_table_record(connection, logger_int , sql):
+    """create_table_record:
+           general code for the inserting of a new record into any table on casbotany.
+           creates connection, and runs sql query. cursor.execute with arg multi, to
+           handle multi-query commands.
+       args:
+           sql: the verbatim sql string, or multi sql query string to send to database
+           connection: the connection parameter in the case of specify self.specify_db_connection
+           logger: the logger instance of your class self.logger
+    """
+    cursor = connection.get_cursor()
+
+    logger_int.info(f'running query: {sql}')
+    logger_int.debug(sql)
+    try:
+        cursor.execute(sql)
+    except Exception as e:
+        print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
+        logger_int.error(traceback.format_exc())
+    try:
+        connection.commit()
+
+    except Exception as e:
+        logger_int.error(f"sql debug: {e}")
+        sys.exit("terminating script")
+
+    cursor.close()
 
 def create_timestamps(start_time: datetime, end_time: datetime,
                       batch_size: int, batch_md5: str):
@@ -165,6 +221,30 @@ def create_unmatch_tab(row ,df, tab_name: str):
                                   val_list=val_list)
 
     return sql
+
+
+def new_taxa_record(taxon_list, connection, logger_int, df: pd.DataFrame):
+    """new_taxa_record: creates record level data for any new taxa added to the database,
+                        populates useful table for qc and troubleshooting
+    args:
+        taxon_list: list of new taxa added to taxon tree during upload
+        connection: connection instance for this sql, using self.specify_db_connection
+        logger_int: the logger instance for this class
+        df: pandas dataframe, the record table uploaded to the database in question
+        """
+    taxa_frame = df[df['fullname'].isin(taxon_list)]
+    for index, row in taxa_frame.iterrows():
+        catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
+        barcode_result = populate_sql(connection,
+                                      tab_name='picturaetaxa_added',
+                                      id_col='CatalogNumber',
+                                      key_col='CatalogNumber',
+                                      match=row[catalog_number],
+                                      match_type="integer"
+                                      )
+        if barcode_result is None:
+            sql = create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
+            create_table_record(connection, logger_int=logger_int, sql=sql)
 
 
 
