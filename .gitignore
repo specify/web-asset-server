@@ -9,6 +9,7 @@
 *-Botany.txt
 */iz_importer_config.py
 /unmatched_taxa/*
+*/picturae_purge_script.sql
 *.pyc
 .idea
 venv
