@@ -13,7 +13,7 @@ from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
 from image_client import ImageClient
-from botany_purger import BotanyPurger
+from botany_undo import BotanyPurger
 
 args = None
 logger = None
@@ -123,7 +123,6 @@ def setup_logging(verbosity: int):
     logger.propagate = False
 
     if verbosity == 0:
-        "setting level"
         logger.setLevel(logging.CRITICAL)
     elif verbosity == 1:
         logger.setLevel(logging.ERROR)

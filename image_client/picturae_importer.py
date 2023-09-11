@@ -105,15 +105,6 @@ class PicturaeImporter(Importer):
         atexit.register(self.run_timestamps, batch_size=self.batch_size)
 
 
-    def unlock_account(self):
-        """function to be called during unexpected interruption of upload,
-           so DB doesn't accidently remain locked"""
-
-        sql = """ALTER USER 'botanist'@'%' ACCOUNT UNLOCK;"""
-
-        self.create_table_record(sql)
-
-
     def col_dtypes(self):
         """just in case csv import changes column dtypes, resetting at top of file,
             re-standardizing null and nan records to all be pd.NA() and
@@ -241,7 +232,10 @@ class PicturaeImporter(Importer):
         self.full_collector_list = []
 
         column_names = list(self.record_full.columns)
-        for i in range(1, 6):
+
+        matches = sum([name.startswith("collector_first_name") for name in column_names])
+
+        for i in range(1, matches+1):
             try:
                 first_index = column_names.index(f'collector_first_name{i}')
                 middle_index = column_names.index(f'collector_middle_name{i}')

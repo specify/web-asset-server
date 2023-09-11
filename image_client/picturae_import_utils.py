@@ -61,27 +61,6 @@ def to_current_directory():
 
     os.chdir(directory)
 
-
-def create_test_images(barcode_list: list, date_string: str, color: str):
-    """create_test_images:
-            creates a number of standard test images in a range of barcodes,
-            and with a specific date string
-       args:
-            barcode_list: a list or range() of barcodes that
-                          you wish to create dummy images for.
-            date_string: a date string , with which to name directory
-                         in which to create and store the dummy images
-    """
-    image = Image.new('RGB', (200, 200), color=color)
-
-    barcode_list = barcode_list
-    for barcode in barcode_list:
-        expected_image_path = f"picturae_img/PIC_{date_string}/CAS{barcode}.JPG"
-        os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
-        print(f"Created directory: {os.path.dirname(expected_image_path)}")
-        image.save(expected_image_path)
-
-
 def get_max_subdirectory_date(parent_directory: str):
     """get_max_subdirectory_date: lists every subdirectory in a directory, presuming data is organized by date, in any
                                 dash divided fomrat Y-M-D, D-M-Y etc..., pulls the largest date from the list.

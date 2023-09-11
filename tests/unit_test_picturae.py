@@ -2,12 +2,11 @@
 import unittest
 import random
 import shutil
-from picturae_importer import *
+from image_client.picturae_importer import *
 from faker import Faker
 from datetime import date, timedelta
-from picturae_importer import DataOnboard
 from PIL import Image
-from casbotany_sql_lite import *
+from image_client.casbotany_sql_lite import *
 
 
 def test_date():
@@ -16,6 +15,26 @@ def test_date():
        ! if this code outlives 20 years of use I would be impressed"""
     unit_date = date.today() - timedelta(days=365 * 20)
     return str(unit_date)
+
+
+def create_test_images(barcode_list: list, date_string: str, color: str):
+    """create_test_images:
+            creates a number of standard test images in a range of barcodes,
+            and with a specific date string
+       args:
+            barcode_list: a list or range() of barcodes that
+                          you wish to create dummy images for.
+            date_string: a date string , with which to name directory
+                         in which to create and store the dummy images
+    """
+    image = Image.new('RGB', (200, 200), color=color)
+
+    barcode_list = barcode_list
+    for barcode in barcode_list:
+        expected_image_path = f"picturae_img/PIC_{date_string}/CAS{barcode}.JPG"
+        os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
+        print(f"Created directory: {os.path.dirname(expected_image_path)}")
+        image.save(expected_image_path)
 
 
 class TestSQLlite(unittest.TestCase):

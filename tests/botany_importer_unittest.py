@@ -5,7 +5,7 @@ import logging
 import filetype
 from unittest.mock import Mock
 from mock import patch
-from botany_importer import BotanyImporter
+from image_client.botany_importer import BotanyImporter
 import unittest
 import logging
 from testfixtures import LogCapture

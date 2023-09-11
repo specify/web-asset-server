@@ -107,7 +107,7 @@ class BotanyImporter(Importer):
         barcode = str(barcode).zfill(9)
         cursor = self.specify_db_connection.get_cursor()
         collecting_event_guid = uuid4()
-        sql = (f"""INSERT INTO casbotany.collectingevent (
+        sql = (f"""INSERT INTO collectingevent (
             TimestampCreated,
             TimestampModified,
             Version,
@@ -131,7 +131,7 @@ class BotanyImporter(Importer):
         collecting_event_id = self.specify_db_connection.get_one_record(sql)
 
         cursor = self.specify_db_connection.get_cursor()
-        sql = (f"""INSERT INTO casbotany.collectionobject (
+        sql = (f"""INSERT INTO collectionobject (
         TimestampCreated,
         TimestampModified,
         CollectingEventID,
