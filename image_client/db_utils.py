@@ -76,10 +76,10 @@ class DbUtils:
 
 
 
-
+    # added buffered = true so will work properly with forloops
     def get_one_record(self, sql):
         self.connect()
-        cursor = self.cnx.cursor()
+        cursor = self.cnx.cursor(buffered=True)
         try:
             cursor.execute(sql)
             retval = cursor.fetchone()

@@ -5,7 +5,7 @@ import sys
 from time import sleep
 
 class DirTools:
-    def __init__(self,callback, limit=None):
+    def __init__(self, callback, limit=None):
         self.logger = logging.getLogger('Client.DirTools')
         self.callback = callback
         self.processed_num = 0
@@ -27,7 +27,7 @@ class DirTools:
 
 
     def process_files_or_directories_recursive(self, path_names):
-        if isinstance(path_names,str):
+        if isinstance(path_names, str):
             path_names = [path_names]
         for path in path_names:
             for root, d_names, f_names in os.walk(path):
@@ -56,7 +56,7 @@ class DirTools:
                     self.process_directory(curfile)
                 else:
 
-                    self.process_file(None,curfile)
+                    self.process_file(None, curfile)
             except botany_importer.DatabaseInconsistentError:
                 print(f"Fatal, skipping: {curfile}")
 

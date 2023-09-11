@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 import argparse
+import botany_importer_config
+import picturae_config
+import datetime
+from picturae_import_utils import get_max_subdirectory_date
+import os
 import logging
 import collection_definitions
 from botany_importer import BotanyImporter
+from picturae_importer import PicturaeImporter
 from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
 from image_client import ImageClient
-from botany_purger import BotanyPurger
+from botany_undo import BotanyPurger
 
 args = None
 logger = None
@@ -40,8 +46,9 @@ def parse_command_line():
 
     search_parser.add_argument('term')
 
-    return parser.parse_args()
+    parser.add_argument('-d', '--date', nargs="?", help='date to use', default=None)
 
+    return parser.parse_args()
 
 
 def main(args):
@@ -49,14 +56,37 @@ def main(args):
     if args.subcommand == 'search':
         image_client = ImageClient()
     elif args.subcommand == 'import':
-
         if args.collection == "Botany":
-             BotanyImporter()
+            # get paths here
+            paths = []
+            for cur_dir in botany_importer_config.BOTANY_SCAN_FOLDERS:
+                paths.append(os.path.join(botany_importer_config.PREFIX,
+                                          botany_importer_config.BOTANY_PREFIX,
+                                          cur_dir))
+                print(f"Scanning: {cur_dir}")
+
+            BotanyImporter(paths=paths, config=botany_importer_config)
+        elif args.collection == 'Botany_PIC':
+            date_override = args.date
+            # default is to get date of most recent folder in csv folder
+            if date_override is None:
+                date_override = get_max_subdirectory_date("image_client/picturae_csv")
+            # otherwise replace dates with most args.date
+            picturae_config.PIC_SCAN_FOLDERS = [f"PIC_{date_override}"]
+            picturae_config.date_str = date_override
+            paths = []
+            for cur_dir in picturae_config.PIC_SCAN_FOLDERS:
+                paths.append(os.path.join(picturae_config.PREFIX,
+                                          picturae_config.PIC_PREFIX,
+                                          cur_dir))
+                print(f"Scanning: {cur_dir}")
+
+            PicturaeImporter(paths=paths, date_string=date_override)
+
+
         elif args.collection == "Ichthyology":
             IchthyologyImporter()
         elif args.collection == "IZ":
-            IzImporter()
-            IzImporter()
             IzImporter()
     elif args.subcommand == 'purge':
         logger.debug("Purge!")
@@ -66,8 +96,6 @@ def main(args):
             purger.purge()
     else:
         print(f"Unknown command: {args.subcommand}")
-
-
 
 
 

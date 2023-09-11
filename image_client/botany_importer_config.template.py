@@ -7,7 +7,7 @@ PASSWORD = 'redacted'
 
 import os
 sla = os.path.sep
-COLLECTION_NAME='Botany'
+COLLECTION_NAME = 'Botany'
 
 BOTANY_REGEX = '(CAS|cas)[0-9]*([\-_])*[0-9a-zA-Z]?.(JPG|jpg|jpeg|TIFF|tif)'
 PREFIX = f"{sla}"

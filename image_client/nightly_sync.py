@@ -8,7 +8,7 @@ import logging
 import sys
 from typing import Optional
 
-image_db = None
+image_db: Optional[ImageDb] = None
 botany_importer = None
 attachment_utils: Optional[AttachmentUtils] = None
 
@@ -39,7 +39,7 @@ def redact(internal_filename, redacted):
         logging.debug(f"No state change required. State is {redacted} object is {internal_filename}")
 
 
-def do_import(collection_name,specify_db_connection):
+def do_sync(collection_name, specify_db_connection):
     global image_db, attachment_utils
 
     print(f"Starting sync..")
@@ -65,11 +65,11 @@ def do_import(collection_name,specify_db_connection):
                 print(f"   internal filename: {internal_filename} redacted: {redacted}", file=sys.stderr, flush=True)
                 next_record = True
             except Exception as e:
-                print(f"Error, probably sql {e}", file=sys.stderr, flush=True)
+                print(f"Error, probably sql: \"{e}\"", file=sys.stderr, flush=True)
                 print(f"exception type: {type(e).__name__}", file=sys.stderr, flush=True)
 
-
     return record_list
+
 
 def main():
     logging.basicConfig()
@@ -93,7 +93,7 @@ def main():
             ich_importer_config.SPECIFY_DATABASE_PORT,
             ich_importer_config.SPECIFY_DATABASE_HOST,
             ich_importer_config.SPECIFY_DATABASE)
-    do_import(collection_name,specify_db_connection)
+    do_sync(collection_name, specify_db_connection)
 
 
 if __name__ == '__main__':
@@ -101,5 +101,4 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         traceback.print_exc()
-
 

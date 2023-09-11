@@ -10,6 +10,7 @@ class AttachmentUtils:
     def __init__(self, db_utils):
         self.db_utils = db_utils
 
+
     def get_collectionobjectid_from_filename(self, attachment_location):
         sql = f"""
         select cat.CollectionObjectID
@@ -23,7 +24,6 @@ class AttachmentUtils:
         logging.debug(f"Got collectionObjectId: {coid}")
 
         return coid
-
 
     def get_attachmentid_from_filepath(self, orig_filepath):
         orig_filepath = repr(orig_filepath)

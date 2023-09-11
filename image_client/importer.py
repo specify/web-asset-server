@@ -31,6 +31,7 @@ class MissingPathException(Exception):
 
 
 class Importer:
+
     def __init__(self, db_config_class, collection_name):
         self.logger = logging.getLogger('Client.importer')
         self.collection_name = collection_name
@@ -140,6 +141,7 @@ class Importer:
         attachment_id = self.attachment_utils.get_attachment_id(attachment_guid)
         self.connect_existing_attachment_to_collection_object_id(attachment_id, collection_object_id, agent_id)
 
+    # This may be replaceable by a simple re.sub + zfill
     def get_first_digits_from_filepath(self, filepath, field_size=9):
         basename = os.path.basename(filepath)
         ints = re.findall(r'\d+', basename)
@@ -245,7 +247,7 @@ class Importer:
             if aid is None:
                 keep_filepaths.append(cur_filepath)
             else:
-                logging.debug(f"Already has an attachment with attachment_id: {aid}, sklipping")
+                logging.debug(f"Already has an attachment with attachment_id: {aid}, skipping")
         return keep_filepaths
 
     #
@@ -303,7 +305,7 @@ class Importer:
             except subprocess.TimeoutExpired:
                 self.logger.error(f"Timeout converting {cur_filepath}")
             except ConvertException:
-                self.logger.error(f"  Conversion failure for {cur_filepath}; skipping.")
+                self.logger.error(f"Conversion failure for {cur_filepath}; skipping.")
             except Exception as e:
                 self.logger.error(
                     f"Upload failure to image server for file: \n\t{cur_filepath}")
