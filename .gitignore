@@ -1,4 +1,6 @@
+**/run_picdb.sh
 **/dummy_cleaner.py
+**/picdb_config.py
 *.DS_Store
 /image_client/duplicates-Botany.txt
 *.csv

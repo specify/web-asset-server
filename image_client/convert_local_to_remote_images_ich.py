@@ -15,7 +15,7 @@ import logging
 import os
 import filetype
 import sys
-from image_client import ImageClient
+from imageclient import ImageClient
 
 
 specify_db_connection = None

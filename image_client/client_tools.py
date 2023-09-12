@@ -12,8 +12,9 @@ from picturae_importer import PicturaeImporter
 from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
-from image_client import ImageClient
-from botany_undo import BotanyPurger
+from imageclient import ImageClient
+from botany_purger import BotanyPurger
+from PIC_upload_undo.PIC_undo_batch import PicturaeUndoBatch
 
 args = None
 logger = None
@@ -47,6 +48,8 @@ def parse_command_line():
     search_parser.add_argument('term')
 
     parser.add_argument('-d', '--date', nargs="?", help='date to use', default=None)
+
+    parser.add_argument('-m', '--md5', nargs="?", type=str,  help='md5 batch to remove from database', default=None)
 
     return parser.parse_args()
 
@@ -94,6 +97,10 @@ def main(args):
         if args.collection == "Botany":
             purger = BotanyPurger()
             purger.purge()
+        if args.collection == "Botany_PIC":
+            md5_insert = args.md5
+            PicturaeUndoBatch(MD5=md5_insert)
+
     else:
         print(f"Unknown command: {args.subcommand}")
 

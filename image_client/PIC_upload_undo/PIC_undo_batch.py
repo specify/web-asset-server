@@ -2,18 +2,37 @@
     database.
     NOTE: only use this process if your upload process includes a LOCK user command
           to prevent other changes to the database during upload"""
-import image_client.picturae_config as picturae_config
-from image_client.importer import Importer
+import picturae_config
+from importer import Importer
 import traceback
 
+# def parse_command_undo():
+#     """parse_command_undo: parses arguments from command line for purging picturae upload batches.
+#                           Allowing user to pass md5 codes as arguments to the PicturaeUndoBatch class
+#                           from the command line."""
+#     parser = argparse.ArgumentParser(
+#              description=f"""
+#                  Tool to manipulate images on the CAS image server.
+#
+#                  Available collections: Botany
+#
+#                  Commands: import, search, purge. Collection is mandatory.
+#                  """,
+#              formatter_class=argparse.RawTextHelpFormatter, add_help=True)
+#
+#     parser.add_argument('--m', '-md5', nargs="?", help='md5 batch to remove from database', default=None)
+#
+#     return parser.parse_args()
 
-class DatabasePurger(Importer):
+
+
+class PicturaeUndoBatch(Importer):
     def __init__(self, MD5):
         super().__init__(picturae_config, "Botany")
         self.purge_code = MD5
-        self.run_all()
+        self.run_all(MD5=self.purge_code)
 
-    def sql_time_purger(self, database, table, timestamp1, timestamp2):
+    def batch_undo_timestamps(self, database, table, timestamp1, timestamp2):
         """sql_time_purger: purges records from select database added between two timestamps.
                 args:
                     database: name of the database which you want to use.
@@ -40,7 +59,7 @@ class DatabasePurger(Importer):
 
         cursor.close()
 
-    def sql_tree_purger(self, database, table, timestamp1, timestamp2):
+    def batch_tree_pruner(self, database, table, timestamp1, timestamp2):
         """sql_tree_purger: used to iteratively remove taxa created by a batch upload.
                             creates a temporary table and removes taxa on the taxa tree
                             added between two timestamps
@@ -81,7 +100,11 @@ class DatabasePurger(Importer):
 
         cursor.close()
 
-    def casbotany_csv_purger(self, database: str, table: str, MD5: str):
+    def batch_log_clear(self, MD5: str):
+
+
+
+    def picturae_csv_undo(self, database: str, table: str, MD5: str):
         """casbotany_csv_purger: runs sql commands to database, to purge sql records created between two timestamps
                                  in which the original upload script was run,
             uses log of sql uploads to retrieve records organized by generated MD5 code.
@@ -99,6 +122,9 @@ class DatabasePurger(Importer):
 
         end_time = self.specify_db_connection.get_one_record(md5_end)
 
+        if start_time is None or end_time is None:
+            raise ValueError(f"{MD5} not found in database table")
+
         time_stamp_list = []
 
         time_stamp_list.append(str(start_time))
@@ -106,26 +132,40 @@ class DatabasePurger(Importer):
 
         table_list = ['collectionobjectattachment', 'attachment',
                       'determination', 'collectionobject', 'collector',
-                      'collectingevent', 'locality', 'agent', ]
+                      'collectingevent', 'locality', 'agent']
 
         for table in table_list:
-            self.sql_time_purger(database='casbotany', table=table,
-                                 timestamp1=time_stamp_list[0],
-                                 timestamp2=time_stamp_list[1])
+            self.batch_undo_timestamps(database='casbotany', table=table,
+                                       timestamp1=time_stamp_list[0],
+                                       timestamp2=time_stamp_list[1])
 
         table = "taxon"
 
-        self.sql_tree_purger(database='casbotany', table=table,
-                             timestamp1=time_stamp_list[0],
-                             timestamp2=time_stamp_list[1])
-
-    def run_all(self):
-        self.casbotany_csv_purger(database="casbotany", table="picturae_batch", MD5=self.purge_code)
+        self.batch_tree_pruner(database='casbotany', table=table,
+                               timestamp1=time_stamp_list[0],
+                               timestamp2=time_stamp_list[1])
 
 
+    def run_all(self, MD5):
+        print("runnning PIC_undo_batch")
+        self.picturae_csv_undo(database="casbotany", table="picturae_batch", MD5=MD5)
 
-# def show_run():
-#     DatabasePurger(MD5="9fa25327b122c7e046f81531a699d5de:2023-08-30 13:18:48.404200")
+
+# def run_picturae_class(MD5: str):
+#     if MD5 is None:
+#         raise ValueError("No md5 code given, exiting program.")
+#     else:
+#         picturae_int = PicturaeUndoBatch(MD5=MD5)
+#
+#         picturae_int.run_all()
+#
+#         print(f"upload batch with code {MD5} removed from database")
 #
 #
-# show_run()
+# if __name__ == '__main__':
+#
+#     args = parse_command_undo()
+#     # parsing md5 code from the command line
+#     md5_parse = str(args.md5)
+#
+#     run_picturae_class(MD5=md5_parse)

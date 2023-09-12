@@ -2,7 +2,7 @@ from attachment_utils import AttachmentUtils
 import datetime
 from uuid import uuid4
 import os, re
-from image_client import ImageClient
+from imageclient import ImageClient
 from db_utils import InvalidFilenameError
 import collections
 import filetype
