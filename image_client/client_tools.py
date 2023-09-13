@@ -13,7 +13,7 @@ import sys
 from ichthyology_importer import IchthyologyImporter
 from image_client import ImageClient
 from botany_purger import BotanyPurger
-from PIC_upload_undo.PIC_undo_batch import PicturaeUndoBatch
+from PIC_undo_batch import PicturaeUndoBatch
 
 args = None
 logger = None

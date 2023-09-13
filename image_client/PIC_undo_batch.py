@@ -8,25 +8,6 @@ from specify_db import SpecifyDb
 import picdb_config
 import traceback
 
-# def parse_command_undo():
-#     """parse_command_undo: parses arguments from command line for purging picturae upload batches.
-#                           Allowing user to pass md5 codes as arguments to the PicturaeUndoBatch class
-#                           from the command line."""
-#     parser = argparse.ArgumentParser(
-#              description=f"""
-#                  Tool to manipulate images on the CAS image server.
-#
-#                  Available collections: Botany
-#
-#                  Commands: import, search, purge. Collection is mandatory.
-#                  """,
-#              formatter_class=argparse.RawTextHelpFormatter, add_help=True)
-#
-#     parser.add_argument('--m', '-md5', nargs="?", help='md5 batch to remove from database', default=None)
-#
-#     return parser.parse_args()
-
-
 
 class PicturaeUndoBatch(Importer):
     def __init__(self, MD5):
@@ -177,23 +158,3 @@ class PicturaeUndoBatch(Importer):
     def run_all(self, MD5):
         print("runnning PIC_undo_batch")
         self.picturae_csv_undo(database="picbatch", table="picturae_batch", MD5=MD5)
-
-
-# def run_picturae_class(MD5: str):
-#     if MD5 is None:
-#         raise ValueError("No md5 code given, exiting program.")
-#     else:
-#         picturae_int = PicturaeUndoBatch(MD5=MD5)
-#
-#         picturae_int.run_all()
-#
-#         print(f"upload batch with code {MD5} removed from database")
-#
-#
-# if __name__ == '__main__':
-#
-#     args = parse_command_undo()
-#     # parsing md5 code from the command line
-#     md5_parse = str(args.md5)
-#
-#     run_picturae_class(MD5=md5_parse)

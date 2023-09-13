@@ -249,7 +249,7 @@ class CsvCreatePicturae(Importer):
                     hybrid_base = full_name
                     full_name = taxon_strings[0]
                     if full_name != genus:
-                        full_name = taxon_strings[-1]
+                        full_name = " ".join(taxon_strings[:2])
 
             elif len(first_intra) != len(full_name):
                 if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
