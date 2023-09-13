@@ -2,7 +2,7 @@ import logging
 from specify_db import SpecifyDb
 from attachment_utils import AttachmentUtils
 import botany_importer_config
-from imageclient import ImageClient
+from image_client import ImageClient
 
 
 class BotanyPurger():

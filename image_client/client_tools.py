@@ -12,7 +12,7 @@ from picturae_importer import PicturaeImporter
 from iz_importer import IzImporter
 import sys
 from ichthyology_importer import IchthyologyImporter
-from imageclient import ImageClient
+from image_client import ImageClient
 from botany_purger import BotanyPurger
 from PIC_upload_undo.PIC_undo_batch import PicturaeUndoBatch
 

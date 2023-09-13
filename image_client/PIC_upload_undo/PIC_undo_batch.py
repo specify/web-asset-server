@@ -100,7 +100,7 @@ class PicturaeUndoBatch(Importer):
 
         cursor.close()
 
-    def batch_log_clear(self, MD5: str):
+    # def batch_log_clear(self, MD5: str):
 
 
 

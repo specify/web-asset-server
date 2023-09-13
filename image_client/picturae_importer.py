@@ -14,10 +14,9 @@ from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
 from sql_csv_utils import *
 from botany_importer import BotanyImporter
-
 from picturae_csv_create import starting_time_stamp
-
-
+from specify_db import SpecifyDb
+import picdb_config
 class PicturaeImporter(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -39,6 +38,9 @@ class PicturaeImporter(Importer):
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
+
+        # setting up alternate db connection for batch database
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         self.no_match_dict = {}
 
@@ -90,7 +92,7 @@ class PicturaeImporter(Importer):
 
             sql = create_update_statement(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
                                           condition=condition)
-            insert_table_record(connection=self.specify_db_connection, sql=sql, logger_int=self.logger)
+            insert_table_record(connection=self.batch_db_connection, sql=sql, logger_int=self.logger)
 
 
     def exit_timestamp(self):
@@ -900,7 +902,7 @@ class PicturaeImporter(Importer):
 
         # creating new taxon list (should think of way to shorten this)
         if len(self.taxon_list) > 0:
-            insert_taxa_added_record(taxon_list=self.taxon_list, connection=self.specify_db_connection,
+            insert_taxa_added_record(taxon_list=self.taxon_list, connection=self.batch_db_connection,
                                      logger_int=self.logger, df=self.record_full)
 
         # uploading attachments

@@ -13,6 +13,8 @@ from picturae_import_utils import *
 from string_utils import *
 from importer import Importer
 from sql_csv_utils import *
+from specify_db import SpecifyDb
+import picdb_config
 
 # creating a batch uuid
 batch_uuid = uuid4()
@@ -26,6 +28,9 @@ class CsvCreatePicturae(Importer):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
+
+        # setting up alternate db connection for batch database
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         # intializing parameters for database upload
         init_list = ['taxon_id', 'barcode',
@@ -257,28 +262,6 @@ class CsvCreatePicturae(Importer):
 
         return str(gen_spec), str(full_name), str(first_intra), str(tax_name), str(hybrid_base)
 
-
-    def taxon_unmatch_create(self, unmatched_taxa: pd.DataFrame):
-        """taxon_unmatch_create: creates sql query for creating new records in taxa unmatch,
-                                from rows that did not pass TNRS successfully,
-                                either through spelling, or taxonomic errors.
-            args:
-                unmatched_taxa: a pandas dataframe with unmatched taxa terms filtered by score
-        """
-        print("uploading unmatched taxa")
-        for index, row in unmatched_taxa.iterrows():
-            catalognumber = unmatched_taxa.columns.get_loc("CatalogNumber")
-
-            sql = create_tnrs_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
-
-            sql_result = get_one_match(connection=self.specify_db_connection, tab_name='taxa_unmatch',
-                                      id_col='CatalogNumber', key_col='CatalogNumber',
-                                      match=row[catalognumber], match_type='integer')
-            if sql_result is None:
-                insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
-            else:
-                pass
-
     def taxon_check_real(self):
         """taxon_check_real:
            Sends the concatenated taxon column, through TNRS, to match names,
@@ -307,9 +290,10 @@ class CsvCreatePicturae(Importer):
         unmatched_taxa = resolved_taxon[resolved_taxon["overall_score"] < .99]
 
         # writing unmatched taxa to db table taxa_unmatch
+        SpecifyDb(db_config_class=picdb_config)
 
         if len(unmatched_taxa) > 0:
-            self.taxon_unmatch_create(unmatched_taxa)
+            taxon_unmatch_insert(connection=self.batch_db_connection, logger=self.logger, unmatched_taxa=unmatched_taxa)
 
         # filtering out taxa with tnrs scores lower than .99 (basically exact match)
         resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]

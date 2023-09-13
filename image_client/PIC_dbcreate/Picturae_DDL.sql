@@ -1,14 +1,4 @@
-# OPEN A Query window for casbotanty and images and run each of these table creation scripts
-# before running picturae_import
-# chmod +x image_client/create_pic_db.txt
-# docker run --name picbatch-mysql -e MYSQL_ROOT_PASSWORD=D1g1tiz3r -e MYSQL_DATABASE=picbatch -d -p 3309:3306 mysql
-# docker cp image_client/Picturae_DDL.sql picbatch-mysql:/usr/lib/mysql
-# docker exec -it picbatch-mysql bash
-# mysql -u root -p
-# USE picbatch;
-# SOURCE /usr/lib/mysql/Picturae_DDL.sql;
-# exit;
-# exit
+# ddl to run inside docker container / or vm for creation of new picturae upload batch database
 
 CREATE TABLE IF NOT EXISTS picbatch.taxa_unmatch (matchID INTEGER PRIMARY KEY AUTO_INCREMENT,
                                          TimestampCreated VARCHAR(128) NOT NULL ,

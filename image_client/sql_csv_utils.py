@@ -179,6 +179,28 @@ def create_update_statement(tab_name: str, col_list: list, val_list: list, condi
 
     return sql
 
+
+def taxon_unmatch_insert(connection, logger,  unmatched_taxa: pd.DataFrame):
+    """taxon_unmatch_create: creates sql query for creating new records in taxa unmatch,
+                            from rows that did not pass TNRS successfully,
+                            either through spelling, or taxonomic errors.
+        args:
+            unmatched_taxa: a pandas dataframe with unmatched taxa terms filtered by score
+    """
+    print("uploading unmatched taxa")
+    for index, row in unmatched_taxa.iterrows():
+        catalognumber = unmatched_taxa.columns.get_loc("CatalogNumber")
+
+        sql = create_tnrs_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
+
+        sql_result = get_one_match(connection=connection, tab_name='taxa_unmatch',
+                                   id_col='CatalogNumber', key_col='CatalogNumber',
+                                   match=row[catalognumber], match_type='integer')
+        if sql_result is None:
+            insert_table_record(connection=connection, logger_int=logger, sql=sql)
+        else:
+            pass
+
 def create_tnrs_unmatch_tab(row ,df, tab_name: str):
     """create_unmatch_tab: function used to insert
         unmatched TNRS taxas into the

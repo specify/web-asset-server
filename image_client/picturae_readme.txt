@@ -5,6 +5,8 @@ setup:
       1. create a picturae_config.py file with the correct database settings and folder setting for your environment.
       2. install all packages from the requirements.txt file
       2. run the picturae_DDL to create the required error tracking tables in the database
+           in web-asset-server directory run in terminal : 'bash image_client/PIC_dbcreate/run_picdb.sh'
+           -then run the commented out sql commands manually
       3. (optional) install R to enable r2py package to work properly
       4. in order to run picturae_importer from the command line run with example date 2023-06-28 after option -d flag:
          "python image_client/client_tools.py -d 2023-06-28 Botany_PIC import"

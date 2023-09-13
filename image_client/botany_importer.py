@@ -97,6 +97,7 @@ class BotanyImporter(Importer):
             self.barcode_map[barcode] = [full_path]
         else:
             self.barcode_map[barcode].append(full_path)
+        print(self.barcode_map)
 
 
 
