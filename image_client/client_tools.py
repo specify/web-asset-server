@@ -2,7 +2,6 @@
 import argparse
 import botany_importer_config
 import picturae_config
-import datetime
 from picturae_import_utils import get_max_subdirectory_date
 import os
 import logging
@@ -83,7 +82,6 @@ def main(args):
                                           picturae_config.PIC_PREFIX,
                                           cur_dir))
                 print(f"Scanning: {cur_dir}")
-
             PicturaeImporter(paths=paths, date_string=date_override)
 
 

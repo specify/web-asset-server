@@ -54,7 +54,6 @@ class BotanyImporter(Importer):
         self.logger.debug(f"Barcode: {barcode}")
         sql = f'''select CollectionObjectID from collectionobject where CatalogNumber={barcode};'''
         collection_object_id = self.specify_db_connection.get_one_record(sql)
-        print(collection_object_id)
         force_redacted = False
         if collection_object_id is None:
             self.logger.debug(f"No record found for catalog number {barcode}, creating skeleton.")
@@ -97,7 +96,6 @@ class BotanyImporter(Importer):
             self.barcode_map[barcode] = [full_path]
         else:
             self.barcode_map[barcode].append(full_path)
-        print(self.barcode_map)
 
 
 

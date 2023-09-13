@@ -6,6 +6,7 @@ setup:
       2. install all packages from the requirements.txt file
       2. run the picturae_DDL to create the required error tracking tables in the database
            in web-asset-server directory run in terminal : 'bash image_client/PIC_dbcreate/run_picdb.sh'
+           to create a docker container for the new db
            -then run the commented out sql commands manually
       3. (optional) install R to enable r2py package to work properly
       4. in order to run picturae_importer from the command line run with example date 2023-06-28 after option -d flag:
@@ -13,6 +14,10 @@ setup:
 
         if no date argument picturae_import will use the image/ csv folder name with the latest date.
 
+      5. to undo uploads, look in picbatch db and retrieve from picturae_batch,
+          the correct md5 associated with your upload time, call PIC_undo_batch.py from the command line
+          by invoking client tools and the purge functionality (example as done from parent directory):
+          python image_client/client_tools.py -m "0d7903b24a616290cf4c449401068f51:2023-09-13 12:24:02.387138" Botany_PIC purge
 
 file list:
     Python files:
@@ -43,7 +48,13 @@ file list:
 
     sql_csv_utils: .py file which contains functions used to quickly parse sql statements for insert/update/select
 
-    csv_purger: .py file used to do a controlled purge using md5 and timestamps of upload batches from picturae_import
+
+    PIC_undo_batch: .py file used to do a controlled purge using md5 and timestamps of upload batches from picturae_import
+                    is run under the purge function in client_tools.py example command using
+                    MD5 batch code from error tracking db.
+            example:
+               python image_client/client_tools.py -m "0d7903b24a616290cf4c449401068f51:2023-09-13 12:24:02.387138" Botany_PIC purge
+
 
     picturae_config.template.py: template for database credentials, and for specifying image and csv folder locations.
                                  contains a date_str variable that can be changed in the command line (default behavior

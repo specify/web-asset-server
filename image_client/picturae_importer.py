@@ -17,6 +17,7 @@ from botany_importer import BotanyImporter
 from picturae_csv_create import starting_time_stamp
 from specify_db import SpecifyDb
 import picdb_config
+
 class PicturaeImporter(Importer):
     """DataOnboard:
            A class with methods designed to wrangle, verify,
@@ -31,10 +32,11 @@ class PicturaeImporter(Importer):
         self.date_use = date_string
 
         self.logger = logging.getLogger('PicturaeImporter')
+
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'taxon_list']
+                       'taxon_list', 'new_taxa']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
@@ -82,7 +84,7 @@ class PicturaeImporter(Importer):
         sql = create_batch_record(start_time=starting_time_stamp, end_time=ending_time_stamp,
                                 batch_md5=self.batch_md5, batch_size=batch_size)
 
-        insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+        insert_table_record(connection=self.batch_db_connection, logger_int=self.logger, sql=sql)
 
         condition = f'''WHERE TimestampCreated >= "{starting_time_stamp}" 
                         AND TimestampCreated <= "{ending_time_stamp}";'''
@@ -374,6 +376,7 @@ class PicturaeImporter(Importer):
                     # # adding family name to list
                     # if self.family_id is None:
                     #     self.taxon_list.append(self.family_name)
+            self.new_taxa.extend(self.taxon_list)
         else:
             pass
 
@@ -602,7 +605,7 @@ class PicturaeImporter(Importer):
 
             insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
-            print("taxon_created!")
+            logging.info(f"taxon: {rank_name} created")
 
 
     def create_collection_object(self):
@@ -897,12 +900,11 @@ class PicturaeImporter(Importer):
         self.exit_timestamp()
 
         # creating tables
-
         self.upload_records()
 
-        # creating new taxon list (should think of way to shorten this)
-        if len(self.taxon_list) > 0:
-            insert_taxa_added_record(taxon_list=self.taxon_list, connection=self.batch_db_connection,
+        # creating new taxon list
+        if len(self.new_taxa) > 0:
+            insert_taxa_added_record(taxon_list=self.new_taxa, connection=self.batch_db_connection,
                                      logger_int=self.logger, df=self.record_full)
 
         # uploading attachments

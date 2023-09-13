@@ -286,12 +286,14 @@ class CsvCreatePicturae(Importer):
 
         resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
 
+        resolved_taxon['overall_score'].fillna(0, inplace=True)
+
         # filtering out taxa without exact matches , saving to db table
+
         unmatched_taxa = resolved_taxon[resolved_taxon["overall_score"] < .99]
 
         # writing unmatched taxa to db table taxa_unmatch
         SpecifyDb(db_config_class=picdb_config)
-
         if len(unmatched_taxa) > 0:
             taxon_unmatch_insert(connection=self.batch_db_connection, logger=self.logger, unmatched_taxa=unmatched_taxa)
 
@@ -300,15 +302,17 @@ class CsvCreatePicturae(Importer):
 
         # dropping uneccessary columns
 
-        resolved_taxon = resolved_taxon.drop(columns=["overall_score", "unmatched_terms", "CatalogNumber"])
+        resolved_taxon = resolved_taxon.drop(columns=["fullname", "overall_score", "unmatched_terms"])
         # merging columns on full name
-        self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
+
+        self.record_full = pd.merge(self.record_full, resolved_taxon, on="CatalogNumber", how="left")
 
         upload_length = len(self.record_full.index)
 
         # dropping taxon rows with no match
 
         self.record_full = self.record_full.dropna(subset=['name_matched'])
+
 
         clean_length = len(self.record_full.index)
 
@@ -447,10 +451,9 @@ class CsvCreatePicturae(Importer):
         # writing csv for inspection and upload
         self.write_upload_csv()
 
-
 # def full_run():
 #     """testing function to run just the first piece o
-#           f the upload process""
+#           f the upload process"""
 #     CsvCreatePicturae(date_string="2023-06-28")
 #
 # full_run()

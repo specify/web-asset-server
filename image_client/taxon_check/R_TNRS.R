@@ -103,10 +103,10 @@ resolved_taxa = process_taxon_resolve(tax_frame = r_dataframe_taxon)
 
 sink()
 
-#test_taxon = list(CatalogNumber = c(1234, 1234),
-              #    fullname = c('Quercus', 'Quercus'))
+# test_taxon = list(CatalogNumber = c(1234, 1234),
+                  # fullname = c('Sarapicamptis', 'Quercus'))
 
-#test_frame = do.call(data.frame, test_taxon)
+# test_frame = do.call(data.frame, test_taxon)
 
 # returnti = process_taxon_resolve(tax_frame = test_frame)
 

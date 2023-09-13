@@ -4,6 +4,8 @@
           to prevent other changes to the database during upload"""
 import picturae_config
 from importer import Importer
+from specify_db import SpecifyDb
+import picdb_config
 import traceback
 
 # def parse_command_undo():
@@ -30,6 +32,7 @@ class PicturaeUndoBatch(Importer):
     def __init__(self, MD5):
         super().__init__(picturae_config, "Botany")
         self.purge_code = MD5
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
         self.run_all(MD5=self.purge_code)
 
     def batch_undo_timestamps(self, database, table, timestamp1, timestamp2):
@@ -100,8 +103,29 @@ class PicturaeUndoBatch(Importer):
 
         cursor.close()
 
-    # def batch_log_clear(self, MD5: str):
+    def batch_log_clear(self, table, MD5: str):
+        """batch_log_clear: after removing imported records associated with a specific batch from
+                            the specify db, then clears the MD5 record in picbactch db to prevent confusion.
+           args:
+                table: the table with the batch_MD5 col from which records will be cleared.
+                MD5: the string of the MD5 code"""
+        try:
+            cursor = self.batch_db_connection.get_cursor()
+        except Exception as e:
+            self.logger.error(f"Connection Error: {e}")
 
+        sql = f'''DELETE FROM picbatch.{table} WHERE batch_MD5 = "{MD5}" '''
+        self.logger.info(f'running query: {sql}')
+        self.logger.debug(sql)
+        try:
+            cursor.execute(sql)
+        except Exception as e:
+            self.logger.error(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
+            self.logger.error(traceback.format_exc())
+
+        self.batch_db_connection.commit()
+
+        cursor.close()
 
 
     def picturae_csv_undo(self, database: str, table: str, MD5: str):
@@ -116,11 +140,11 @@ class PicturaeUndoBatch(Importer):
         """
         md5_start = f'''SELECT StartTimeStamp FROM {database}.{table} WHERE batch_MD5 = "{MD5}";'''
 
-        start_time = self.specify_db_connection.get_one_record(md5_start)
+        start_time = self.batch_db_connection.get_one_record(md5_start)
 
         md5_end = f'''SELECT EndTimeStamp FROM {database}.{table} WHERE batch_MD5 = "{MD5}";'''
 
-        end_time = self.specify_db_connection.get_one_record(md5_end)
+        end_time = self.batch_db_connection.get_one_record(md5_end)
 
         if start_time is None or end_time is None:
             raise ValueError(f"{MD5} not found in database table")
@@ -145,10 +169,14 @@ class PicturaeUndoBatch(Importer):
                                timestamp1=time_stamp_list[0],
                                timestamp2=time_stamp_list[1])
 
+        # clearing picbatch records
+        for table in ['picturaetaxa_added', 'taxa_unmatch', 'picturae_batch']:
+            self.batch_log_clear(table=table, MD5 = MD5)
+
 
     def run_all(self, MD5):
         print("runnning PIC_undo_batch")
-        self.picturae_csv_undo(database="casbotany", table="picturae_batch", MD5=MD5)
+        self.picturae_csv_undo(database="picbatch", table="picturae_batch", MD5=MD5)
 
 
 # def run_picturae_class(MD5: str):
