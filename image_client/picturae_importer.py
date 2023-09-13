@@ -4,8 +4,6 @@
 """
 import atexit
 import picturae_config
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
 from uuid import uuid4
 from picturae_import_utils import *
 import logging
@@ -162,6 +160,10 @@ class PicturaeImporter(Importer):
                 barcode: the string barcode of the taxon name associated with each photo.
                          used to re-merge dataframes after TNRS and keep track of the record in R.
         """
+
+        from rpy2 import robjects
+        from rpy2.robjects import pandas2ri
+
         taxon_frame = {"CatalogNumber": [barcode], "fullname": [taxon_name]}
 
         taxon_frame = pd.DataFrame(taxon_frame)

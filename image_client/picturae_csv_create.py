@@ -5,8 +5,6 @@
    Source for taxon names at IPNI (International Plant Names Index): https://www.ipni.org/ """
 from uuid import uuid4
 import picturae_config
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
 import logging
 from taxon_parse_utils import *
 from picturae_import_utils import *
@@ -268,6 +266,9 @@ class CsvCreatePicturae(Importer):
            with and without spelling mistakes, only checks base name
            for hybrids as IPNI does not work well with hybrids
            """
+
+        from rpy2 import robjects
+        from rpy2.robjects import pandas2ri
 
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
