@@ -2,6 +2,8 @@ from datetime import date, timedelta
 import random
 from faker import Faker
 import csv
+from PIL import Image
+import os
 import shutil
 class TestingTools:
     def test_date(self):
@@ -28,3 +30,22 @@ class TestingTools:
                     # writing data to CSV
                     writer.writerow([specimen_bar, folder_barcode, jpg_path])
             print(f"Fake dataset {path} with {num_records} records created successfully")
+
+    def create_test_images(self, barcode_list: list, date_string: str, color: str):
+        """create_test_images:
+                creates a number of standard test images in a range of barcodes,
+                and with a specific date string
+           args:
+                barcode_list: a list or range() of barcodes that
+                              you wish to create dummy images for.
+                date_string: a date string , with which to name directory
+                             in which to create and store the dummy images
+        """
+        image = Image.new('RGB', (200, 200), color=color)
+
+        barcode_list = barcode_list
+        for barcode in barcode_list:
+            expected_image_path = f"picturae_img/PIC_{date_string}/CAS{barcode}.JPG"
+            os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
+            print(f"Created directory: {os.path.dirname(expected_image_path)}")
+            image.save(expected_image_path)
