@@ -24,7 +24,7 @@ class PicturaeImporter(Importer):
            along with attached images
     """
 
-    def __init__(self, paths, date_string=None):
+    def __init__(self, paths, date_string=None, istesting=False):
         super().__init__(picturae_config, "Botany")
 
         self.date_use = date_string
@@ -72,7 +72,8 @@ class PicturaeImporter(Importer):
 
         self.paths = paths
 
-        self.run_all_methods()
+        if istesting is False:
+            self.run_all_methods()
 
 
     def run_timestamps(self, batch_size: int):
