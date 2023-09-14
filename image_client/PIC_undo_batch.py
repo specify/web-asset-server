@@ -16,10 +16,9 @@ class PicturaeUndoBatch(Importer):
         self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
         self.run_all(MD5=self.purge_code)
 
-    def batch_undo_timestamps(self, database, table, timestamp1, timestamp2):
-        """sql_time_purger: purges records from select database added between two timestamps.
+    def batch_undo_timestamps(self, table, timestamp1, timestamp2):
+        """batch_undo_timestamps: purges records from select database added between two timestamps.
                 args:
-                    database: name of the database which you want to use.
                     table: name of the table which you want to purge records from.
                     timestamp1: the start time/ lower bound of the TimestampCreated you want to purge
                     timestamp2: the end time/ upper bound of the TimestampCreated you want to purge
@@ -29,7 +28,7 @@ class PicturaeUndoBatch(Importer):
         except Exception as e:
             self.logger.error(f"Connection Error: {e}")
 
-        sql = f'''DELETE FROM {database}.{table} WHERE TimestampCreated >= 
+        sql = f'''DELETE FROM {table} WHERE TimestampCreated >= 
                   "{timestamp1}" AND TimestampCreated <= "{timestamp2}"'''
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
@@ -43,13 +42,12 @@ class PicturaeUndoBatch(Importer):
 
         cursor.close()
 
-    def batch_tree_pruner(self, database, table, timestamp1, timestamp2):
+    def batch_tree_pruner(self, table, timestamp1, timestamp2):
         """sql_tree_purger: used to iteratively remove taxa created by a batch upload.
                             creates a temporary table and removes taxa on the taxa tree
                             added between two timestamps
                             from the bottom up until no nodes are left.
             args:
-                database: the name of the database which will be used.
                 table: the name of the taxon tree table from which records will be removed
                 timestamp1: the start time/ lower bound of the TimestampCreated you want to purge
                 timestamp2: the end time/ upper bound of the TimestampCreated you want to purge
@@ -59,12 +57,13 @@ class PicturaeUndoBatch(Importer):
             cursor = self.specify_db_connection.get_cursor()
         except Exception as e:
             self.logger.error(f"Connection Error: {e}")
-        sql_temp = f'''CREATE TEMPORARY TABLE temp_leaf_nodes AS SELECT TaxonID FROM {database}.{table} WHERE TaxonID
-                       NOT IN (SELECT DISTINCT ParentID FROM {database}.{table}
+
+        sql_temp = f'''CREATE TEMPORARY TABLE temp_leaf_nodes AS SELECT TaxonID FROM {table} WHERE TaxonID
+                       NOT IN (SELECT DISTINCT ParentID FROM {table}
                        WHERE ParentID IS NOT NULL) 
                        AND TimestampCreated >= "{timestamp1}" AND TimestampCreated <= "{timestamp2}";'''
 
-        sql_del = f'''DELETE FROM {database}.{table} WHERE TaxonID IN (SELECT TaxonID FROM temp_leaf_nodes);'''
+        sql_del = f'''DELETE FROM {table} WHERE TaxonID IN (SELECT TaxonID FROM temp_leaf_nodes);'''
 
         sql_drop = f'''DROP TEMPORARY TABLE IF EXISTS temp_leaf_nodes;'''
         rows_affected = 0
@@ -95,7 +94,7 @@ class PicturaeUndoBatch(Importer):
         except Exception as e:
             self.logger.error(f"Connection Error: {e}")
 
-        sql = f'''DELETE FROM picbatch.{table} WHERE batch_MD5 = "{MD5}" '''
+        sql = f'''DELETE FROM {table} WHERE batch_MD5 = "{MD5}" '''
         self.logger.info(f'running query: {sql}')
         self.logger.debug(sql)
         try:
@@ -109,21 +108,20 @@ class PicturaeUndoBatch(Importer):
         cursor.close()
 
 
-    def picturae_csv_undo(self, database: str, table: str, MD5: str):
-        """casbotany_csv_purger: runs sql commands to database, to purge sql records created between two timestamps
+    def picturae_csv_undo(self, table: str, MD5: str):
+        """picturae_csv_undo: runs sql commands to database, to purge sql records created between two timestamps
                                  in which the original upload script was run,
             uses log of sql uploads to retrieve records organized by generated MD5 code.
             args:
-                database:name of database to use
                 table: the name of the table on which upload timestamps and MD5s are stored.
                 MD5: the verbatim md5 string format of the desired upload to purge.
 
         """
-        md5_start = f'''SELECT StartTimeStamp FROM {database}.{table} WHERE batch_MD5 = "{MD5}";'''
+        md5_start = f'''SELECT StartTimeStamp FROM {table} WHERE batch_MD5 = "{MD5}";'''
 
         start_time = self.batch_db_connection.get_one_record(md5_start)
 
-        md5_end = f'''SELECT EndTimeStamp FROM {database}.{table} WHERE batch_MD5 = "{MD5}";'''
+        md5_end = f'''SELECT EndTimeStamp FROM {table} WHERE batch_MD5 = "{MD5}";'''
 
         end_time = self.batch_db_connection.get_one_record(md5_end)
 
@@ -140,21 +138,21 @@ class PicturaeUndoBatch(Importer):
                       'collectingevent', 'locality', 'agent']
 
         for table in table_list:
-            self.batch_undo_timestamps(database='casbotany', table=table,
+            self.batch_undo_timestamps(table=table,
                                        timestamp1=time_stamp_list[0],
                                        timestamp2=time_stamp_list[1])
 
         table = "taxon"
 
-        self.batch_tree_pruner(database='casbotany', table=table,
+        self.batch_tree_pruner(table=table,
                                timestamp1=time_stamp_list[0],
                                timestamp2=time_stamp_list[1])
 
         # clearing picbatch records
         for table in ['picturaetaxa_added', 'taxa_unmatch', 'picturae_batch']:
-            self.batch_log_clear(table=table, MD5 = MD5)
+            self.batch_log_clear(table=table, MD5=MD5)
 
 
     def run_all(self, MD5):
         print("runnning PIC_undo_batch")
-        self.picturae_csv_undo(database="picbatch", table="picturae_batch", MD5=MD5)
+        self.picturae_csv_undo(table="picturae_batch", MD5=MD5)

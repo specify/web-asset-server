@@ -22,7 +22,7 @@ starting_time_stamp = datetime.now()
 
 
 class CsvCreatePicturae(Importer):
-    def __init__(self, date_string):
+    def __init__(self, date_string, istesting=False):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
@@ -40,7 +40,8 @@ class CsvCreatePicturae(Importer):
         for param in init_list:
             setattr(self, param, None)
 
-        self.run_all()
+        if istesting is False:
+            self.run_all()
 
     def file_present(self):
         """file_present:

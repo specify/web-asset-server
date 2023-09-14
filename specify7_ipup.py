@@ -69,8 +69,6 @@ def master_run():
 
     ip_replace('image_client/picdb_config.py')
 
-
-
 # running master function
 master_run()
 
