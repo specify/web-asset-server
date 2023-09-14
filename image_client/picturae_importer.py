@@ -4,8 +4,6 @@
 """
 import atexit
 import picturae_config
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
 from uuid import uuid4
 from picturae_import_utils import *
 import logging
@@ -14,9 +12,9 @@ from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
 from sql_csv_utils import *
 from botany_importer import BotanyImporter
-
 from picturae_csv_create import starting_time_stamp
-
+from specify_db import SpecifyDb
+import picdb_config
 
 class PicturaeImporter(Importer):
     """DataOnboard:
@@ -32,13 +30,17 @@ class PicturaeImporter(Importer):
         self.date_use = date_string
 
         self.logger = logging.getLogger('PicturaeImporter')
+
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'taxon_list']
+                       'taxon_list', 'new_taxa']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
+
+        # setting up alternate db connection for batch database
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         self.no_match_dict = {}
 
@@ -80,7 +82,7 @@ class PicturaeImporter(Importer):
         sql = create_batch_record(start_time=starting_time_stamp, end_time=ending_time_stamp,
                                 batch_md5=self.batch_md5, batch_size=batch_size)
 
-        insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+        insert_table_record(connection=self.batch_db_connection, logger_int=self.logger, sql=sql)
 
         condition = f'''WHERE TimestampCreated >= "{starting_time_stamp}" 
                         AND TimestampCreated <= "{ending_time_stamp}";'''
@@ -90,7 +92,7 @@ class PicturaeImporter(Importer):
 
             sql = create_update_statement(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
                                           condition=condition)
-            insert_table_record(connection=self.specify_db_connection, sql=sql, logger_int=self.logger)
+            insert_table_record(connection=self.batch_db_connection, sql=sql, logger_int=self.logger)
 
 
     def exit_timestamp(self):
@@ -158,6 +160,10 @@ class PicturaeImporter(Importer):
                 barcode: the string barcode of the taxon name associated with each photo.
                          used to re-merge dataframes after TNRS and keep track of the record in R.
         """
+
+        from rpy2 import robjects
+        from rpy2.robjects import pandas2ri
+
         taxon_frame = {"CatalogNumber": [barcode], "fullname": [taxon_name]}
 
         taxon_frame = pd.DataFrame(taxon_frame)
@@ -372,6 +378,7 @@ class PicturaeImporter(Importer):
                     # # adding family name to list
                     # if self.family_id is None:
                     #     self.taxon_list.append(self.family_name)
+            self.new_taxa.extend(self.taxon_list)
         else:
             pass
 
@@ -600,7 +607,7 @@ class PicturaeImporter(Importer):
 
             insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
-            print("taxon_created!")
+            logging.info(f"taxon: {rank_name} created")
 
 
     def create_collection_object(self):
@@ -895,12 +902,11 @@ class PicturaeImporter(Importer):
         self.exit_timestamp()
 
         # creating tables
-
         self.upload_records()
 
-        # creating new taxon list (should think of way to shorten this)
-        if len(self.taxon_list) > 0:
-            insert_taxa_added_record(taxon_list=self.taxon_list, connection=self.specify_db_connection,
+        # creating new taxon list
+        if len(self.new_taxa) > 0:
+            insert_taxa_added_record(taxon_list=self.new_taxa, connection=self.batch_db_connection,
                                      logger_int=self.logger, df=self.record_full)
 
         # uploading attachments

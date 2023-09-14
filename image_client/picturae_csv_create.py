@@ -5,14 +5,14 @@
    Source for taxon names at IPNI (International Plant Names Index): https://www.ipni.org/ """
 from uuid import uuid4
 import picturae_config
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
 import logging
 from taxon_parse_utils import *
 from picturae_import_utils import *
 from string_utils import *
 from importer import Importer
 from sql_csv_utils import *
+from specify_db import SpecifyDb
+import picdb_config
 
 # creating a batch uuid
 batch_uuid = uuid4()
@@ -22,10 +22,13 @@ starting_time_stamp = datetime.now()
 
 
 class CsvCreatePicturae(Importer):
-    def __init__(self, date_string):
+    def __init__(self, date_string, istesting=False):
         super().__init__(picturae_config, "Botany")
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
+
+        # setting up alternate db connection for batch database
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         # intializing parameters for database upload
         init_list = ['taxon_id', 'barcode',
@@ -37,7 +40,8 @@ class CsvCreatePicturae(Importer):
         for param in init_list:
             setattr(self, param, None)
 
-        self.run_all()
+        if istesting is False:
+            self.run_all()
 
     def file_present(self):
         """file_present:
@@ -246,7 +250,7 @@ class CsvCreatePicturae(Importer):
                     hybrid_base = full_name
                     full_name = taxon_strings[0]
                     if full_name != genus:
-                        full_name = taxon_strings[-1]
+                        full_name = " ".join(taxon_strings[:2])
 
             elif len(first_intra) != len(full_name):
                 if "var." in full_name or "subsp." in full_name or " f." in full_name or "subf." in full_name:
@@ -257,34 +261,15 @@ class CsvCreatePicturae(Importer):
 
         return str(gen_spec), str(full_name), str(first_intra), str(tax_name), str(hybrid_base)
 
-
-    def taxon_unmatch_create(self, unmatched_taxa: pd.DataFrame):
-        """taxon_unmatch_create: creates sql query for creating new records in taxa unmatch,
-                                from rows that did not pass TNRS successfully,
-                                either through spelling, or taxonomic errors.
-            args:
-                unmatched_taxa: a pandas dataframe with unmatched taxa terms filtered by score
-        """
-        print("uploading unmatched taxa")
-        for index, row in unmatched_taxa.iterrows():
-            catalognumber = unmatched_taxa.columns.get_loc("CatalogNumber")
-
-            sql = create_tnrs_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
-
-            sql_result = get_one_match(connection=self.specify_db_connection, tab_name='taxa_unmatch',
-                                      id_col='CatalogNumber', key_col='CatalogNumber',
-                                      match=row[catalognumber], match_type='integer')
-            if sql_result is None:
-                insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
-            else:
-                pass
-
     def taxon_check_real(self):
         """taxon_check_real:
            Sends the concatenated taxon column, through TNRS, to match names,
            with and without spelling mistakes, only checks base name
            for hybrids as IPNI does not work well with hybrids
            """
+
+        from rpy2 import robjects
+        from rpy2.robjects import pandas2ri
 
         bar_tax = self.record_full[['CatalogNumber', 'fullname']]
 
@@ -303,28 +288,33 @@ class CsvCreatePicturae(Importer):
 
         resolved_taxon = robjects.conversion.rpy2py(resolved_taxon)
 
+        resolved_taxon['overall_score'].fillna(0, inplace=True)
+
         # filtering out taxa without exact matches , saving to db table
+
         unmatched_taxa = resolved_taxon[resolved_taxon["overall_score"] < .99]
 
         # writing unmatched taxa to db table taxa_unmatch
-
+        SpecifyDb(db_config_class=picdb_config)
         if len(unmatched_taxa) > 0:
-            self.taxon_unmatch_create(unmatched_taxa)
+            taxon_unmatch_insert(connection=self.batch_db_connection, logger=self.logger, unmatched_taxa=unmatched_taxa)
 
         # filtering out taxa with tnrs scores lower than .99 (basically exact match)
         resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]
 
         # dropping uneccessary columns
 
-        resolved_taxon = resolved_taxon.drop(columns=["overall_score", "unmatched_terms", "CatalogNumber"])
+        resolved_taxon = resolved_taxon.drop(columns=["fullname", "overall_score", "unmatched_terms"])
         # merging columns on full name
-        self.record_full = pd.merge(self.record_full, resolved_taxon, on="fullname", how="left")
+
+        self.record_full = pd.merge(self.record_full, resolved_taxon, on="CatalogNumber", how="left")
 
         upload_length = len(self.record_full.index)
 
         # dropping taxon rows with no match
 
         self.record_full = self.record_full.dropna(subset=['name_matched'])
+
 
         clean_length = len(self.record_full.index)
 
@@ -463,10 +453,9 @@ class CsvCreatePicturae(Importer):
         # writing csv for inspection and upload
         self.write_upload_csv()
 
-
 # def full_run():
 #     """testing function to run just the first piece o
-#           f the upload process""
+#           f the upload process"""
 #     CsvCreatePicturae(date_string="2023-06-28")
 #
 # full_run()
