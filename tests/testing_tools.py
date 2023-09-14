@@ -8,12 +8,17 @@ import shutil
 class TestingTools:
     def test_date(self):
         """test_date: creates an arbitrary date, 20 years in the past from today's date,
-           to create test files for, so as not to overwrite current work
+           to use for testing, so as not to accidentally overwrite or modify current work.
            ! if this code outlives 20 years of use I would be impressed"""
         unit_date = date.today() - timedelta(days=365 * 20)
         return str(unit_date)
 
     def create_fake_dataset(self, num_records: int, path_list: list):
+        """create_fake_dataset: creates a fake csv dataset with random data of a custom length,
+                                can create multiple fake datasets with custom file_paths provided in a list.
+            args:
+                num_records: the amount of rows that will be in the fake dataset
+                path_list: the number of paths at which to save the same number of fake datasets"""
         fake = Faker()
         for path in path_list:
             with open(path, 'w', newline='') as csvfile:
