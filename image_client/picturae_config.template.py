@@ -18,6 +18,9 @@ PREFIX = f"web-asset-server{sla}image_client{sla}"
 # number for created by agent field , check your agent id on the agent table
 agent_number = 123456
 
-SPECIMEN_PATH = f"picturae_csv/some_folder/some_specimen_file.csv"
 
-FOLDER_PATH = f"picturae_csv/some_folder/some_folder_file.csv"
+DATA_FOLDER = f"picturae_csv{sla}"
+
+CSV_SPEC = f"{sla}picturae_specimen("
+
+CSV_FOLD = f"{sla}picturae_folder("
