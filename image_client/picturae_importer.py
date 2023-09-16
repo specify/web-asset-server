@@ -45,13 +45,16 @@ class PicturaeImporter(Importer):
         self.no_match_dict = {}
 
         # running csv create
-        CsvCreatePicturae(date_string=self.date_use)
+        if istesting is False:
+            CsvCreatePicturae(date_string=self.date_use)
 
-        self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
+            self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
 
-        self.record_full = pd.read_csv(self.file_path)
+            self.record_full = pd.read_csv(self.file_path)
 
-        self.batch_size = len(self.record_full)
+            self.batch_size = len(self.record_full)
+
+            self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -67,8 +70,6 @@ class PicturaeImporter(Importer):
             setattr(self, param, None)
 
         self.created_by_agent = picturae_config.agent_number
-
-        self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
         self.paths = paths
 

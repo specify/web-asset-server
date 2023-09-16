@@ -2,6 +2,7 @@ import unittest
 import shutil
 import os
 import picturae_csv_create as pcc
+import picturae_config
 from tests.testing_tools import TestingTools
 from datetime import date, timedelta
 
@@ -26,10 +27,12 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         else:
             # create test directories
 
-            expected_folder_path = 'picturae_csv/' + str(self.date_string) + '/picturae_folder(' + \
-                                   str(self.date_string) + ').csv'
-            expected_specimen_path = 'picturae_csv/' + str(self.date_string) + '/picturae_specimen(' + \
-                                     str(self.date_string) + ').csv'
+            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_FOLD + \
+                                 f"{self.date_string}" + ").csv"
+
+            expected_specimen_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_SPEC + \
+                                     f"{self.date_string}" + ").csv"
+
             # making the directories
             os.makedirs(os.path.dirname(expected_folder_path), exist_ok=True)
 
@@ -85,8 +88,8 @@ class DirectoryTests(unittest.TestCase, TestingTools):
             del self.CsvCreatePicturae
             # create test directories
 
-            expected_folder_path = 'picturae_csv/' + str(self.date_string) + '/picturae_folder(' + \
-                                   str(self.date_string) + ').csv'
+            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_FOLD + \
+                                   f"{self.date_string}" + ").csv"
             shutil.rmtree(os.path.dirname(expected_folder_path))
 
 

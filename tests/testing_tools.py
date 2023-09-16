@@ -8,9 +8,8 @@ import shutil
 class TestingTools:
     def test_date(self):
         """test_date: creates an arbitrary date, 20 years in the past from today's date,
-           to use for testing, so as not to accidentally overwrite or modify current work.
-           ! if this code outlives 20 years of use I would be impressed"""
-        unit_date = date.today() - timedelta(days=365 * 20)
+           to use for testing, so as not to accidentally overwrite or modify current work."""
+        unit_date = date.today() - timedelta(days=365 * 100)
         return str(unit_date)
 
     def create_fake_dataset(self, num_records: int, path_list: list):
