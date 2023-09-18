@@ -78,14 +78,14 @@ class CsvCreatePicturae(Importer):
         else:
             raise ValueError(f"subdirectory for {self.date_use} not present")
 
-    def csv_read_folder(self, folder_string):
-        """csv_read_folder:
+    def csv_read_path(self, csv_level: str):
+        """csv_read_path:
                 reads in csv data for given date self.date_use
         args:
             folder_string: denotes whether specimen or folder level data with "folder" or "specimen"
         """
 
-        folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_' + str(folder_string) + '(' + \
+        folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_' + str(csv_level) + '(' + \
                       str(self.date_use) + ').csv'
 
         folder_csv = pd.read_csv(folder_path)
@@ -99,8 +99,8 @@ class CsvCreatePicturae(Importer):
                 fold_csv: folder level csv to be input as argument for merging
                 spec_csv: specimen level csv to be input as argument for merging
         """
-        fold_csv = self.csv_read_folder("folder")
-        spec_csv = self.csv_read_folder("specimen")
+        fold_csv = self.csv_read_path(csv_level="folder")
+        spec_csv = self.csv_read_path(csv_level="specimen")
 
         # checking if columns to merge contain same data
         if (set(fold_csv['specimen_barcode']) == set(spec_csv['specimen_barcode'])) is True:
@@ -411,8 +411,6 @@ class CsvCreatePicturae(Importer):
 
     def check_if_images_present(self):
         """checks that each image exists, creating boolean column for later use"""
-
-        print(os.getcwd())
 
         self.record_full['image_valid'] = self.record_full['image_path'].apply(self.check_for_valid_image)
 

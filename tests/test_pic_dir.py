@@ -4,14 +4,14 @@ import os
 import picturae_csv_create as pcc
 import picturae_config
 from tests.testing_tools import TestingTools
-from datetime import date, timedelta
 
 os.chdir("./image_client")
 
 class DirectoryTests(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.date_string = self.test_date()
+        self.md5_hash = self.test_date()
+        self.md5_hash = self.generate_random_md5()
 
 
     """WorkingDirectoryTests: a series of unit tests to verify
@@ -20,18 +20,18 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         """setUP: unittest setup function creates empty csvs,
                   and folders for given test path"""
         # initializing
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.date_string, istesting=True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting=True)
 
         if self._testMethodName == "test_missing_folder_raise_error":
             pass
         else:
             # create test directories
 
-            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_FOLD + \
-                                 f"{self.date_string}" + ").csv"
+            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.md5_hash}" + picturae_config.CSV_FOLD + \
+                                 f"{self.md5_hash}" + ").csv"
 
-            expected_specimen_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_SPEC + \
-                                     f"{self.date_string}" + ").csv"
+            expected_specimen_path = picturae_config.DATA_FOLDER + f"{self.md5_hash}" + picturae_config.CSV_SPEC + \
+                                     f"{self.md5_hash}" + ").csv"
 
             # making the directories
             os.makedirs(os.path.dirname(expected_folder_path), exist_ok=True)
@@ -45,7 +45,7 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         """checks if incorrect sub_directory raises error from file present"""
         with self.assertRaises(ValueError) as cm:
             self.CsvCreatePicturae.file_present()
-        self.assertEqual(str(cm.exception), f"subdirectory for {self.date_string} not present")
+        self.assertEqual(str(cm.exception), f"subdirectory for {self.md5_hash} not present")
 
 
     def test_expected_path_date(self):
@@ -61,8 +61,8 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         """test_raise_specimen: tests whether correct value
            error is raised for missing specimen_csv"""
         # removing test path specimen
-        os.remove('picturae_csv/' + str(self.date_string) + '/picturae_specimen(' +
-                  str(self.date_string) + ').csv')
+        os.remove('picturae_csv/' + str(self.md5_hash) + '/picturae_specimen(' +
+                  str(self.md5_hash) + ').csv')
         with self.assertRaises(ValueError) as cm:
             self.CsvCreatePicturae.file_present()
         self.assertEqual(str(cm.exception), "Specimen csv does not exist")
@@ -71,8 +71,8 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         """test_raise_folder: tests whether correct value error
            is raised for missing folder_csv"""
         # removing test path folder
-        os.remove('picturae_csv/' + str(self.date_string) + '/picturae_folder(' +
-                  str(self.date_string) + ').csv')
+        os.remove('picturae_csv/' + str(self.md5_hash) + '/picturae_folder(' +
+                  str(self.md5_hash) + ').csv')
         with self.assertRaises(ValueError) as cm:
             self.CsvCreatePicturae.file_present()
         self.assertEqual(str(cm.exception), "Folder csv does not exist")
@@ -88,8 +88,8 @@ class DirectoryTests(unittest.TestCase, TestingTools):
             del self.CsvCreatePicturae
             # create test directories
 
-            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.date_string}" + picturae_config.CSV_FOLD + \
-                                   f"{self.date_string}" + ").csv"
+            expected_folder_path = picturae_config.DATA_FOLDER + f"{self.md5_hash}" + picturae_config.CSV_FOLD + \
+                                   f"{self.md5_hash}" + ").csv"
             shutil.rmtree(os.path.dirname(expected_folder_path))
 
 

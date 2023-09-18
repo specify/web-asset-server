@@ -1,20 +1,19 @@
+"""tests for the taxon_concat and taxon_check_real function (using tnrs)"""
+import os
 import pandas as pd
 import unittest
 import picturae_csv_create as pcc
-import picturae_config
 from tests.testing_tools import TestingTools
-import picturae_importer as pi
-import os
 
 os.chdir("./image_client")
 class ConcatTaxonTests(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.date_string = self.test_date()
+        self.md5_hash = self.generate_random_md5()
     def setUp(self):
         """creates fake taxon columns in
            dummy dataset to test out taxon_concat string output"""
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.date_string, istesting=True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting=True)
 
         # jose Gonzalez is a real agent,
         # to make sure true matches are not added to list.
@@ -60,7 +59,9 @@ class ConcatTaxonTests(unittest.TestCase, TestingTools):
         self.CsvCreatePicturae.taxon_check_real()
         # assert statements
         self.assertEqual(len(self.CsvCreatePicturae.record_full.columns), 15)
-        # 2 as the genus level hybrid Serapicamtis and the mispelled Castilloja should fail
+
+        # 2 rows left as the genus level hybrid Serapicamptis and the mispelled "Castilloja" should fail
+
         self.assertEqual(len(self.CsvCreatePicturae.record_full), 2)
 
         self.assertTrue('name_matched' in self.CsvCreatePicturae.record_full.columns,

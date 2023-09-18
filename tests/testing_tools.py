@@ -5,12 +5,10 @@ import csv
 from PIL import Image
 import os
 import shutil
+import hashlib
+import random
+import string
 class TestingTools:
-    def test_date(self):
-        """test_date: creates an arbitrary date, 20 years in the past from today's date,
-           to use for testing, so as not to accidentally overwrite or modify current work."""
-        unit_date = date.today() - timedelta(days=365 * 100)
-        return str(unit_date)
 
     def create_fake_dataset(self, num_records: int, path_list: list):
         """create_fake_dataset: creates a fake csv dataset with random data of a custom length,
@@ -53,3 +51,13 @@ class TestingTools:
             os.makedirs(os.path.dirname(expected_image_path), exist_ok=True)
             print(f"Created directory: {os.path.dirname(expected_image_path)}")
             image.save(expected_image_path)
+
+    def generate_random_md5(self):
+        """generate_random_md5: creates random combination of characters and digits, to create
+                                a unique md5 code."""
+        characters = string.ascii_letters + string.digits
+        random_string = ''.join(random.choice(characters) for _ in range(16))
+        md5_hash = hashlib.md5(random_string.encode()).hexdigest()
+
+        return md5_hash
+
