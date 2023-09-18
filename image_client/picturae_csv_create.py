@@ -55,14 +55,16 @@ class CsvCreatePicturae(Importer):
 
         to_current_directory()
 
-        dir_sub = os.path.isdir(str("picturae_csv/") + str(self.date_use))
+        dir_path = picturae_config.DATA_FOLDER + f"{self.date_use}"
+
+        dir_sub = os.path.isdir(dir_path)
 
         if dir_sub is True:
-            folder_path = 'picturae_csv/' + str(self.date_use) + '/picturae_folder(' + \
-                          str(self.date_use) + ').csv'
+            folder_path = picturae_config.DATA_FOLDER + f"{self.date_use}" + picturae_config.CSV_FOLD + \
+                          f"{self.date_use}" + ").csv"
 
-            specimen_path = 'picturae_csv/' + str(self.date_use) + '/picturae_specimen(' + \
-                            str(self.date_use) + ').csv'
+            specimen_path = picturae_config.DATA_FOLDER + f"{self.date_use}" + picturae_config.CSV_SPEC + \
+                            f"{self.date_use}" + ").csv"
 
             if os.path.exists(folder_path):
                 print("Folder csv exists!")
