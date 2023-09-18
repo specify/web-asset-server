@@ -13,7 +13,7 @@ class ColNamesTest(unittest.TestCase, TestingTools):
     def setUp(self):
         """creates dummy dataset with representative column names"""
         # initializing class
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting = True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
         # creating dummy dataset
         numb_range = list(range(1, 101))
         column_names = ['application_batch', 'csv_batch', 'object_type', 'folder_barcode',

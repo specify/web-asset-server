@@ -22,7 +22,7 @@ class CsvReadMergeTests(unittest.TestCase, TestingTools):
           so that test merges and uploads can be performed.
           """
         # print("setup called!")
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting=True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
         # maybe create a separate function for setting up test directories
         path_type_list = ['folder', 'specimen']
         path_list = []

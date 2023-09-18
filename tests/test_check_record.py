@@ -11,7 +11,7 @@ class DatabaseChecks(unittest.TestCase, TestingTools):
     def setUp(self):
         """creates fake dataset with dummy columns,
           that have a small subset of representative real column names,
-          """
+        """
         # initializing
         self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting=True)
 

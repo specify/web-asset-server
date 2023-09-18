@@ -10,9 +10,7 @@ os.chdir("./image_client")
 class DirectoryTests(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.md5_hash = self.test_date()
         self.md5_hash = self.generate_random_md5()
-
 
     """WorkingDirectoryTests: a series of unit tests to verify
         correct working directory, subdirectories."""
@@ -20,7 +18,7 @@ class DirectoryTests(unittest.TestCase, TestingTools):
         """setUP: unittest setup function creates empty csvs,
                   and folders for given test path"""
         # initializing
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istesting=True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
 
         if self._testMethodName == "test_missing_folder_raise_error":
             pass
