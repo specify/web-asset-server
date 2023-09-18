@@ -1,6 +1,4 @@
-"""test_date: creates an arbitrary date, 100 years in the past from today's date,
-   to create test files for, so as not to overwrite current work
-   ! if this code outlives 100 years of use I would be impressed"""
+"""Csv merge tests the csv_merge and csv_read_path functions"""
 import unittest
 import shutil
 import os

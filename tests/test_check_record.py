@@ -1,4 +1,4 @@
-"""tests to test the record present, barcode present and image present functions."""
+"""tests to test the record_present, barcode_present and image_has_record functions."""
 import unittest
 import picturae_csv_create as pcc
 import pandas as pd

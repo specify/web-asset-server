@@ -1,3 +1,4 @@
+"""tests the rename_cols function, to make sure correct column names are assigned"""
 import unittest
 import os
 import pandas as pd
