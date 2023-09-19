@@ -24,9 +24,32 @@ class PicturaeImporter(Importer):
            along with attached images
     """
 
-    def __init__(self, paths, date_string=None, istesting=False):
+    def __init__(self, paths, date_string=None, istest=False):
         super().__init__(picturae_config, "Botany")
 
+        self.setting_init_variables(date_string=date_string, paths=paths)
+
+        # running csv create
+        CsvCreatePicturae(date_string=self.date_use)
+
+        self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
+
+        self.record_full = pd.read_csv(self.file_path)
+
+        self.batch_size = len(self.record_full)
+
+        self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
+
+        if istest is False:
+            self.run_all_methods()
+
+
+    def setting_init_variables(self, date_string, paths):
+        """setting init variables:
+            a list of variables and data structures to be initialized at the beginning of the class.
+            args:
+                date_string: the date input recieved from init params
+                paths: the paths string recieved from the init params"""
         self.date_use = date_string
 
         self.logger = logging.getLogger('PicturaeImporter')
@@ -43,18 +66,6 @@ class PicturaeImporter(Importer):
         self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         self.no_match_dict = {}
-
-        # running csv create
-        if istesting is False:
-            CsvCreatePicturae(date_string=self.date_use)
-
-            self.file_path = f"PIC_upload/PIC_record_{self.date_use}.csv"
-
-            self.record_full = pd.read_csv(self.file_path)
-
-            self.batch_size = len(self.record_full)
-
-            self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
         # intializing parameters for database upload
         init_list = ['GeographyID', 'taxon_id', 'barcode',
@@ -73,8 +84,6 @@ class PicturaeImporter(Importer):
 
         self.paths = paths
 
-        if istesting is False:
-            self.run_all_methods()
 
 
     def run_timestamps(self, batch_size: int):
@@ -82,7 +91,7 @@ class PicturaeImporter(Importer):
         ending_time_stamp = datetime.now()
 
         sql = create_batch_record(start_time=starting_time_stamp, end_time=ending_time_stamp,
-                                batch_md5=self.batch_md5, batch_size=batch_size)
+                                  batch_md5=self.batch_md5, batch_size=batch_size)
 
         insert_table_record(connection=self.batch_db_connection, logger_int=self.logger, sql=sql)
 

@@ -1,23 +1,20 @@
+"""tests the rename_cols function, to make sure correct column names are assigned"""
 import unittest
-import shutil
 import os
 import pandas as pd
 import picturae_csv_create as pcc
 from tests.testing_tools import TestingTools
-import picturae_config
-from tests.testing_tools import TestingTools
-from datetime import date, timedelta
 
 os.chdir("./image_client")
 
 class ColNamesTest(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.date_string = self.test_date()
+        self.md5_hash = self.generate_random_md5()
     def setUp(self):
         """creates dummy dataset with representative column names"""
         # initializing class
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.date_string, istesting = True)
+        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
         # creating dummy dataset
         numb_range = list(range(1, 101))
         column_names = ['application_batch', 'csv_batch', 'object_type', 'folder_barcode',
