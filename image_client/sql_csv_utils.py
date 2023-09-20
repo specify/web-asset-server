@@ -103,10 +103,12 @@ def insert_table_record(connection, logger_int , sql):
            connection: the connection parameter in the case of specify self.specify_db_connection
            logger: the logger instance of your class self.logger
     """
+
     cursor = connection.get_cursor()
 
     logger_int.info(f'running query: {sql}')
     logger_int.debug(sql)
+
     try:
         cursor.execute(sql)
     except Exception as e:
@@ -120,6 +122,7 @@ def insert_table_record(connection, logger_int , sql):
         sys.exit("terminating script")
 
     cursor.close()
+
 
 def create_batch_record(start_time: datetime, end_time: datetime,
                       batch_size: int, batch_md5: str):

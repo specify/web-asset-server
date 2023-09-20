@@ -2,7 +2,7 @@
 import unittest
 import os
 import pandas as pd
-import picturae_csv_create as pcc
+from tests.pic_csv_test_class import TestCsvCreatePicturae
 from tests.testing_tools import TestingTools
 
 os.chdir("./image_client")
@@ -14,7 +14,7 @@ class ColNamesTest(unittest.TestCase, TestingTools):
     def setUp(self):
         """creates dummy dataset with representative column names"""
         # initializing class
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
+        self.test_csv_create_picturae = TestCsvCreatePicturae(date_string=self.md5_hash)
         # creating dummy dataset
         numb_range = list(range(1, 101))
         column_names = ['application_batch', 'csv_batch', 'object_type', 'folder_barcode',
@@ -39,15 +39,15 @@ class ColNamesTest(unittest.TestCase, TestingTools):
         new_df['Notes'] = pd.NA
         new_df['Feedback'] = pd.NA
 
-        self.CsvCreatePicturae.record_full = pd.DataFrame(new_df)
+        self.test_csv_create_picturae.record_full = pd.DataFrame(new_df)
 
     def test_if_id_cols(self):
         """test_if_id_col: tests whether certain essential
            ID columns present. Also tests, wether name columns correctly
            reformated
         """
-        self.CsvCreatePicturae.csv_colnames()
-        csv_columns = self.CsvCreatePicturae.record_full.columns
+        self.test_csv_create_picturae.csv_colnames()
+        csv_columns = self.test_csv_create_picturae.record_full.columns
         column_names = ['collector_number', 'RankID',
                         'CatalogNumber', 'collector_last_name1',
                         'collector_first_name5']
@@ -55,9 +55,9 @@ class ColNamesTest(unittest.TestCase, TestingTools):
 
     def test_if_nas(self):
         """test_if_nas: test if any left-over columns contain only NAs"""
-        self.CsvCreatePicturae.csv_colnames()
-        self.record_full = self.CsvCreatePicturae.record_full.dropna(axis=1, how='all')
+        self.test_csv_create_picturae.csv_colnames()
+        self.record_full = self.test_csv_create_picturae.record_full.dropna(axis=1, how='all')
         self.assertEqual(len(self.record_full.columns), len(self.record_full.columns))
 
     def tearDown(self):
-        del self.CsvCreatePicturae
+        del self.test_csv_create_picturae

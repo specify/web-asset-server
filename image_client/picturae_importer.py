@@ -24,10 +24,10 @@ class PicturaeImporter(Importer):
            along with attached images
     """
 
-    def __init__(self, paths, date_string=None, istest=False):
+    def __init__(self, paths, date_string=None):
         super().__init__(picturae_config, "Botany")
 
-        self.setting_init_variables(date_string=date_string, paths=paths)
+        self.init_all_vars(date_string=date_string, paths=paths)
 
         # running csv create
         CsvCreatePicturae(date_string=self.date_use)
@@ -40,11 +40,10 @@ class PicturaeImporter(Importer):
 
         self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
 
-        if istest is False:
-            self.run_all_methods()
+        self.run_all_methods()
 
 
-    def setting_init_variables(self, date_string, paths):
+    def init_all_vars(self, date_string, paths):
         """setting init variables:
             a list of variables and data structures to be initialized at the beginning of the class.
             args:
@@ -265,14 +264,14 @@ class PicturaeImporter(Importer):
             # need a way to keep ones with nas, but only split titles from real names
             if not pd.isna(first) or not pd.isna(middle) or not pd.isna(last):
                 # first name title taking priority over last
-                first_name, title = assign_titles(first_last='first', name=f"{first}")
-                last_name, title = assign_titles(first_last='last', name=f"{last}")
+                first_name, title = assign_collector_titles(first_last='first', name=f"{first}")
+                last_name, title = assign_collector_titles(first_last='last', name=f"{last}")
 
                 middle = middle
                 elements = [first_name, last_name, title, middle]
 
                 for index in range(len(elements)):
-                    if elements[index] == '':
+                    if pd.isna(elements[index]) or elements[index] == '':
                         elements[index] = pd.NA
 
                 first_name, last_name, title, middle = elements
@@ -309,7 +308,7 @@ class PicturaeImporter(Importer):
         column_list = ['CatalogNumber', 'verbatim_date', 'start_date',
                        'end_date', 'collector_number', 'locality', 'fullname', 'taxname',
                        'gen_spec', 'qualifier', 'name_matched', 'Genus', 'Family', 'Hybrid', 'accepted_author',
-                       'name_matched', 'first_intra', 'county', 'state', 'country']
+                       'first_intra', 'county', 'state', 'country']
         # print(self.full_name)
         index_list = []
         for column in column_list:
@@ -330,15 +329,14 @@ class PicturaeImporter(Importer):
         self.family_name = row[index_list[12]]
         self.is_hybrid = row[index_list[13]]
         self.author = row[index_list[14]]
-        self.name_matched = row[index_list[15]]
-        self.first_intra = row[index_list[16]]
+        self.first_intra = row[index_list[15]]
 
         guid_list = ['collecting_event_guid', 'collection_ob_guid', 'locality_guid', 'determination_guid']
         for guid_string in guid_list:
             setattr(self, guid_string, uuid4())
 
-        self.geography_string = str(row[index_list[17]]) + ", " + \
-                                str(row[index_list[18]]) + ", " + str(row[index_list[19]])
+        self.geography_string = str(row[index_list[16]]) + ", " + \
+                                str(row[index_list[17]]) + ", " + str(row[index_list[18]])
 
         self.GeographyID = get_one_match(self.specify_db_connection, tab_name='geography', id_col='GeographyID',
                                          key_col='FullName', match=self.geography_string)

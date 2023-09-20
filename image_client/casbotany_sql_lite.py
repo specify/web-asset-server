@@ -382,6 +382,7 @@ def table_sql_list():
                         );''']
 
     return sql_bot_list
+
 def casbotany_lite_creator():
     connect = sqlite3.connect('cas_botanylite.db')
     sql_list = table_sql_list()
@@ -391,6 +392,28 @@ def casbotany_lite_creator():
         curs.execute(table)
         connect.commit()
     # closing connection
+    curs.close()
+    connect.close()
+
+
+def sql_lite_connection(db_name):
+    connection = sqlite3.connect(db_name)
+    return connection
+
+def sql_lite_insert(sql, db_name):
+    """facimile statement to insert_table_record in sql_csv_utils.py"""
+    connect = sqlite3.connect(db_name)
+    curs = connect.cursor()
+    try:
+        curs.execute(sql)
+    except Exception as e:
+        raise ValueError(f"Exception thrown while processing sql: {sql}\n{e}\n")
+    try:
+        connect.commit()
+
+    except Exception as e:
+        raise ValueError(f"sql debug: {e}")
+
     curs.close()
     connect.close()
 

@@ -2,7 +2,7 @@
 import os
 import pandas as pd
 import unittest
-import picturae_csv_create as pcc
+from tests.pic_csv_test_class import TestCsvCreatePicturae
 from tests.testing_tools import TestingTools
 
 os.chdir("./image_client")
@@ -13,7 +13,7 @@ class ConcatTaxonTests(unittest.TestCase, TestingTools):
     def setUp(self):
         """creates fake taxon columns in
            dummy dataset to test out taxon_concat string output"""
-        self.CsvCreatePicturae = pcc.CsvCreatePicturae(date_string=self.md5_hash, istest=True)
+        self.test_csv_create_picturae = TestCsvCreatePicturae(date_string=self.md5_hash)
 
         # jose Gonzalez is a real agent,
         # to make sure true matches are not added to list.
@@ -27,14 +27,14 @@ class ConcatTaxonTests(unittest.TestCase, TestingTools):
                 'Hybrid': [True, True, False, False]
                 }
 
-        self.CsvCreatePicturae.record_full = pd.DataFrame(data)
+        self.test_csv_create_picturae.record_full = pd.DataFrame(data)
 
     def test_taxon_concat_string(self):
         """tests whether correct full taxon name string is returned from taxon_concat"""
         temp_taxon_list = []
-        for index, row in self.CsvCreatePicturae.record_full.iterrows():
-            self.CsvCreatePicturae.taxon_concat(row)
-            temp_taxon_list.extend(self.CsvCreatePicturae.taxon_concat(row))
+        for index, row in self.test_csv_create_picturae.record_full.iterrows():
+            self.test_csv_create_picturae.taxon_concat(row)
+            temp_taxon_list.extend(self.test_csv_create_picturae.taxon_concat(row))
         self.assertEqual(temp_taxon_list[0], 'x Serapicamptis')
         self.assertEqual(temp_taxon_list[3], 'x Serapicamptis')
         self.assertEqual((temp_taxon_list[5]), 'Castilleja miniata')
@@ -51,24 +51,24 @@ class ConcatTaxonTests(unittest.TestCase, TestingTools):
     def test_check_taxon_real(self):
         """test the tnrs name resolution service in the check_taxon_real function"""
 
-        self.CsvCreatePicturae.record_full[['gen_spec', 'fullname',
+        self.test_csv_create_picturae.record_full[['gen_spec', 'fullname',
                                             'first_intra',
                                             'taxname', 'hybrid_base']] = \
-            self.CsvCreatePicturae.record_full.apply(self.CsvCreatePicturae.taxon_concat, axis=1, result_type='expand')
+            self.test_csv_create_picturae.record_full.apply(self.test_csv_create_picturae.taxon_concat, axis=1, result_type='expand')
 
-        self.CsvCreatePicturae.taxon_check_real()
+        self.test_csv_create_picturae.taxon_check_real()
         # assert statements
-        self.assertEqual(len(self.CsvCreatePicturae.record_full.columns), 15)
+        self.assertEqual(len(self.test_csv_create_picturae.record_full.columns), 15)
 
         # 2 rows left as the genus level hybrid Serapicamptis and the mispelled "Castilloja" should fail
 
-        self.assertEqual(len(self.CsvCreatePicturae.record_full), 2)
+        self.assertEqual(len(self.test_csv_create_picturae.record_full), 2)
 
-        self.assertTrue('name_matched' in self.CsvCreatePicturae.record_full.columns,
+        self.assertTrue('name_matched' in self.test_csv_create_picturae.record_full.columns,
                         "does not contain name_matched")
 
 
 
     def tearDown(self):
         """deleting instance of PicturaeImporter"""
-        del self.CsvCreatePicturae
+        del self.test_csv_create_picturae
