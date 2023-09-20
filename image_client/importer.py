@@ -265,7 +265,12 @@ class Importer:
 
         for cur_filepath in filepath_list:
             cur_filename = os.path.basename(cur_filepath)
-            cur_file_base, cur_file_ext = cur_filename.split(".")
+            try:
+                cur_file_base, cur_file_ext = cur_filename.split(".")
+            except ValueError as e:
+                print (f"Can't parse {cur_filename}, skipping.")
+                continue
+
 
             if not self.image_client.check_image_db_if_filename_imported(self.collection_name, cur_file_base + ".jpg",
                                                                          exact=True):
