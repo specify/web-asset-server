@@ -52,7 +52,7 @@ def move_first_substring(string: str, n_char: int):
         return string[n_char+1:] + string[0:n_char+1]
 
 
-def assign_titles(first_last, name: str):
+def assign_collector_titles(first_last, name: str):
     """assign_titles:
             function designed to separate out titles in names into a new title column
         args:
@@ -123,7 +123,7 @@ def roman_to_int(string):
     return output
 
 
-def string_converter(df: pd.DataFrame, column: str, option: str):
+def string_to_int_converter(df: pd.DataFrame, column: str, option: str):
     """function to turn string with decimal points into string or int with no decimals
        args:
             df: dataframe to modify
