@@ -395,6 +395,11 @@ def casbotany_lite_creator():
     curs.close()
     connect.close()
 
+
+def sql_lite_connection(db_name):
+    connection = sqlite3.connect(db_name)
+    return connection
+
 def sql_lite_insert(sql, db_name):
     """facimile statement to insert_table_record in sql_csv_utils.py"""
     connect = sqlite3.connect(db_name)

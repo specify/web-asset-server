@@ -13,7 +13,7 @@ class TestPopulateFields(unittest.TestCase, TestingTools):
     def setUp(self):
         """creating fake dataset to check if
           populate fields function assigns the strings and numbers"""
-        self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash,
+        self.test_picturae_importer = TestPicturaeImporter(date_string=self.md5_hash,
                                                          paths=self.md5_hash)
         data = {'CatalogNumber': ['123456'],
                 'verbatim_date': ['March 21, 2008'],
@@ -36,19 +36,19 @@ class TestPopulateFields(unittest.TestCase, TestingTools):
                 'state': 'California',
                 'country': 'United States'}
 
-        self.TestPicturaeImporter.record_full = pd.DataFrame(data)
+        self.test_picturae_importer.record_full = pd.DataFrame(data)
 
     def test_assigned_to_variable(self):
         """tests whether correct integer and string values assigned to
            initialized variables from populate_fields"""
-        for index, row in self.TestPicturaeImporter.record_full.iterrows():
-            self.TestPicturaeImporter.populate_fields(row)
-            self.assertEqual(self.TestPicturaeImporter.barcode, '000123456')
-            self.assertEqual(self.TestPicturaeImporter.locality, 'Harden Lake')
-            self.assertEqual(self.TestPicturaeImporter.GeographyID, 16490)
-            self.assertEqual(self.TestPicturaeImporter.locality_id, 54)
-            self.assertEqual(self.TestPicturaeImporter.first_intra, 'Castilleja miniata subsp. dixonii')
+        for index, row in self.test_picturae_importer.record_full.iterrows():
+            self.test_picturae_importer.populate_fields(row)
+            self.assertEqual(self.test_picturae_importer.barcode, '000123456')
+            self.assertEqual(self.test_picturae_importer.locality, 'Harden Lake')
+            self.assertEqual(self.test_picturae_importer.GeographyID, 16490)
+            self.assertEqual(self.test_picturae_importer.locality_id, 54)
+            self.assertEqual(self.test_picturae_importer.first_intra, 'Castilleja miniata subsp. dixonii')
 
     def tearDown(self):
         """deleting PicturaeImporter class instance"""
-        del self.TestPicturaeImporter
+        del self.test_picturae_importer

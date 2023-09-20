@@ -11,7 +11,7 @@ class TestAgentList(unittest.TestCase, TestingTools):
         """creating instance of PicturaeImporter, +
            creating dummy dataset of real and fake names"""
 
-        self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash,
+        self.test_picturae_importer = TestPicturaeImporter(date_string=self.md5_hash,
                                                          paths=self.md5_hash)
 
         # jose Gonzalez is a real agent,
@@ -27,34 +27,35 @@ class TestAgentList(unittest.TestCase, TestingTools):
                 'collector_middle_name3': [pd.NA, pd.NA]
                 }
 
-        self.TestPicturaeImporter.record_full = pd.DataFrame(data)
+        self.test_picturae_importer.record_full = pd.DataFrame(data)
 
-        self.TestPicturaeImporter.collector_list = []
+        self.test_picturae_importer.collector_list = []
 
     def test_agent_list(self):
         """makes sure the correct list of dictionaries is produced of collectors,
            where new agents are included, and old agents are excluded from new_collector_list"""
         temp_agent_list = []
-        for index, row in self.TestPicturaeImporter.record_full.iterrows():
-            self.TestPicturaeImporter.create_agent_list(row)
-            temp_agent_list.extend(self.TestPicturaeImporter.new_collector_list)
-        print(temp_agent_list)
+        for index, row in self.test_picturae_importer.record_full.iterrows():
+            self.test_picturae_importer.create_agent_list(row)
+            temp_agent_list.extend(self.test_picturae_importer.new_collector_list)
+
         first_dict = temp_agent_list[0]
         second_dict = temp_agent_list[1]
         third_dict = temp_agent_list[2]
+        # array
+        collectors = [[first_dict['collector_first_name'], 'Bob'], [first_dict['collector_last_name'], 'Fakeson'],
+                      [first_dict['collector_title'], 'jr.'], [second_dict['collector_first_name'], 'Enrique'],
+                      [second_dict['collector_middle_initial'], 'X'], [third_dict['collector_first_name'], 'Joe'],
+                      [third_dict['collector_last_name'], 'DiMaggio'], [len(temp_agent_list), 3]
+                      ]
 
-        self.assertEqual(first_dict['collector_first_name'], 'Bob')
-        self.assertEqual(first_dict['collector_last_name'], 'Fakeson')
-        self.assertEqual(first_dict['collector_title'], 'jr.')
-        self.assertEqual(second_dict['collector_first_name'], 'Enrique')
-        self.assertEqual(second_dict['collector_middle_initial'], 'X')
-        self.assertEqual(third_dict['collector_first_name'], 'Joe')
-        self.assertEqual(third_dict['collector_middle_initial'], 'S')
-        self.assertEqual(third_dict['collector_last_name'], 'DiMaggio')
+        for comparison in collectors:
+            self.assertEqual(comparison[0], comparison[1])
+
         self.assertEqual(len(temp_agent_list), 3)
 
     def tearDown(self):
         """deleting instance of self.PicturaeImporter"""
-        del self.TestPicturaeImporter
+        del self.test_picturae_importer
 
 

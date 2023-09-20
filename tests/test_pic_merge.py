@@ -20,7 +20,7 @@ class CsvReadMergeTests(unittest.TestCase, TestingTools):
           so that test merges and uploads can be performed.
           """
         # print("setup called!")
-        self.TestCsvCreatePicturae = TestCsvCreatePicturae(date_string=self.md5_hash)
+        self.test_csv_create_picturae = TestCsvCreatePicturae(date_string=self.md5_hash)
         # maybe create a separate function for setting up test directories
         path_type_list = ['folder', 'specimen']
         path_list = []
@@ -40,13 +40,13 @@ class CsvReadMergeTests(unittest.TestCase, TestingTools):
 
     def test_file_empty(self):
         """tests if dataset returns as empty set or not"""
-        self.assertEqual(self.TestCsvCreatePicturae.csv_read_path('folder').empty, False)
-        self.assertEqual(self.TestCsvCreatePicturae.csv_read_path('specimen').empty, False)
+        self.assertEqual(self.test_csv_create_picturae.csv_read_path('folder').empty, False)
+        self.assertEqual(self.test_csv_create_picturae.csv_read_path('specimen').empty, False)
 
     def test_file_colnumber(self):
         """tests if expected # of columns given test datasets"""
-        self.assertEqual(len(self.TestCsvCreatePicturae.csv_read_path('folder').columns), 3)
-        self.assertEqual(len(self.TestCsvCreatePicturae.csv_read_path('specimen').columns), 3)
+        self.assertEqual(len(self.test_csv_create_picturae.csv_read_path('folder').columns), 3)
+        self.assertEqual(len(self.test_csv_create_picturae.csv_read_path('specimen').columns), 3)
 
     def test_barcode_column_present(self):
         """tests if barcode column is present

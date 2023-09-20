@@ -21,21 +21,21 @@ class HideFilesTest(unittest.TestCase,TestingTools):
         self.expected_image_path = f"picturae_img/PIC_{self.md5_hash}/CAS{123456}.JPG"
 
         # initializing
-        self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash, paths=self.md5_hash)
+        self.test_picturae_importer = TestPicturaeImporter(date_string=self.md5_hash, paths=self.md5_hash)
 
-        self.TestPicturaeImporter.image_list = [f"picturae_img/PIC_{self.md5_hash}/CAS123456.JPG"]
+        self.test_picturae_importer.image_list = [f"picturae_img/PIC_{self.md5_hash}/CAS123456.JPG"]
 
     def test_file_hide(self):
         """testing whether file_hide hides files not in barcode list"""
-        self.TestPicturaeImporter.hide_unwanted_files()
+        self.test_picturae_importer.hide_unwanted_files()
         files = os.listdir(f"picturae_img/PIC_{self.md5_hash}")
         self.assertTrue('CAS123456.JPG' in files)
         self.assertTrue('.hidden_CAS123457.JPG')
 
     def test_file_unhide(self):
         """testing whether files are correctly unhidden after running hide_unwanted_files"""
-        self.TestPicturaeImporter.hide_unwanted_files()
-        self.TestPicturaeImporter.unhide_files()
+        self.test_picturae_importer.hide_unwanted_files()
+        self.test_picturae_importer.unhide_files()
         files = os.listdir(f"picturae_img/PIC_{self.md5_hash}")
         self.assertEqual(set(files), {'CAS123456.JPG', 'CAS123457.JPG', 'CAS123458.JPG'})
 
@@ -44,4 +44,4 @@ class HideFilesTest(unittest.TestCase,TestingTools):
 
         shutil.rmtree(os.path.dirname(self.expected_image_path))
 
-        del self.TestPicturaeImporter
+        del self.test_picturae_importer
