@@ -11,11 +11,10 @@ class TestPopulateFields(unittest.TestCase, TestingTools):
         self.md5_hash = self.generate_random_md5()
 
     def setUp(self):
-        path = self.paths_generator(date=self.generate_random_md5())
         """creating fake dataset to check if
           populate fields function assigns the strings and numbers"""
         self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash,
-                                                          paths=path)
+                                                         paths=self.md5_hash)
         data = {'CatalogNumber': ['123456'],
                 'verbatim_date': ['March 21, 2008'],
                 'start_date': ['3/21/2008'],

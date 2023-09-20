@@ -59,17 +59,3 @@ class TestingTools:
         md5_hash = hashlib.md5(random_string.encode()).hexdigest()
 
         return md5_hash
-    def paths_generator(self, date: str):
-        """paths_generator: function to generate paths variable to
-           initialize the class PicturaeImporter.
-           args:
-              date: the date or md5 code used to initialize a test folder
-        """
-        picturae_config.PIC_SCAN_FOLDERS = [f"PIC_{date}"]
-        paths = []
-        for cur_dir in picturae_config.PIC_SCAN_FOLDERS:
-            paths.append(os.path.join(picturae_config.PREFIX,
-                                      picturae_config.PIC_PREFIX,
-                                      cur_dir))
-
-        return paths

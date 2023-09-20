@@ -10,10 +10,9 @@ class TestAgentList(unittest.TestCase, TestingTools):
     def setUp(self):
         """creating instance of PicturaeImporter, +
            creating dummy dataset of real and fake names"""
-        paths = self.paths_generator(date=self.md5_hash)
 
         self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash,
-                                                         paths=paths)
+                                                         paths=self.md5_hash)
 
         # jose Gonzalez is a real agent,
         # to make sure true matches are not added to list.

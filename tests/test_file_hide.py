@@ -13,9 +13,6 @@ class HideFilesTest(unittest.TestCase,TestingTools):
         """creating test images in test_date folder, in order to test
            file_hide and file_unhide functions, creates 3 sample test
            images with sample barcodes"""
-
-        # print("setup called!")
-        paths = self.paths_generator(date=self.md5_hash)
         # create test directories
 
         self.create_test_images(barcode_list=[123456, 123457, 123458],
@@ -24,7 +21,7 @@ class HideFilesTest(unittest.TestCase,TestingTools):
         self.expected_image_path = f"picturae_img/PIC_{self.md5_hash}/CAS{123456}.JPG"
 
         # initializing
-        self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash, paths=paths)
+        self.TestPicturaeImporter = TestPicturaeImporter(date_string=self.md5_hash, paths=self.md5_hash)
 
         self.TestPicturaeImporter.image_list = [f"picturae_img/PIC_{self.md5_hash}/CAS123456.JPG"]
 
