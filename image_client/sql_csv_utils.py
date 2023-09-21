@@ -1,5 +1,5 @@
+import sqlite3
 import traceback
-
 import pandas as pd
 from picturae_import_utils import remove_two_index
 import time_utils
@@ -93,7 +93,7 @@ def create_insert_statement(col_list: list, val_list: list, tab_name: str):
 
     return sql
 
-def insert_table_record(connection, logger_int , sql):
+def insert_table_record(connection, logger_int , sql, sqllite = False):
     """create_table_record:
            general code for the inserting of a new record into any table on database,
            creates connection, and runs sql query. cursor.execute with arg multi, to
@@ -102,9 +102,13 @@ def insert_table_record(connection, logger_int , sql):
            sql: the verbatim sql string, or multi sql query string to send to database
            connection: the connection parameter in the case of specify self.specify_db_connection
            logger: the logger instance of your class self.logger
+           sqllite: option for sqllite configuration, as get_cursor()
+                      requires database ip, which sqllite does not have
     """
-
-    cursor = connection.get_cursor()
+    if sqllite is False:
+        cursor = connection.get_cursor()
+    else:
+        cursor = connection.cursor()
 
     logger_int.info(f'running query: {sql}')
     logger_int.debug(sql)

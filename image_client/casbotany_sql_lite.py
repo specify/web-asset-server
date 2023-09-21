@@ -383,8 +383,15 @@ def table_sql_list():
 
     return sql_bot_list
 
+def casbotany_lite_delete(table_list, db_name):
+    """deletes all data from tables on sql lite database"""
+    for tab in table_list:
+        sql = f'''DELETE FROM {tab};'''
+        sql_lite_insert(sql=sql, db_name=db_name)
+
 def casbotany_lite_creator():
-    connect = sqlite3.connect('cas_botanylite.db')
+    """casbotany_lite_creator: creates the sqllite tables contained in the sqllite DDL list"""
+    connect = sqlite3.connect('casbotany_lite.db')
     sql_list = table_sql_list()
     curs = connect.cursor()
     # running a loop through tables for sql_lite
@@ -397,8 +404,11 @@ def casbotany_lite_creator():
 
 
 def sql_lite_connection(db_name):
+    """creates the connection for sqllite db,
+        used as the "connection" parameter in other functions """
     connection = sqlite3.connect(db_name)
     return connection
+
 
 def sql_lite_insert(sql, db_name):
     """facimile statement to insert_table_record in sql_csv_utils.py"""
@@ -417,9 +427,10 @@ def sql_lite_insert(sql, db_name):
     curs.close()
     connect.close()
 
+
 def casbotany_lite_getrecord(sql_query: str):
     """modified get one record function for sql lite"""
-    connect = sqlite3.connect('cas_botanylite.db')
+    connect = sqlite3.connect('casbotany_lite.db')
     curs = connect.cursor()
     # running sql query
     curs.execute(sql_query)
