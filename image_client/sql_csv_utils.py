@@ -8,6 +8,7 @@ from datetime import timedelta
 import hmac
 import settings
 import sys
+from casbotany_sql_lite import casbotany_lite_getrecord
 
 
 # static methods
@@ -51,7 +52,7 @@ def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, t
     return sql
 
 
-def get_one_match(connection, tab_name, id_col, key_col, match, match_type="string"):
+def get_one_match(connection, tab_name, id_col, key_col, match, match_type="string", sqlite=False):
     """populate_sql:
             creates a custom select statement for get one record,
             from which a result can be gotten more seamlessly
@@ -69,8 +70,10 @@ def get_one_match(connection, tab_name, id_col, key_col, match, match_type="stri
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
     elif match_type == "integer":
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
-
-    result = connection.get_one_record(sql)
+    if sqlite is False:
+        result = connection.get_one_record(sql)
+    else:
+        result = casbotany_lite_getrecord(sql)
 
     return result
 
@@ -93,7 +96,7 @@ def create_insert_statement(col_list: list, val_list: list, tab_name: str):
 
     return sql
 
-def insert_table_record(connection, logger_int , sql, sqllite = False):
+def insert_table_record(connection, logger_int , sql, sqlite = False):
     """create_table_record:
            general code for the inserting of a new record into any table on database,
            creates connection, and runs sql query. cursor.execute with arg multi, to
@@ -105,7 +108,7 @@ def insert_table_record(connection, logger_int , sql, sqllite = False):
            sqllite: option for sqllite configuration, as get_cursor()
                       requires database ip, which sqllite does not have
     """
-    if sqllite is False:
+    if sqlite is False:
         cursor = connection.get_cursor()
     else:
         cursor = connection.cursor()

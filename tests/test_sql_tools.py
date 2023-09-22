@@ -8,7 +8,7 @@ from image_client.sql_csv_utils import insert_table_record
 from tests.pic_importer_test_class import TestPicturaeImporter
 import image_client.sql_csv_utils as scu
 from tests.testing_tools import TestingTools
-from casbotany_sql_lite import *
+from image_client.casbotany_sql_lite import *
 from image_client import time_utils
 from uuid import uuid4
 
@@ -19,7 +19,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         super().__init__(*args, **kwargs)
         self.md5_hash = self.generate_random_md5()
         self.logger = logging.getLogger("TestSqlInsert")
-        self.connection = sql_lite_connection(db_name='casbotany_lite.db')
+        self.connection = sql_lite_connection(db_name='tests/casbotany_lite.db')
 
     def setUp(self):
         """setting up instance of PicturaeImporter"""
@@ -28,7 +28,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
     def test_casbotanylite(self):
         "testing the wether the sqllite datbase can connect"
-        connection = sqlite3.connect('casbotany_lite.db')
+        connection = sqlite3.connect('tests/casbotany_lite.db')
         curs = connection.cursor()
         curs.execute('''SELECT * FROM agent''')
         num_columns = len(curs.description)
@@ -92,16 +92,16 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = scu.create_insert_statement(tab_name="locality", col_list=column_list,
                                           val_list=value_list)
         # testing insert table record
-        insert_table_record(connection=self.connection, sql=sql, logger_int=self.logger, sqllite=True)
+        insert_table_record(connection=self.connection, sql=sql, logger_int=self.logger, sqlite=True)
         # checking whether locality id created properly
-        data_base_locality = casbotany_lite_getrecord(f'''SELECT `LocalityID` FROM locality WHERE 
-                                                      `LocalityName` = "{localityname}"''')
+        sql = f'''SELECT `LocalityID` FROM locality WHERE `LocalityName` = "{localityname}"'''
+        data_base_locality = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
 
         self.assertFalse(data_base_locality is None)
 
         # checking whether geocode present
-        data_base_geo_code = casbotany_lite_getrecord(f'''SELECT `GeographyID` FROM locality WHERE 
-                                                       `LocalityName` = "{localityname}"''')
+        sql = f'''SELECT `GeographyID` FROM locality WHERE `LocalityName` = "{localityname}"'''
+        data_base_geo_code = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
 
         self.assertEqual(data_base_geo_code, 256)
 
@@ -147,10 +147,12 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = scu.create_insert_statement(tab_name=table, col_list=column_list,
                                           val_list=value_list)
 
-        insert_table_record(connection=self.connection, logger_int=self.logger, sql=sql, sqllite=True)
+        insert_table_record(connection=self.connection, logger_int=self.logger, sql=sql, sqlite=True)
 
-        station_field = casbotany_lite_getrecord(f'''SELECT `StationFieldNumber` FROM collectingevent WHERE 
-                                                     `StationFieldNumber` = {123456}''')
+        sql = f'''SELECT `StationFieldNumber` FROM collectingevent WHERE 
+                                                `StationFieldNumber` = {123456}'''
+
+        station_field = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
 
         # asserting that station field number is in right column
 

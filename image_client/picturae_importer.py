@@ -56,7 +56,7 @@ class PicturaeImporter(Importer):
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'taxon_list', 'new_taxa']
+                       'taxon_list', 'new_taxa', 'parent_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
@@ -345,8 +345,8 @@ class PicturaeImporter(Importer):
                                          key_col='LocalityName', match=self.locality)
 
     def taxon_get(self, name):
-        sql = f'''SELECT TaxonID FROM {picturae_config.SPECIFY_DATABASE}.taxon WHERE FullName = "{name}";'''
-        result_id = self.specify_db_connection.get_one_record(sql)
+        result_id = get_one_match(tab_name="taxon", id_col="TaxonID", key_col="FullName", match=name,
+                                  match_type="string", connection=self.specify_db_connection)
         return result_id
 
     def populate_taxon(self):
@@ -366,10 +366,11 @@ class PicturaeImporter(Importer):
             if self.full_name != self.first_intra and self.first_intra != self.gen_spec:
                 self.first_intra_id = self.taxon_get(name=self.first_intra)
                 if self.first_intra_id is None:
-                    self.taxon_list.append(self.gen_spec)
+                    self.taxon_list.append(self.first_intra)
 
-            if self.full_name != self.gen_spec:
+            if self.full_name != self.gen_spec and self.gen_spec != self.genus:
                 self.gen_spec_id = self.taxon_get(name=self.gen_spec)
+                # check high taxa gen_spec for author
                 self.single_taxa_tnrs(taxon_name=self.gen_spec, barcode=self.barcode)
                 # adding base name to taxon_list
                 if self.gen_spec_id is None:
@@ -390,6 +391,42 @@ class PicturaeImporter(Importer):
             self.new_taxa.extend(self.taxon_list)
         else:
             pass
+
+    def generate_taxon_fields(self, index, taxon):
+        """generates necessary fields for creating new taxon fields
+            args:
+                index: index num in the taxon list.
+                taxon: the taxon name in the taxon list ,
+                       iterrated through from highest to lowest rank"""
+        taxon_guid = uuid4()
+        rank_name = taxon
+        parent_id = self.taxon_get(name=self.parent_list[index + 1])
+        if taxon == self.full_name:
+            rank_end = self.tax_name
+        else:
+            rank_end = taxon.split()[-1]
+
+        author_insert = self.author
+
+        if rank_name != self.family_name:
+            tree_item_id, rank_id = self.taxon_assign_defitem(taxon_string=rank_name)
+        else:
+            rank_id = 140
+            tree_item_id = 11
+
+        if rank_id < 220:
+            author_insert = pd.NA
+
+        # assigning parent_author if needed , for gen_spec
+
+        if rank_id == 220 and self.full_name != self.gen_spec:
+            author_insert = self.parent_author
+
+        if self.is_hybrid is True:
+            author_insert = pd.NA
+
+        return author_insert, tree_item_id, rank_end, parent_id, taxon_guid
+
 
     def create_locality_record(self):
         """create_locality_record:
@@ -479,7 +516,7 @@ class PicturaeImporter(Importer):
             values, columns = remove_two_index(values, columns)
 
             sql = create_insert_statement(tab_name=table, col_list=columns,
-                                    val_list=values)
+                                          val_list=values)
 
             insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
@@ -542,37 +579,12 @@ class PicturaeImporter(Importer):
                         rank levels of each taxon name.
         """
         # for now do not upload
-        parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
-        parent_list = unique_ordered_list(parent_list)
-        for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
-            taxon_guid = uuid4()
-            rank_name = taxa_rank
-            parent_id = self.taxon_get(name=parent_list[index + 1])
-            table = 'taxon'
-            if taxa_rank == self.full_name:
-                rank_end = self.tax_name
-            else:
-                rank_end = taxa_rank.split()[-1]
+        self.parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
+        self.parent_list = unique_ordered_list(self.parent_list)
+        for index, taxon in reversed(list(enumerate(self.taxon_list))):
 
-            author_insert = self.author
-
-            if rank_name != self.family_name:
-                tree_item_id, rank_id = self.taxon_assign_defitem(taxon_string=rank_name)
-            else:
-                rank_id = 140
-                tree_item_id = 11
-
-            if rank_id < 220:
-                author_insert = pd.NA
-
-            # assigning parent_author if needed , for gen_spec
-
-            if rank_id == 220 and self.full_name != self.gen_spec:
-                author_insert = self.parent_author
-
-            if self.is_hybrid is True:
-                author_insert = pd.NA
-
+            author_insert, tree_item_id, rank_end, \
+                            parent_id, taxon_guid = self.generate_taxon_fields(index=index, taxon=taxon)
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
