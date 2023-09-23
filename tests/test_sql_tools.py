@@ -11,6 +11,7 @@ from tests.testing_tools import TestingTools
 from image_client.casbotany_sql_lite import *
 from image_client import time_utils
 from uuid import uuid4
+import shutil
 
 
 ## this one should go to a test file for sql_db_utils
@@ -25,6 +26,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         """setting up instance of PicturaeImporter"""
         self.test_picturae_importer = TestPicturaeImporter(date_string=self.md5_hash,
                                                            paths=self.md5_hash)
+        shutil.copyfile("tests/casbotany_lite.db", "tests/casbotany_backup.db")
 
     def test_casbotanylite(self):
         "testing the wether the sqllite datbase can connect"
@@ -161,6 +163,8 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
     def tearDown(self):
         """deleting instance of PicturaeImporter"""
         del self.test_picturae_importer
+        shutil.copyfile("tests/casbotany_backup.db", "tests/casbotany_lite.db")
+        os.remove("tests/casbotany_backup.db")
 
 if __name__ == "__main__":
     unittest.main()
