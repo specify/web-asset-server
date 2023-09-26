@@ -338,15 +338,17 @@ class PicturaeImporter(Importer):
         self.geography_string = str(row[index_list[16]]) + ", " + \
                                 str(row[index_list[17]]) + ", " + str(row[index_list[18]])
 
-        self.GeographyID = get_one_match(self.specify_db_connection, tab_name='geography', id_col='GeographyID',
+        self.GeographyID = get_one_match(connection=self.specify_db_connection, tab_name='geography', id_col='GeographyID',
                                          key_col='FullName', match=self.geography_string)
 
-        self.locality_id = get_one_match(self.specify_db_connection, tab_name='locality', id_col='LocalityID',
+        self.locality_id = get_one_match(connection=self.specify_db_connection, tab_name='locality', id_col='LocalityID',
                                          key_col='LocalityName', match=self.locality)
 
     def taxon_get(self, name):
+
         result_id = get_one_match(tab_name="taxon", id_col="TaxonID", key_col="FullName", match=name,
                                   match_type="string", connection=self.specify_db_connection)
+
         return result_id
 
     def populate_taxon(self):
@@ -425,7 +427,7 @@ class PicturaeImporter(Importer):
         if self.is_hybrid is True:
             author_insert = pd.NA
 
-        return author_insert, tree_item_id, rank_end, parent_id, taxon_guid
+        return author_insert, tree_item_id, rank_end, parent_id, taxon_guid, rank_id
 
 
     def create_locality_record(self):
@@ -582,9 +584,10 @@ class PicturaeImporter(Importer):
         self.parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
         self.parent_list = unique_ordered_list(self.parent_list)
         for index, taxon in reversed(list(enumerate(self.taxon_list))):
+            # getting index pos of taxon in parent list
 
             author_insert, tree_item_id, rank_end, \
-                            parent_id, taxon_guid = self.generate_taxon_fields(index=index, taxon=taxon)
+                            parent_id, taxon_guid, rank_id = self.generate_taxon_fields(index=index, taxon=taxon)
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
@@ -607,7 +610,7 @@ class PicturaeImporter(Importer):
                           f"{time_utils.get_pst_time_now_string()}",
                           1,
                           author_insert,
-                          f"{rank_name}",
+                          f"{taxon}",
                           f"{taxon_guid}",
                           "World Checklist of Vascular Plants 2023",
                           True,
@@ -623,12 +626,12 @@ class PicturaeImporter(Importer):
 
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_insert_statement(tab_name=table, col_list=column_list,
+            sql = create_insert_statement(tab_name="taxon", col_list=column_list,
                                           val_list=value_list)
 
             insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
-            logging.info(f"taxon: {rank_name} created")
+            logging.info(f"taxon: {taxon} created")
 
 
     def create_collection_object(self):
@@ -683,7 +686,7 @@ class PicturaeImporter(Importer):
         value_list, column_list = remove_two_index(value_list, column_list)
 
         sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                val_list=value_list)
+                                      val_list=value_list)
 
         insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
 
@@ -858,6 +861,8 @@ class PicturaeImporter(Importer):
             self.populate_fields(row)
             self.create_agent_list(row)
             self.populate_taxon()
+
+
             if self.taxon_id is None:
                 self.create_taxon()
 

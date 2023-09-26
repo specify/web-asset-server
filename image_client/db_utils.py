@@ -109,7 +109,7 @@ class DbUtils:
         self.connect()
         return self.cnx.cursor()
 
-    def execute(self,sql):
+    def execute(self, sql):
         cursor = self.get_cursor()
         self.logger.debug(f"SQL: {sql}")
         cursor.execute(sql)

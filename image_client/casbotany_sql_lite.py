@@ -1,7 +1,8 @@
-import os
+"""contains sql functions for inserting into, pulling from, and creating sqlite tables"""
 import sqlite3
 
 def table_sql_list():
+    """table_sql_list: creates list of sql DDL commands to run in sqlite DB"""
 
     sql_bot_list = ['''CREATE TABLE IF NOT EXISTS collectionobject (
                         CollectionObjectID INTEGER PRIMARY KEY,
@@ -384,14 +385,10 @@ def table_sql_list():
 
     return sql_bot_list
 
-def casbotany_lite_delete(table_list, db_name):
-    """deletes all data from tables on sql lite database"""
-    for tab in table_list:
-        sql = f'''DELETE FROM {tab};'''
-        sql_lite_insert(sql=sql, db_name=db_name)
 
 def casbotany_lite_creator():
-    """casbotany_lite_creator: creates the sqllite tables contained in the sqllite DDL list"""
+    """casbotqny_lite_creator: casbotany_lite_creator: creates the
+                  sqllite tables contained in the sqllite DDL list"""
     connect = sqlite3.connect('tests/casbotany_lite.db')
     sql_list = table_sql_list()
     curs = connect.cursor()
@@ -406,40 +403,65 @@ def casbotany_lite_creator():
 
 
 def sql_lite_connection(db_name):
-    """creates the connection for sqllite db,
-        used as the "connection" parameter in other functions """
+    """sql_lite_connection: creates the connection for sqllite db,
+        used as the "connection" parameter in other functions
+        args:
+            db_name: db_name is the file path to the sqlite db."""
     connection = sqlite3.connect(db_name)
     return connection
 
 
-def sql_lite_insert(sql, db_name):
-    """facimile statement to insert_table_record in sql_csv_utils.py"""
-    connect = sqlite3.connect(db_name)
-    curs = connect.cursor()
+def sql_lite_insert(sql, connection, logger_int):
+    """sql_lite_insert: facsimile to insert_table_record in sql_csv_utils.py
+        args:
+            sql: sql string to send to database
+            connection: the sqlite connection used to insert data
+            logger_int: the instance of logger to use for error reporting
+    """
+    curs = connection.cursor()
     try:
         curs.execute(sql)
     except Exception as e:
-        raise ValueError(f"Exception thrown while processing sql: {sql}\n{e}\n")
+        logger_int.error(f"Exception thrown while processing sql: {sql}\n{e}\n")
     try:
-        connect.commit()
+        connection.commit()
 
     except Exception as e:
         raise ValueError(f"sql debug: {e}")
 
     curs.close()
-    connect.close()
+    connection.close()
 
 
-def casbotany_lite_getrecord(sql: str, sqlite_db: str):
-    """modified get one record function for sql lite"""
-    connect = sqlite3.connect(sqlite_db)
-    curs = connect.cursor()
+def casbotany_lite_getrecord(id_col, tab_name, key_col, match, match_type="string"):
+    """modified get one record function for sql lite
+
+       args:
+            tab_name: the name of the table to select
+            id_col: the name of the column in which the unique id is stored
+            key_col: column on which to match values
+            match: value with which to match key_col
+            match_type: "string" or "integer", optional with default as "string"
+                        puts quotes around sql terms or not depending on data type """
+
+    sql = ""
+    if match_type == "string":
+        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
+    elif match_type == "integer":
+        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
+
+    connection = sqlite3.connect(database="../tests/casbotany_lite.db")
+    curs = connection.cursor()
     # running sql query
     curs.execute(sql)
     record = curs.fetchone()
     # closing connection
     curs.close()
-    connect.close()
-    return record[0]
+    connection.close()
+    if record is not None:
+        return record[0]
+    else:
+        return record
+
 
 

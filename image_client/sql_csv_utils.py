@@ -52,7 +52,7 @@ def check_agent_name_sql(first_name: str, last_name: str, middle_initial: str, t
     return sql
 
 
-def get_one_match(connection, tab_name, id_col, key_col, match, match_type="string", sqlite=False):
+def get_one_match(connection, tab_name, id_col, key_col, match, match_type="string"):
     """populate_sql:
             creates a custom select statement for get one record,
             from which a result can be gotten more seamlessly
@@ -70,12 +70,13 @@ def get_one_match(connection, tab_name, id_col, key_col, match, match_type="stri
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
     elif match_type == "integer":
         sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
-    if sqlite is False:
-        result = connection.get_one_record(sql)
-    else:
-        result = casbotany_lite_getrecord(sql)
 
-    return result
+    result = connection.get_one_record(sql)
+
+    if isinstance(result, (list, dict, set)):
+        return result[0]
+    else:
+        return result
 
 
 
@@ -105,8 +106,8 @@ def insert_table_record(connection, logger_int , sql, sqlite = False):
            sql: the verbatim sql string, or multi sql query string to send to database
            connection: the connection parameter in the case of specify self.specify_db_connection
            logger: the logger instance of your class self.logger
-           sqllite: option for sqllite configuration, as get_cursor()
-                      requires database ip, which sqllite does not have
+           sqlite: option for sqlite configuration, as get_cursor()
+                      requires database ip, which sqlite does not have
     """
     if sqlite is False:
         cursor = connection.get_cursor()
