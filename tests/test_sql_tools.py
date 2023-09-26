@@ -3,7 +3,7 @@ import unittest
 import logging
 import numpy as np
 import pandas as pd
-
+import os
 from image_client.sql_csv_utils import insert_table_record
 from tests.pic_importer_test_class import TestPicturaeImporter
 import image_client.sql_csv_utils as scu
@@ -13,24 +13,24 @@ from image_client import time_utils
 from uuid import uuid4
 import shutil
 
-
+os.chdir("./image_client")
 ## this one should go to a test file for sql_db_utils
 class TestSqlInsert(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.md5_hash = self.generate_random_md5()
         self.logger = logging.getLogger("TestSqlInsert")
-        self.connection = sql_lite_connection(db_name='tests/casbotany_lite.db')
+        self.connection = sql_lite_connection(db_name='../tests/casbotany_lite.db')
 
     def setUp(self):
         """setting up instance of PicturaeImporter"""
         self.test_picturae_importer = TestPicturaeImporter(date_string=self.md5_hash,
                                                            paths=self.md5_hash)
-        shutil.copyfile("tests/casbotany_lite.db", "tests/casbotany_backup.db")
+        shutil.copyfile("../tests/casbotany_lite.db", "../tests/casbotany_backup.db")
 
     def test_casbotanylite(self):
         "testing the wether the sqllite datbase can connect"
-        connection = sqlite3.connect('tests/casbotany_lite.db')
+        connection = sqlite3.connect('../tests/casbotany_lite.db')
         curs = connection.cursor()
         curs.execute('''SELECT * FROM agent''')
         num_columns = len(curs.description)
@@ -96,14 +96,17 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         # testing insert table record
         insert_table_record(connection=self.connection, sql=sql, logger_int=self.logger, sqlite=True)
         # checking whether locality id created properly
-        sql = f'''SELECT `LocalityID` FROM locality WHERE `LocalityName` = "{localityname}"'''
-        data_base_locality = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
+        data_base_locality = casbotany_lite_getrecord(id_col="LocalityID", tab_name="locality",
+                                                      key_col="LocalityName", match=localityname,
+                                                      match_type="string")
 
         self.assertFalse(data_base_locality is None)
 
         # checking whether geocode present
-        sql = f'''SELECT `GeographyID` FROM locality WHERE `LocalityName` = "{localityname}"'''
-        data_base_geo_code = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
+
+        data_base_geo_code = casbotany_lite_getrecord(id_col="GeographyID", tab_name="locality",
+                                                      key_col="LocalityName", match=localityname,
+                                                      match_type="string")
 
         self.assertEqual(data_base_geo_code, 256)
 
@@ -151,10 +154,9 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
         insert_table_record(connection=self.connection, logger_int=self.logger, sql=sql, sqlite=True)
 
-        sql = f'''SELECT `StationFieldNumber` FROM collectingevent WHERE 
-                                                `StationFieldNumber` = {123456}'''
-
-        station_field = casbotany_lite_getrecord(sql=sql, sqlite_db='tests/casbotany_lite.db')
+        station_field = casbotany_lite_getrecord(id_col="StationFieldNumber", tab_name="collectingevent",
+                                                 key_col="StationFieldNumber",
+                                                 match= 123456, match_type="integer")
 
         # asserting that station field number is in right column
 
@@ -163,8 +165,8 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
     def tearDown(self):
         """deleting instance of PicturaeImporter"""
         del self.test_picturae_importer
-        shutil.copyfile("tests/casbotany_backup.db", "tests/casbotany_lite.db")
-        os.remove("tests/casbotany_backup.db")
+        shutil.copyfile("../tests/casbotany_backup.db", "../tests/casbotany_lite.db")
+        os.remove("../tests/casbotany_backup.db")
 
 if __name__ == "__main__":
     unittest.main()
