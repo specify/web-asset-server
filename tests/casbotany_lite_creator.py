@@ -1,6 +1,7 @@
-"""contains sql functions for inserting into, pulling from, and creating sqlite tables"""
+"""contains functions for creating sqlite database"""
 import sqlite3
 
+# make this into a command line activated class?
 def table_sql_list():
     """table_sql_list: creates list of sql DDL commands to run in sqlite DB"""
 
@@ -402,66 +403,4 @@ def casbotany_lite_creator():
     connect.close()
 
 
-def sql_lite_connection(db_name):
-    """sql_lite_connection: creates the connection for sqllite db,
-        used as the "connection" parameter in other functions
-        args:
-            db_name: db_name is the file path to the sqlite db."""
-    connection = sqlite3.connect(db_name)
-    return connection
-
-
-def sql_lite_insert(sql, connection, logger_int):
-    """sql_lite_insert: facsimile to insert_table_record in sql_csv_utils.py
-        args:
-            sql: sql string to send to database
-            connection: the sqlite connection used to insert data
-            logger_int: the instance of logger to use for error reporting
-    """
-    curs = connection.cursor()
-    try:
-        curs.execute(sql)
-    except Exception as e:
-        logger_int.error(f"Exception thrown while processing sql: {sql}\n{e}\n")
-    try:
-        connection.commit()
-
-    except Exception as e:
-        raise ValueError(f"sql debug: {e}")
-
-    curs.close()
-    connection.close()
-
-
-def casbotany_lite_getrecord(id_col, tab_name, key_col, match, match_type="string"):
-    """modified get one record function for sql lite
-
-       args:
-            tab_name: the name of the table to select
-            id_col: the name of the column in which the unique id is stored
-            key_col: column on which to match values
-            match: value with which to match key_col
-            match_type: "string" or "integer", optional with default as "string"
-                        puts quotes around sql terms or not depending on data type """
-
-    sql = ""
-    if match_type == "string":
-        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = "{match}";'''
-    elif match_type == "integer":
-        sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
-
-    connection = sqlite3.connect(database="../tests/casbotany_lite.db")
-    curs = connection.cursor()
-    # running sql query
-    curs.execute(sql)
-    record = curs.fetchone()
-    # closing connection
-    curs.close()
-    connection.close()
-    if record is not None:
-        return record[0]
-    else:
-        return record
-
-
-
+casbotany_lite_creator()

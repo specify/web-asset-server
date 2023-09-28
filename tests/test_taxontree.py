@@ -7,13 +7,10 @@ import pandas as pd
 from uuid import uuid4
 from image_client import time_utils
 from image_client.picturae_import_utils import remove_two_index
-from image_client.sql_csv_utils import create_insert_statement
 from tests.pic_importer_test_class_lite import TestPicturaeImporterlite
-from image_client.sql_csv_utils import insert_table_record
-from image_client.casbotany_sql_lite import *
+from casbotany_sql_lite import *
 from tests.testing_tools import TestingTools
 from image_client.picturae_import_utils import unique_ordered_list
-
 os.chdir("./image_client")
 class Testtaxontrees(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
@@ -21,7 +18,6 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
         self.md5_hash = self.generate_random_md5()
         self.logger = logging.getLogger("TestSqlInsert")
         self.taxon_dicts = []
-        self.connection = sql_lite_connection("../tests/casbotany_lite.db")
 
     def setUp(self):
         self.test_picturae_importer_lite = TestPicturaeImporterlite(paths=self.md5_hash, date_string=self.md5_hash)
@@ -83,9 +79,6 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
             self.assertEqual(self.test_picturae_importer_lite.taxon_list, tax_names[index])
 
 
-
-
-    # test is a little long
     def test_generate_taxon_fields(self):
         """tests that generate taxon fields assigns the expected values to each field"""
 
@@ -118,10 +111,11 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
                 rank_end, parent_id, taxon_guid, rank_id = self.test_picturae_importer_lite.generate_taxon_fields(
                                                            index=index, taxon=taxon)
 
-                test_parent_id = casbotany_lite_getrecord(id_col="TaxonID", tab_name="taxon",
-                                                          key_col="FullName",
-                                                          match=self.test_picturae_importer_lite.parent_list[index+1],
-                                                          match_type="string")
+                test_parent_id = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
+                                                                  id_col="TaxonID", tab_name="taxon",
+                                                                  key_col="FullName",
+                                                                   match=self.test_picturae_importer_lite.parent_list[index+1],
+                                                                    match_type="string")
 
 
                 self.assertEqual(parent_id, test_parent_id)

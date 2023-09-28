@@ -10,7 +10,7 @@ from taxon_parse_utils import *
 from picturae_import_utils import *
 from string_utils import *
 from importer import Importer
-from sql_csv_utils import *
+from sql_csv_utils import SqlCsvTools
 from specify_db import SpecifyDb
 import picdb_config
 
@@ -24,8 +24,8 @@ starting_time_stamp = datetime.now()
 class CsvCreatePicturae(Importer):
     def __init__(self, date_string):
         super().__init__(picturae_config, "Botany")
-        self.init_all_vars(date_string)
 
+        self.init_all_vars(date_string)
 
         self.run_all()
 
@@ -36,8 +36,11 @@ class CsvCreatePicturae(Importer):
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
 
+        self.sql_csv_tools = SqlCsvTools()
+
         # setting up alternate db connection for batch database
         self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
+
 
         # intializing parameters for database upload
         init_list = ['taxon_id', 'barcode',
@@ -306,7 +309,8 @@ class CsvCreatePicturae(Importer):
         # writing unmatched taxa to db table taxa_unmatch
         SpecifyDb(db_config_class=picdb_config)
         if len(unmatched_taxa) > 0:
-            taxon_unmatch_insert(connection=self.batch_db_connection, logger=self.logger, unmatched_taxa=unmatched_taxa)
+            self.sql_csv_tools.taxon_unmatch_insert(connection=self.batch_db_connection,
+                                                    logger=self.logger, unmatched_taxa=unmatched_taxa)
 
         # filtering out taxa with tnrs scores lower than .99 (basically exact match)
         resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]
@@ -401,6 +405,7 @@ class CsvCreatePicturae(Importer):
             db_name = self.specify_db_connection.get_one_record(sql)
             if db_name is None:
                 self.record_full.loc[index, 'image_present'] = False
+
             else:
                 self.record_full.loc[index, 'image_present'] = True
 
