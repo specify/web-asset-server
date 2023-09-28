@@ -272,7 +272,8 @@ class Importer:
                 continue
 
 
-            if not self.image_client.check_image_db_if_filename_imported(self.collection_name, cur_file_base + ".jpg",
+            if not self.image_client.check_image_db_if_filename_imported(self.collection_name,
+                                                                         cur_file_base + ".jpg",
                                                                          exact=True):
                 keep_filepaths.append(cur_filepath)
         return keep_filepaths
@@ -282,9 +283,12 @@ class Importer:
                                       collection_object_id,
                                       agent_id,
                                       force_redacted=False,
-                                      copyright_filepath_map=None):
+                                      copyright_filepath_map=None,
+                                      skip_redacted_check=False):
         for cur_filepath in filepath_list:
-            if force_redacted:
+            if skip_redacted_check:
+                is_redacted = False
+            elif force_redacted:
                 is_redacted = True
             else:
                 is_redacted = self.attachment_utils.get_is_collection_object_redacted(collection_object_id)
