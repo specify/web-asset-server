@@ -8,7 +8,6 @@ from uuid import uuid4
 from image_client import time_utils
 from image_client.picturae_import_utils import remove_two_index
 from tests.pic_importer_test_class_lite import TestPicturaeImporterlite
-from casbotany_sql_lite import *
 from tests.testing_tools import TestingTools
 from image_client.picturae_import_utils import unique_ordered_list
 os.chdir("./image_client")
@@ -21,6 +20,10 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
 
     def setUp(self):
         self.test_picturae_importer_lite = TestPicturaeImporterlite(paths=self.md5_hash, date_string=self.md5_hash)
+
+        self.specify_db_connection = self.test_picturae_importer_lite.specify_db_connection
+
+        self.sql_csv_tools = self.test_picturae_importer_lite.sql_csv_tools
         # creating restore point for db
         shutil.copyfile("../tests/casbotany_lite.db", "../tests/casbotany_backup.db")
 
@@ -201,36 +204,41 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
 
                 value_list, column_list = remove_two_index(value_list, column_list)
 
-                sql = create_insert_statement(tab_name="taxon", col_list=column_list,
-                                              val_list=value_list)
+                sql = self.sql_csv_tools.create_insert_statement(tab_name="taxon",
+                                                                 col_list=column_list,
+                                                                 val_list=value_list)
 
-                insert_table_record(connection=self.connection, logger_int=self.logger, sql=sql, sqlite=True)
+                self.sql_csv_tools.insert_table_record(connection=self.specify_db_connection,
+                                                       logger_int=self.logger, sql=sql)
 
 
                 # pulling sample taxon to make sure columns line up
 
                 # checking taxname
-                pull_name_end = casbotany_lite_getrecord(id_col="Name", tab_name="taxon",
-                                                          key_col="FullName",
-                                                          match=taxon,
-                                                          match_type="string")
+                pull_name_end = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
+                                                                 id_col="Name", tab_name="taxon",
+                                                                 key_col="FullName",
+                                                                 match=taxon,
+                                                                 match_type="string")
 
                 self.assertEqual(pull_name_end, rank_end)
 
                 # checking parent id
 
-                pull_parent = casbotany_lite_getrecord(id_col="ParentID", tab_name="taxon",
-                                                          key_col="FullName",
-                                                          match=taxon,
-                                                          match_type="string")
+                pull_parent = self.sql_csv_tools.get_one_match(connection = self.specify_db_connection,
+                                                               id_col="ParentID", tab_name="taxon",
+                                                               key_col="FullName",
+                                                               match=taxon,
+                                                               match_type="string")
 
                 self.assertEqual(pull_parent, parent_id)
 
                 # checking taxon id
-                pull_taxid = casbotany_lite_getrecord(id_col="TaxonID", tab_name="taxon",
-                                                          key_col="FullName",
-                                                          match=taxon,
-                                                          match_type="string")
+                pull_taxid = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
+                                                              id_col="TaxonID", tab_name="taxon",
+                                                              key_col="FullName",
+                                                              match=taxon,
+                                                              match_type="string")
 
                 self.assertFalse(pd.isna(pull_taxid))
 

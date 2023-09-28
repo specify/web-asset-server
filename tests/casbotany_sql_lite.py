@@ -38,6 +38,7 @@ class SqlLiteTools:
                 connection: the sqlite connection used to insert data
                 logger_int: the instance of logger to use for error reporting
         """
+        connection = sqlite3.connect(database=connection)
         curs = connection.cursor()
         try:
             curs.execute(sql)

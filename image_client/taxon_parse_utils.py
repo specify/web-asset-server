@@ -18,7 +18,7 @@ def separate_qualifiers(tax_frame: pd.DataFrame, tax_col: str):
 
     tax_frame['qualifier'] = pd.NA
 
-    qual_regex = ['cf.', 'aff.', 'vel aff.']
+    qual_regex = ['cf.', 'aff.', 'vel aff.', 'sec.']
     for qual in qual_regex:
         cf_mask = tax_frame[tax_col].str.contains(f"{qual}")
         if len(cf_mask) > 0:
