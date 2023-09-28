@@ -28,14 +28,14 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
         self.sql_csv_tools = self.test_picturae_importer.sql_csv_tools
 
-        self.sqllite_csv_tools = self.test_picturae_importer.sqllite_csv_tools
+        self.sqlite_csv_tools = self.test_picturae_importer.sqlite_csv_tools
 
         self.specify_db_connection = self.test_picturae_importer.specify_db_connection
 
         shutil.copyfile("../tests/casbotany_lite.db", "../tests/casbotany_backup.db")
 
     def test_casbotanylite(self):
-        "testing the wether the sqllite datbase can connect"
+        "testing the wether the sqlite datbase can connect"
         connection = sqlite3.connect('../tests/casbotany_lite.db')
         curs = connection.cursor()
         curs.execute('''SELECT * FROM agent''')
@@ -75,7 +75,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
     def test_create_locality(self):
         """testing create_locality function by
-           recreating insert protocol for locality table, but with sqlLite DB"""
+           recreating insert protocol for locality table, but with sqlite DB"""
 
         localityname = f"2 miles from eastern side of Mt.Fake + {self.md5_hash}"
 
@@ -101,10 +101,10 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = self.sql_csv_tools.create_insert_statement(tab_name="locality", col_list=column_list,
                                                          val_list=value_list)
         # testing insert table record
-        self.sqllite_csv_tools.insert_table_record(connection=self.sqlite_connection,
+        self.sqlite_csv_tools.insert_table_record(connection=self.sqlite_connection,
                                                    sql=sql, logger_int=self.logger)
         # checking whether locality id created properly
-        data_base_locality = self.sqllite_csv_tools.get_one_match(connection=self.sqlite_connection,
+        data_base_locality = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
                                                               id_col="LocalityID", tab_name="locality",
                                                               key_col="LocalityName", match=localityname,
                                                               match_type="string")
@@ -113,7 +113,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
         # checking whether geocode present
 
-        data_base_geo_code = self.sqllite_csv_tools.get_one_match(connection=self.sqlite_connection,
+        data_base_geo_code = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
                                                               id_col="GeographyID", tab_name="locality",
                                                               key_col="LocalityName", match=localityname,
                                                               match_type="string")
@@ -162,10 +162,10 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
                                                          val_list=value_list)
 
-        self.sqllite_csv_tools.insert_table_record(connection=self.sqlite_connection,
+        self.sqlite_csv_tools.insert_table_record(connection=self.sqlite_connection,
                                                    logger_int=self.logger, sql=sql)
 
-        station_field = self.sqllite_csv_tools.get_one_match(connection=self.sqlite_connection,
+        station_field = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
                                                              id_col="StationFieldNumber", tab_name="collectingevent",
                                                              key_col="StationFieldNumber",
                                                              match=123456, match_type="integer")

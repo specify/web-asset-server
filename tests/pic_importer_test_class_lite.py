@@ -2,7 +2,7 @@
     for taxon tree testing."""
 import logging
 from uuid import uuid4
-from tests.casbotany_sql_lite import SqlLiteTools
+from tests.sqlite_csv_utils import SqlLiteTools
 from image_client.importer import Importer
 from image_client.picturae_importer import PicturaeImporter
 from image_client import picturae_config
