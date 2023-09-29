@@ -1,4 +1,3 @@
-
 import traceback
 import pandas as pd
 from picturae_import_utils import remove_two_index
@@ -8,11 +7,30 @@ from datetime import timedelta
 import hmac
 import settings
 import sys
+from specify_db import SpecifyDb
+
+class SqlCsvTools():
+    def __init__(self, config):
+        self.config = config
+        self.connection = SpecifyDb(db_config_class=self.config)
+    def sql_db_connection(self):
+        """standard connector"""
+        return self.connection.connect()
+
+    def get_record(self, sql):
+        """dbtools get_one_record"""
+        return self.connection.get_one_record(sql=sql)
+
+    def get_cursor(self):
+        """standard db cursor"""
+        return self.connection.get_cursor()
 
 
-class SqlCsvTools:
-    def __init__(self):
-        pass
+    def commit(self):
+        """standard db commit"""
+        return self.connection.commit()
+
+
     # static methods
     def check_agent_name_sql(self, first_name: str, last_name: str, middle_initial: str, title: str):
         """create_name_sql: create a custom sql string, based on number of non-na arguments, the
@@ -51,9 +69,14 @@ class SqlCsvTools:
 
         sql += ''';'''
 
-        return sql
+        result = self.get_record(sql=sql)
 
-    def get_one_match(self, connection, tab_name, id_col, key_col, match, match_type="string"):
+        if isinstance(result, (list, dict, set)):
+            return result[0]
+        else:
+            return result
+
+    def get_one_match(self, tab_name, id_col, key_col, match, match_type="string"):
         """populate_sql:
                 creates a custom select statement for get one record,
                 from which a result can be gotten more seamlessly
@@ -72,7 +95,7 @@ class SqlCsvTools:
         elif match_type == "integer":
             sql = f'''SELECT {id_col} FROM {tab_name} WHERE `{key_col}` = {match};'''
 
-        result = connection.get_one_record(sql)
+        result = self.get_record(sql=sql)
 
         if isinstance(result, (list, dict, set)):
             return result[0]
@@ -98,7 +121,7 @@ class SqlCsvTools:
 
         return sql
 
-    def insert_table_record(self, connection, logger_int, sql):
+    def insert_table_record(self, logger_int, sql):
         """create_table_record:
                general code for the inserting of a new record into any table on database,
                creates connection, and runs sql query. cursor.execute with arg multi, to
@@ -110,8 +133,7 @@ class SqlCsvTools:
                sqlite: option for sqlite configuration, as get_cursor()
                           requires database ip, which sqlite does not have
         """
-        cursor = connection.get_cursor()
-
+        cursor = self.get_cursor()
         logger_int.info(f'running query: {sql}')
         logger_int.debug(sql)
 
@@ -121,7 +143,7 @@ class SqlCsvTools:
             print(f"Exception thrown while processing sql: {sql}\n{e}\n", flush=True)
             logger_int.error(traceback.format_exc())
         try:
-            connection.commit()
+            self.commit()
 
         except Exception as e:
             logger_int.error(f"sql debug: {e}")
@@ -186,7 +208,7 @@ class SqlCsvTools:
 
         return sql
 
-    def taxon_unmatch_insert(self, connection,  logger,  unmatched_taxa: pd.DataFrame):
+    def taxon_unmatch_insert(self, logger,  unmatched_taxa: pd.DataFrame):
         """taxon_unmatch_create: creates sql query for creating new records in taxa unmatch,
                                 from rows that did not pass TNRS successfully,
                                 either through spelling, or taxonomic errors.
@@ -199,11 +221,11 @@ class SqlCsvTools:
 
             sql = self.create_tnrs_unmatch_tab(row=row, df=unmatched_taxa, tab_name='taxa_unmatch')
 
-            sql_result = self.get_one_match(connection=connection, tab_name='taxa_unmatch',
+            sql_result = self.get_one_match(tab_name='taxa_unmatch',
                                             id_col='CatalogNumber', key_col='CatalogNumber',
                                             match=row[catalognumber], match_type='integer')
             if sql_result is None:
-                self.insert_table_record(connection=connection, logger_int=logger, sql=sql)
+                self.insert_table_record(logger_int=logger, sql=sql)
             else:
                 pass
 
@@ -252,7 +274,7 @@ class SqlCsvTools:
 
         return sql
 
-    def insert_taxa_added_record(self, connection, taxon_list, logger_int, df: pd.DataFrame):
+    def insert_taxa_added_record(self, taxon_list, logger_int, df: pd.DataFrame):
         """new_taxa_record: creates record level data for any new taxa added to the database,
                             populates useful table for qc and troubleshooting
         args:
@@ -264,7 +286,7 @@ class SqlCsvTools:
         taxa_frame = df[df['fullname'].isin(taxon_list)]
         for index, row in taxa_frame.iterrows():
             catalog_number = taxa_frame.columns.get_loc('CatalogNumber')
-            barcode_result = self.get_one_match(connection=connection, tab_name='picturaetaxa_added',
+            barcode_result = self.get_one_match(tab_name='picturaetaxa_added',
                                                 id_col='CatalogNumber',
                                                 key_col='CatalogNumber',
                                                 match=row[catalog_number],
@@ -272,7 +294,7 @@ class SqlCsvTools:
             if barcode_result is None:
                 sql = self.create_new_tax_tab(row=row, df=taxa_frame, tab_name='picturaetaxa_added')
 
-                self.insert_table_record(connection=connection, logger_int=logger_int, sql=sql)
+                self.insert_table_record(logger_int=logger_int, sql=sql)
 
     def create_new_tax_tab(self, row, df: pd.DataFrame, tab_name: str):
         """create_new_tax: does a similar function as create_unmatch_tab,

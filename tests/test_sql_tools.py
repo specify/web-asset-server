@@ -19,7 +19,6 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         super().__init__(*args, **kwargs)
         self.md5_hash = self.generate_random_md5()
         self.logger = logging.getLogger("TestSqlInsert")
-        self.sqlite_connection = '../tests/casbotany_lite.db'
 
     def setUp(self):
         """setting up instance of PicturaeImporter"""
@@ -101,11 +100,9 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = self.sql_csv_tools.create_insert_statement(tab_name="locality", col_list=column_list,
                                                          val_list=value_list)
         # testing insert table record
-        self.sqlite_csv_tools.insert_table_record(connection=self.sqlite_connection,
-                                                   sql=sql, logger_int=self.logger)
+        self.sqlite_csv_tools.insert_table_record(sql=sql, logger_int=self.logger)
         # checking whether locality id created properly
-        data_base_locality = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
-                                                              id_col="LocalityID", tab_name="locality",
+        data_base_locality = self.sqlite_csv_tools.get_one_match(id_col="LocalityID", tab_name="locality",
                                                               key_col="LocalityName", match=localityname,
                                                               match_type="string")
 
@@ -113,8 +110,7 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
 
         # checking whether geocode present
 
-        data_base_geo_code = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
-                                                              id_col="GeographyID", tab_name="locality",
+        data_base_geo_code = self.sqlite_csv_tools.get_one_match(id_col="GeographyID", tab_name="locality",
                                                               key_col="LocalityName", match=localityname,
                                                               match_type="string")
 
@@ -162,11 +158,9 @@ class TestSqlInsert(unittest.TestCase, TestingTools):
         sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
                                                          val_list=value_list)
 
-        self.sqlite_csv_tools.insert_table_record(connection=self.sqlite_connection,
-                                                   logger_int=self.logger, sql=sql)
+        self.sqlite_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
-        station_field = self.sqlite_csv_tools.get_one_match(connection=self.sqlite_connection,
-                                                             id_col="StationFieldNumber", tab_name="collectingevent",
+        station_field = self.sqlite_csv_tools.get_one_match(id_col="StationFieldNumber", tab_name="collectingevent",
                                                              key_col="StationFieldNumber",
                                                              match=123456, match_type="integer")
 

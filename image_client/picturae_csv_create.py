@@ -36,10 +36,14 @@ class CsvCreatePicturae(Importer):
         self.date_use = date_string
         self.logger = logging.getLogger('DataOnboard')
 
-        self.sql_csv_tools = SqlCsvTools()
-
         # setting up alternate db connection for batch database
         self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
+
+        # setting up alternate csv tools connections
+
+        self.sql_csv_tools = SqlCsvTools(config=picturae_config)
+
+        self.batch_sql_tools = SqlCsvTools(config=picdb_config)
 
 
         # intializing parameters for database upload
@@ -309,8 +313,7 @@ class CsvCreatePicturae(Importer):
         # writing unmatched taxa to db table taxa_unmatch
         SpecifyDb(db_config_class=picdb_config)
         if len(unmatched_taxa) > 0:
-            self.sql_csv_tools.taxon_unmatch_insert(connection=self.batch_db_connection,
-                                                    logger=self.logger, unmatched_taxa=unmatched_taxa)
+            self.batch_sql_tools.taxon_unmatch_insert(logger=self.logger, unmatched_taxa=unmatched_taxa)
 
         # filtering out taxa with tnrs scores lower than .99 (basically exact match)
         resolved_taxon = resolved_taxon[resolved_taxon["overall_score"] >= .99]

@@ -18,12 +18,12 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
         self.logger = logging.getLogger("TestSqlInsert")
         self.taxon_dicts = []
 
+
     def setUp(self):
         self.test_picturae_importer_lite = TestPicturaeImporterlite(paths=self.md5_hash, date_string=self.md5_hash)
 
-        self.specify_db_connection = self.test_picturae_importer_lite.specify_db_connection
-
         self.sql_csv_tools = self.test_picturae_importer_lite.sql_csv_tools
+
         # creating restore point for db
         shutil.copyfile("../tests/casbotany_lite.db", "../tests/casbotany_backup.db")
 
@@ -101,10 +101,10 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
             self.test_picturae_importer_lite.taxon_guid = uuid4()
 
             self.test_picturae_importer_lite.parent_list = [self.test_picturae_importer_lite.full_name,
-                                                       self.test_picturae_importer_lite.first_intra,
-                                                       self.test_picturae_importer_lite.gen_spec,
-                                                       self.test_picturae_importer_lite.genus,
-                                                       self.test_picturae_importer_lite.family_name]
+                                                            self.test_picturae_importer_lite.first_intra,
+                                                            self.test_picturae_importer_lite.gen_spec,
+                                                            self.test_picturae_importer_lite.genus,
+                                                            self.test_picturae_importer_lite.family_name]
 
             self.test_picturae_importer_lite.parent_list = unique_ordered_list(self.test_picturae_importer_lite.parent_list)
 
@@ -114,19 +114,20 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
                 rank_end, parent_id, taxon_guid, rank_id = self.test_picturae_importer_lite.generate_taxon_fields(
                                                            index=index, taxon=taxon)
 
-                test_parent_id = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
-                                                                  id_col="TaxonID", tab_name="taxon",
+                test_parent_id = self.sql_csv_tools.get_one_match(id_col="TaxonID", tab_name="taxon",
                                                                   key_col="FullName",
-                                                                   match=self.test_picturae_importer_lite.parent_list[index+1],
-                                                                    match_type="string")
+                                                                  match=self.test_picturae_importer_lite.parent_list[index+1],
+                                                                  match_type="string")
 
 
                 self.assertEqual(parent_id, test_parent_id)
 
                 if self.test_picturae_importer_lite.is_hybrid is False and taxon == self.test_picturae_importer_lite.full_name:
                     self.assertEqual(author_insert, row['accepted_author'])
+
                 elif self.test_picturae_importer_lite.is_hybrid is False:
                     pass
+
                 elif self.test_picturae_importer_lite.is_hybrid is True:
                     self.assertTrue(pd.isna(author_insert))
 
@@ -154,14 +155,16 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
             self.test_picturae_importer_lite.taxon_guid = uuid4()
 
             self.test_picturae_importer_lite.parent_list = [self.test_picturae_importer_lite.full_name,
-                                                       self.test_picturae_importer_lite.first_intra,
-                                                       self.test_picturae_importer_lite.gen_spec,
-                                                       self.test_picturae_importer_lite.genus,
-                                                       self.test_picturae_importer_lite.family_name]
+                                                            self.test_picturae_importer_lite.first_intra,
+                                                            self.test_picturae_importer_lite.gen_spec,
+                                                            self.test_picturae_importer_lite.genus,
+                                                            self.test_picturae_importer_lite.family_name]
 
             self.test_picturae_importer_lite.parent_list = unique_ordered_list(self.test_picturae_importer_lite.parent_list)
 
+            self.test_picturae_importer_lite.create_taxon()
             for index, taxon in reversed(list(enumerate(self.test_picturae_importer_lite.taxon_list))):
+
 
                 author_insert, tree_item_id, \
                 rank_end, parent_id, taxon_guid, rank_id = self.test_picturae_importer_lite.generate_taxon_fields(
@@ -207,16 +210,14 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
                 sql = self.sql_csv_tools.create_insert_statement(tab_name="taxon",
                                                                  col_list=column_list,
                                                                  val_list=value_list)
-
-                self.sql_csv_tools.insert_table_record(connection=self.specify_db_connection,
-                                                       logger_int=self.logger, sql=sql)
+                self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
                 # pulling sample taxon to make sure columns line up
 
+
                 # checking taxname
-                pull_name_end = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
-                                                                 id_col="Name", tab_name="taxon",
+                pull_name_end = self.sql_csv_tools.get_one_match(id_col="Name", tab_name="taxon",
                                                                  key_col="FullName",
                                                                  match=taxon,
                                                                  match_type="string")
@@ -225,17 +226,16 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
 
                 # checking parent id
 
-                pull_parent = self.sql_csv_tools.get_one_match(connection = self.specify_db_connection,
-                                                               id_col="ParentID", tab_name="taxon",
+                pull_parent = self.sql_csv_tools.get_one_match(id_col="ParentID", tab_name="taxon",
                                                                key_col="FullName",
                                                                match=taxon,
                                                                match_type="string")
 
                 self.assertEqual(pull_parent, parent_id)
 
+
                 # checking taxon id
-                pull_taxid = self.sql_csv_tools.get_one_match(connection=self.specify_db_connection,
-                                                              id_col="TaxonID", tab_name="taxon",
+                pull_taxid = self.sql_csv_tools.get_one_match(id_col="TaxonID", tab_name="taxon",
                                                               key_col="FullName",
                                                               match=taxon,
                                                               match_type="string")

@@ -13,8 +13,7 @@ class TestPicturaeImporterlite(PicturaeImporter):
         Importer.__init__(self, db_config_class=picturae_config, collection_name="Botany")
         self.init_all_vars(date_string=date_string, paths=paths)
         self.logger = logging.getLogger("TestPicturaeImporter")
-        self.sql_csv_tools = SqlLiteTools()
-        self.specify_db_connection = '../tests/casbotany_lite.db'
+        self.sql_csv_tools = SqlLiteTools(sql_db="../tests/casbotany_lite.db")
 
     # patched populate_fields function to avoid having to pull from the geography tree, for taxon tree tests
     def populate_fields(self, row):
