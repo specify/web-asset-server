@@ -10,6 +10,5 @@ class TestPicturaeImporter(PicturaeImporter):
     def __init__(self, date_string, paths):
         Importer.__init__(self, db_config_class=picturae_config, collection_name="Botany")
         self.init_all_vars(date_string=date_string, paths=paths)
-        self.sqlite_csv_tools = SqlLiteTools(sql_db="../tests/casbotany_lite.db")
-        self.sql_csv_tools = SqlCsvTools(config=picturae_config)
+        self.sql_csv_tools = SqlLiteTools(sql_db="../tests/casbotany_lite.db")
         self.logger = logging.getLogger("TestPicturaeImporter")
