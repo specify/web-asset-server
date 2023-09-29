@@ -52,18 +52,18 @@ class CsvReadMergeTests(unittest.TestCase, TestingTools):
         """tests if barcode column is present
            (test if column names loaded correctly,
            specimen_barcode being in required in both csvs)"""
-        self.assertEqual('specimen_barcode' in self.CsvCreatePicturae.csv_read_path('folder').columns, True)
-        self.assertEqual('specimen_barcode' in self.CsvCreatePicturae.csv_read_path('specimen').columns, True)
+        self.assertEqual('specimen_barcode' in self.test_csv_create_picturae.csv_read_path('folder').columns, True)
+        self.assertEqual('specimen_barcode' in self.test_csv_create_picturae.csv_read_path('specimen').columns, True)
 
     # these tests are for the csv merge function
     def test_merge_num_columns(self):
         """test merge with sample data set , checks if shared columns are removed,
            and that the merge occurs with expected # of columns"""
         # -3 as merge function drops duplicate columns automatically
-        self.CsvCreatePicturae.csv_merge()
-        self.assertEqual(len(self.CsvCreatePicturae.record_full.columns),
-                         len(self.CsvCreatePicturae.csv_read_path('folder').columns) +
-                         len(self.CsvCreatePicturae.csv_read_path('specimen').columns) - 3)
+        self.test_csv_create_picturae.csv_merge()
+        self.assertEqual(len(self.test_csv_create_picturae.record_full.columns),
+                         len(self.test_csv_create_picturae.csv_read_path('folder').columns) +
+                         len(self.test_csv_create_picturae.csv_read_path('specimen').columns) - 3)
 
     def test_index_length_matches(self):
         """checks whether dataframe, length changes,
@@ -71,32 +71,32 @@ class CsvReadMergeTests(unittest.TestCase, TestingTools):
            folder and specimen csvs should
            always be a 100% match on barcodes
            """
-        self.CsvCreatePicturae.csv_merge()
-        csv_folder = self.CsvCreatePicturae.csv_read_path('folder')
+        self.test_csv_create_picturae.csv_merge()
+        csv_folder = self.test_csv_create_picturae.csv_read_path('folder')
         # test merge index before and after
-        self.assertEqual(len(self.CsvCreatePicturae.record_full),
+        self.assertEqual(len(self.test_csv_create_picturae.record_full),
                          len(csv_folder))
 
     def test_unequalbarcode_raise(self):
         """checks whether inserted errors in barcode column raise
            a Value error raise in the merge function"""
         # testing output
-        csv_folder = self.CsvCreatePicturae.csv_read_path(csv_level="folder")
-        csv_specimen = self.CsvCreatePicturae.csv_read_path(csv_level="specimen")
+        csv_folder = self.test_csv_create_picturae.csv_read_path(csv_level="folder")
+        csv_specimen = self.test_csv_create_picturae.csv_read_path(csv_level="specimen")
         self.assertEqual(set(csv_folder['specimen_barcode']), set(csv_specimen['specimen_barcode']))
 
     def test_output_isnot_empty(self):
         """tests whether merge function accidentally
            produces an empty dataframe"""
-        self.CsvCreatePicturae.csv_merge()
+        self.test_csv_create_picturae.csv_merge()
         # testing output
-        self.assertFalse(self.CsvCreatePicturae.record_full.empty)
+        self.assertFalse(self.test_csv_create_picturae.record_full.empty)
 
     def tearDown(self):
         """deletes destination directories for dummy datasets"""
         # print("teardown called!")
         # deleting instance
-        del self.CsvCreatePicturae
+        del self.test_csv_create_picturae
         # deleting folders
 
         folder_path = 'picturae_csv/' + str(self.md5_hash) + '/picturae_folder(' + \

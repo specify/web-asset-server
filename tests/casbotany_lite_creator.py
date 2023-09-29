@@ -1,6 +1,9 @@
+"""contains functions for creating sqlite database"""
 import sqlite3
 
+# make this into a command line activated class?
 def table_sql_list():
+    """table_sql_list: creates list of sql DDL commands to run in sqlite DB"""
 
     sql_bot_list = ['''CREATE TABLE IF NOT EXISTS collectionobject (
                         CollectionObjectID INTEGER PRIMARY KEY,
@@ -383,51 +386,21 @@ def table_sql_list():
 
     return sql_bot_list
 
+
 def casbotany_lite_creator():
-    connect = sqlite3.connect('cas_botanylite.db')
+    """casbotqny_lite_creator: casbotany_lite_creator: creates the
+                  sqllite tables contained in the sqllite DDL list"""
+    connect = sqlite3.connect('tests/casbotany_lite.db')
     sql_list = table_sql_list()
     curs = connect.cursor()
     # running a loop through tables for sql_lite
     for table in sql_list:
         curs.execute(table)
         connect.commit()
+
     # closing connection
     curs.close()
     connect.close()
 
-
-def sql_lite_connection(db_name):
-    connection = sqlite3.connect(db_name)
-    return connection
-
-def sql_lite_insert(sql, db_name):
-    """facimile statement to insert_table_record in sql_csv_utils.py"""
-    connect = sqlite3.connect(db_name)
-    curs = connect.cursor()
-    try:
-        curs.execute(sql)
-    except Exception as e:
-        raise ValueError(f"Exception thrown while processing sql: {sql}\n{e}\n")
-    try:
-        connect.commit()
-
-    except Exception as e:
-        raise ValueError(f"sql debug: {e}")
-
-    curs.close()
-    connect.close()
-
-def casbotany_lite_getrecord(sql_query: str):
-    """modified get one record function for sql lite"""
-    connect = sqlite3.connect('cas_botanylite.db')
-    curs = connect.cursor()
-    # running sql query
-    curs.execute(sql_query)
-    record = curs.fetchone()
-    # closing connection
-    curs.close()
-    connect.close()
-    return record[0]
 
 casbotany_lite_creator()
-

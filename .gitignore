@@ -31,3 +31,4 @@ settings.development.py
 *.JPG
 *.TIF
 .hidden_*
+/tests/casbotany_lite.db

@@ -60,7 +60,7 @@ def assign_collector_titles(first_last, name: str):
             name: the name string from which to separate out the titles.
     """
     # to lower to standardize matching
-    titles = ['mr.', 'mrs.', 'ms.', 'dr.', 'jr.', 'sr.', 'ii', 'iii', 'ii', 'v', 'vi', 'vii', 'viii', 'ix']
+    titles = ['mr.', 'mrs.', 'ms.', 'dr.', 'jr.', 'sr.', 'ii', 'iii', 'ii', 'v', 'vi', 'vii', 'viii', 'ix', 'esq.']
     title = ""
     new_name = ""
 

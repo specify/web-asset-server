@@ -16,6 +16,8 @@ tests for picturae_importer file:
     test_agent_list.py: runs unittests on create_agent_list function.
     test_populate_fields.py: runs unittests on populate_fields function.
     test_file_hide.py: runs unittests on hide_unwanted_files and unhide_files
+    test_taxontree.py: runs unittests for the populate taxon, generate taxon fields, and insert statements for taxon
+                       into taxon tree.
 
 
 

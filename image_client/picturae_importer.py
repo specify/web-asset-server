@@ -10,11 +10,12 @@ import logging
 from string_utils import *
 from importer import Importer
 from picturae_csv_create import CsvCreatePicturae
-from sql_csv_utils import *
+from sql_csv_utils import SqlCsvTools
 from botany_importer import BotanyImporter
 from picturae_csv_create import starting_time_stamp
 from specify_db import SpecifyDb
 import picdb_config
+import time_utils
 
 class PicturaeImporter(Importer):
     """DataOnboard:
@@ -38,7 +39,7 @@ class PicturaeImporter(Importer):
 
         self.batch_size = len(self.record_full)
 
-        self.batch_md5 = generate_token(starting_time_stamp, self.file_path)
+        self.batch_md5 = self.sql_csv_tools.generate_token(starting_time_stamp, self.file_path)
 
         self.run_all_methods()
 
@@ -51,18 +52,25 @@ class PicturaeImporter(Importer):
                 paths: the paths string recieved from the init params"""
         self.date_use = date_string
 
+        # setting up alternate db connection for batch database
+        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
+
+        # setting up db sql_tools for each connection
+
+        self.sql_csv_tools = SqlCsvTools(config=picturae_config)
+
+        self.batch_sql_tools = SqlCsvTools(config=picdb_config)
+
+
         self.logger = logging.getLogger('PicturaeImporter')
 
         # full collector list is for populating existing and missing agents into collector table
         # new_collector_list is only for adding new agents to agent table.
         empty_lists = ['barcode_list', 'image_list', 'full_collector_list', 'new_collector_list',
-                       'taxon_list', 'new_taxa']
+                       'taxon_list', 'new_taxa', 'parent_list']
 
         for empty_list in empty_lists:
             setattr(self, empty_list, [])
-
-        # setting up alternate db connection for batch database
-        self.batch_db_connection = SpecifyDb(db_config_class=picdb_config)
 
         self.no_match_dict = {}
 
@@ -89,10 +97,10 @@ class PicturaeImporter(Importer):
         """updating md5 fields for new taxon and taxon mismatch batches"""
         ending_time_stamp = datetime.now()
 
-        sql = create_batch_record(start_time=starting_time_stamp, end_time=ending_time_stamp,
-                                  batch_md5=self.batch_md5, batch_size=batch_size)
+        sql = self.batch_sql_tools.create_batch_record(start_time=starting_time_stamp, end_time=ending_time_stamp,
+                                                       batch_md5=self.batch_md5, batch_size=batch_size)
 
-        insert_table_record(connection=self.batch_db_connection, logger_int=self.logger, sql=sql)
+        self.batch_sql_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
         condition = f'''WHERE TimestampCreated >= "{starting_time_stamp}" 
                         AND TimestampCreated <= "{ending_time_stamp}";'''
@@ -100,9 +108,10 @@ class PicturaeImporter(Importer):
         error_tabs = ['taxa_unmatch', 'picturaetaxa_added']
         for tab in error_tabs:
 
-            sql = create_update_statement(tab_name=tab, col_list=['batch_MD5'], val_list=[self.batch_md5],
-                                          condition=condition)
-            insert_table_record(connection=self.batch_db_connection, sql=sql, logger_int=self.logger)
+            sql = self.batch_sql_tools.create_update_statement(tab_name=tab, col_list=['batch_MD5'],
+                                                             val_list=[self.batch_md5], condition=condition)
+
+            self.batch_sql_tools.insert_table_record(sql=sql, logger_int=self.logger)
 
 
     def exit_timestamp(self):
@@ -276,9 +285,7 @@ class PicturaeImporter(Importer):
 
                 first_name, last_name, title, middle = elements
 
-                sql = check_agent_name_sql(first_name, last_name, middle, title)
-
-                agent_id = self.specify_db_connection.get_one_record(sql)
+                agent_id = self.sql_csv_tools.check_agent_name_sql(first_name, last_name, middle, title)
 
                 collector_dict = {f'collector_first_name': first_name,
                                   f'collector_middle_initial': middle,
@@ -288,12 +295,6 @@ class PicturaeImporter(Importer):
                 self.full_collector_list.append(collector_dict)
                 if agent_id is None:
                     self.new_collector_list.append(collector_dict)
-
-    # check after getting real dataset, still not final
-
-
-    # proposed solution move it to importer , but I think that migh be iffy. This function relies
-
 
     def populate_fields(self, row):
         """populate_fields:
@@ -338,15 +339,17 @@ class PicturaeImporter(Importer):
         self.geography_string = str(row[index_list[16]]) + ", " + \
                                 str(row[index_list[17]]) + ", " + str(row[index_list[18]])
 
-        self.GeographyID = get_one_match(self.specify_db_connection, tab_name='geography', id_col='GeographyID',
-                                         key_col='FullName', match=self.geography_string)
+        self.GeographyID = self.sql_csv_tools.get_one_match(tab_name='geography', id_col='GeographyID',
+                                                            key_col='FullName', match=self.geography_string)
 
-        self.locality_id = get_one_match(self.specify_db_connection, tab_name='locality', id_col='LocalityID',
-                                         key_col='LocalityName', match=self.locality)
+        self.locality_id = self.sql_csv_tools.get_one_match(tab_name='locality', id_col='LocalityID',
+                                                            key_col='LocalityName', match=self.locality)
 
     def taxon_get(self, name):
-        sql = f'''SELECT TaxonID FROM {picturae_config.SPECIFY_DATABASE}.taxon WHERE FullName = "{name}";'''
-        result_id = self.specify_db_connection.get_one_record(sql)
+
+        result_id = self.sql_csv_tools.get_one_match(tab_name="taxon", id_col="TaxonID", key_col="FullName", match=name,
+                                                     match_type="string")
+
         return result_id
 
     def populate_taxon(self):
@@ -366,10 +369,11 @@ class PicturaeImporter(Importer):
             if self.full_name != self.first_intra and self.first_intra != self.gen_spec:
                 self.first_intra_id = self.taxon_get(name=self.first_intra)
                 if self.first_intra_id is None:
-                    self.taxon_list.append(self.gen_spec)
+                    self.taxon_list.append(self.first_intra)
 
-            if self.full_name != self.gen_spec:
+            if self.full_name != self.gen_spec and self.gen_spec != self.genus:
                 self.gen_spec_id = self.taxon_get(name=self.gen_spec)
+                # check high taxa gen_spec for author
                 self.single_taxa_tnrs(taxon_name=self.gen_spec, barcode=self.barcode)
                 # adding base name to taxon_list
                 if self.gen_spec_id is None:
@@ -390,6 +394,42 @@ class PicturaeImporter(Importer):
             self.new_taxa.extend(self.taxon_list)
         else:
             pass
+
+    def generate_taxon_fields(self, index, taxon):
+        """generates necessary fields for creating new taxon fields
+            args:
+                index: index num in the taxon list.
+                taxon: the taxon name in the taxon list ,
+                       iterrated through from highest to lowest rank"""
+        taxon_guid = uuid4()
+        rank_name = taxon
+        parent_id = self.taxon_get(name=self.parent_list[index + 1])
+        if taxon == self.full_name:
+            rank_end = self.tax_name
+        else:
+            rank_end = taxon.split()[-1]
+
+        author_insert = self.author
+
+        if rank_name != self.family_name:
+            tree_item_id, rank_id = self.taxon_assign_defitem(taxon_string=rank_name)
+        else:
+            rank_id = 140
+            tree_item_id = 11
+
+        if rank_id < 220:
+            author_insert = pd.NA
+
+        # assigning parent_author if needed , for gen_spec
+
+        if rank_id == 220 and self.full_name != self.gen_spec:
+            author_insert = self.parent_author
+
+        if self.is_hybrid is True:
+            author_insert = pd.NA
+
+        return author_insert, tree_item_id, rank_end, parent_id, taxon_guid, rank_id
+
 
     def create_locality_record(self):
         """create_locality_record:
@@ -428,10 +468,10 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                      val_list=value_list)
+        sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
+                                                         val_list=value_list)
 
-        insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+        self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
     def create_agent_id(self):
@@ -478,10 +518,10 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             values, columns = remove_two_index(values, columns)
 
-            sql = create_insert_statement(tab_name=table, col_list=columns,
-                                    val_list=values)
+            sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=columns,
+                                                             val_list=values)
 
-            insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+            self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
     def create_collecting_event(self):
@@ -493,8 +533,9 @@ class PicturaeImporter(Importer):
 
         # re-pulling locality id to reflect update
 
-        self.locality_id = get_one_match(self.specify_db_connection, tab_name='locality', id_col='LocalityID',
-                                         key_col='LocalityName', match=self.locality)
+        self.locality_id = self.sql_csv_tools.get_one_match(tab_name='locality',
+                                                            id_col='LocalityID',
+                                                            key_col='LocalityName', match=self.locality)
 
         table = 'collectingevent'
 
@@ -529,10 +570,10 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                val_list=value_list)
+        sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
+                                                         val_list=value_list)
 
-        insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+        self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
     def create_taxon(self):
@@ -542,37 +583,13 @@ class PicturaeImporter(Importer):
                         rank levels of each taxon name.
         """
         # for now do not upload
-        parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
-        parent_list = unique_ordered_list(parent_list)
-        for index, taxa_rank in reversed(list(enumerate(self.taxon_list))):
-            taxon_guid = uuid4()
-            rank_name = taxa_rank
-            parent_id = self.taxon_get(name=parent_list[index + 1])
-            table = 'taxon'
-            if taxa_rank == self.full_name:
-                rank_end = self.tax_name
-            else:
-                rank_end = taxa_rank.split()[-1]
+        self.parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
+        self.parent_list = unique_ordered_list(self.parent_list)
+        for index, taxon in reversed(list(enumerate(self.taxon_list))):
+            # getting index pos of taxon in parent list
 
-            author_insert = self.author
-
-            if rank_name != self.family_name:
-                tree_item_id, rank_id = self.taxon_assign_defitem(taxon_string=rank_name)
-            else:
-                rank_id = 140
-                tree_item_id = 11
-
-            if rank_id < 220:
-                author_insert = pd.NA
-
-            # assigning parent_author if needed , for gen_spec
-
-            if rank_id == 220 and self.full_name != self.gen_spec:
-                author_insert = self.parent_author
-
-            if self.is_hybrid is True:
-                author_insert = pd.NA
-
+            author_insert, tree_item_id, rank_end, \
+                            parent_id, taxon_guid, rank_id = self.generate_taxon_fields(index=index, taxon=taxon)
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
@@ -595,7 +612,7 @@ class PicturaeImporter(Importer):
                           f"{time_utils.get_pst_time_now_string()}",
                           1,
                           author_insert,
-                          f"{rank_name}",
+                          f"{taxon}",
                           f"{taxon_guid}",
                           "World Checklist of Vascular Plants 2023",
                           True,
@@ -611,12 +628,12 @@ class PicturaeImporter(Importer):
 
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                          val_list=value_list)
+            sql = self.sql_csv_tools.create_insert_statement(tab_name="taxon", col_list=column_list,
+                                                             val_list=value_list)
 
-            insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+            self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
-            logging.info(f"taxon: {rank_name} created")
+            logging.info(f"taxon: {taxon} created")
 
 
     def create_collection_object(self):
@@ -628,9 +645,9 @@ class PicturaeImporter(Importer):
         # will new collecting event ids need to be created ?
         # re-pulling collecting event id to reflect new record
 
-        self.collecting_event_id = get_one_match(self.specify_db_connection, tab_name='collectingevent',
-                                                 id_col='CollectingEventID',
-                                                 key_col='GUID', match=self.collecting_event_guid)
+        self.collecting_event_id = self.sql_csv_tools.get_one_match(tab_name='collectingevent',
+                                                                    id_col='CollectingEventID',
+                                                                    key_col='GUID', match=self.collecting_event_guid)
 
         table = 'collectionobject'
 
@@ -670,10 +687,10 @@ class PicturaeImporter(Importer):
         # removing na values from both lists
         value_list, column_list = remove_two_index(value_list, column_list)
 
-        sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                val_list=value_list)
+        sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
+                                                         val_list=value_list)
 
-        insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+        self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
     def create_determination(self):
@@ -686,11 +703,12 @@ class PicturaeImporter(Importer):
         """
         table = 'determination'
 
-        self.collection_ob_id = get_one_match(self.specify_db_connection, tab_name='collectionobject', id_col='CollectionObjectID',
-                                              key_col='GUID', match=self.collection_ob_guid)
+        self.collection_ob_id = self.sql_csv_tools.get_one_match(tab_name='collectionobject',
+                                                                 id_col='CollectionObjectID',
+                                                                 key_col='GUID', match=self.collection_ob_guid)
 
-        self.taxon_id = get_one_match(self.specify_db_connection,tab_name='taxon', id_col='TaxonID',
-                                      key_col='FullName', match=self.full_name)
+        self.taxon_id = self.sql_csv_tools.get_one_match(tab_name='taxon', id_col='TaxonID',
+                                                         key_col='FullName', match=self.full_name)
         if self.taxon_id is not None:
 
             column_list = ['TimestampCreated',
@@ -727,9 +745,10 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                          val_list=value_list)
-            insert_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)
+            sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
+                                                             val_list=value_list)
+
+            self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
         else:
             self.logger.error(f"failed to add determination , missing taxon for {self.full_name}")
@@ -749,12 +768,10 @@ class PicturaeImporter(Importer):
         for index, agent_dict in enumerate(self.full_collector_list):
             table = 'collector'
 
-            sql = check_agent_name_sql(first_name=agent_dict["collector_first_name"],
-                                        last_name=agent_dict["collector_last_name"],
-                                        middle_initial=agent_dict["collector_middle_initial"],
-                                        title=agent_dict["collector_title"])
-
-            agent_id = self.specify_db_connection.get_one_record(sql=sql)
+            agent_id = self.sql_csv_tools.check_agent_name_sql(first_name=agent_dict["collector_first_name"],
+                                                          last_name=agent_dict["collector_last_name"],
+                                                          middle_initial=agent_dict["collector_middle_initial"],
+                                                          title=agent_dict["collector_title"])
 
             column_list = ['TimestampCreated',
                            'TimestampModified',
@@ -781,10 +798,10 @@ class PicturaeImporter(Importer):
             # removing na values from both lists
             value_list, column_list = remove_two_index(value_list, column_list)
 
-            sql = create_insert_statement(tab_name=table, col_list=column_list,
-                                          val_list=value_list)
+            sql = self.sql_csv_tools.create_insert_statement(tab_name=table, col_list=column_list,
+                                                             val_list=value_list)
 
-            insert_table_record(connection=self.specify_db_connection, logger_int=self.logger, sql=sql)
+            self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
 
     def hide_unwanted_files(self):
@@ -846,6 +863,8 @@ class PicturaeImporter(Importer):
             self.populate_fields(row)
             self.create_agent_list(row)
             self.populate_taxon()
+
+
             if self.taxon_id is None:
                 self.create_taxon()
 
@@ -905,7 +924,7 @@ class PicturaeImporter(Importer):
                  SET account_locked = 'Y'
                  WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
-        insert_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)
+        self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
 
         # starting purge timer
         self.exit_timestamp()
@@ -915,8 +934,8 @@ class PicturaeImporter(Importer):
 
         # creating new taxon list
         if len(self.new_taxa) > 0:
-            insert_taxa_added_record(taxon_list=self.new_taxa, connection=self.batch_db_connection,
-                                     logger_int=self.logger, df=self.record_full)
+            self.batch_sql_tools.insert_taxa_added_record(taxon_list=self.new_taxa,
+                                                          logger_int=self.logger, df=self.record_full)
 
         # uploading attachments
         self.upload_attachments()
@@ -931,4 +950,4 @@ class PicturaeImporter(Importer):
                  SET account_locked = 'n'
                  WHERE user != '{picturae_config.USER}' AND host = '%';"""
 
-        insert_table_record(self.specify_db_connection, logger_int=self.logger, sql=sql)
+        self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
