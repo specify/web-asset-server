@@ -578,11 +578,10 @@ class PicturaeImporter(Importer):
 
     def create_taxon(self):
         """create_taxon: populates the taxon table iteratively by adding higher taxa first,
-                            before lower taxa. Assigns taxa ranks and TaxonTreedefItemID.
-                        Using parent list in order to populate parent ids, by using the parsed
-                        rank levels of each taxon name.
+                         before lower taxa. Assigns taxa ranks and TaxonTreedefItemID.
+                         Using parent list in order to populate parent ids, by using the parsed
+                         rank levels of each taxon name.
         """
-        # for now do not upload
         self.parent_list = [self.full_name, self.first_intra, self.gen_spec, self.genus, self.family_name]
         self.parent_list = unique_ordered_list(self.parent_list)
         for index, taxon in reversed(list(enumerate(self.taxon_list))):
@@ -642,8 +641,6 @@ class PicturaeImporter(Importer):
                 args through create_sql_string and create_table record
                 in order to add new collectionobject record to database.
         """
-        # will new collecting event ids need to be created ?
-        # re-pulling collecting event id to reflect new record
 
         self.collecting_event_id = self.sql_csv_tools.get_one_match(tab_name='collectingevent',
                                                                     id_col='CollectingEventID',

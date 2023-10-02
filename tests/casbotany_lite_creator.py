@@ -388,9 +388,9 @@ def table_sql_list():
 
 
 def casbotany_lite_creator():
-    """casbotqny_lite_creator: casbotany_lite_creator: creates the
+    """casbotany_lite_creator: casbotany_lite_creator: creates the
                   sqllite tables contained in the sqllite DDL list"""
-    connect = sqlite3.connect('tests/casbotany_lite.db')
+    connect = sqlite3.connect('casbotany_lite.db')
     sql_list = table_sql_list()
     curs = connect.cursor()
     # running a loop through tables for sql_lite

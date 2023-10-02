@@ -136,7 +136,6 @@ class SqlCsvTools():
         cursor = self.get_cursor()
         logger_int.info(f'running query: {sql}')
         logger_int.debug(sql)
-
         try:
             cursor.execute(sql)
         except Exception as e:

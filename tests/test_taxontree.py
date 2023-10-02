@@ -11,6 +11,8 @@ from tests.pic_importer_test_class_lite import TestPicturaeImporterlite
 from tests.testing_tools import TestingTools
 from image_client.picturae_import_utils import unique_ordered_list
 os.chdir("./image_client")
+
+
 class Testtaxontrees(unittest.TestCase, TestingTools):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -26,8 +28,6 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
 
         # creating restore point for db
         shutil.copyfile("../tests/casbotany_lite.db", "../tests/casbotany_backup.db")
-
-
 
 
         data = {'CatalogNumber': ["12345", "12346", "12347", "12348"],
@@ -53,6 +53,7 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
                 'Hybrid': [False, True, False, True],
                 'accepted_author': ['Dougl. ex Hook.', 'Erd.', 'Drew', 'Schleich. ex Ser']
                 }
+
         self.test_picturae_importer_lite.record_full = pd.DataFrame(data)
 
 
@@ -119,7 +120,6 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
                                                                   match=self.test_picturae_importer_lite.parent_list[index+1],
                                                                   match_type="string")
 
-
                 self.assertEqual(parent_id, test_parent_id)
 
                 if self.test_picturae_importer_lite.is_hybrid is False and taxon == self.test_picturae_importer_lite.full_name:
@@ -146,111 +146,56 @@ class Testtaxontrees(unittest.TestCase, TestingTools):
 
         for index, row in self.test_picturae_importer_lite.record_full.iterrows():
             self.test_picturae_importer_lite.populate_fields(row)
-            # self.test_picturae_importer_lite.taxon_guid = uuid4()
-            self.test_picturae_importer_lite.taxon_list = []
 
             self.test_picturae_importer_lite.populate_taxon()
 
 
             self.test_picturae_importer_lite.taxon_guid = uuid4()
 
-            self.test_picturae_importer_lite.parent_list = [self.test_picturae_importer_lite.full_name,
-                                                            self.test_picturae_importer_lite.first_intra,
-                                                            self.test_picturae_importer_lite.gen_spec,
-                                                            self.test_picturae_importer_lite.genus,
-                                                            self.test_picturae_importer_lite.family_name]
-
-            self.test_picturae_importer_lite.parent_list = unique_ordered_list(self.test_picturae_importer_lite.parent_list)
-
             self.test_picturae_importer_lite.create_taxon()
-            for index, taxon in reversed(list(enumerate(self.test_picturae_importer_lite.taxon_list))):
 
+            # pulling sample taxon to make sure columns line up
 
-                author_insert, tree_item_id, \
-                rank_end, parent_id, taxon_guid, rank_id = self.test_picturae_importer_lite.generate_taxon_fields(
-                                                           index=index, taxon=taxon)
+        # checking expected names
+        tax_ends = ["fakus", "fake x cool", "arnoldi", "summi", "x ambigua"]
+        full_name = ["Castilleja miniata subsp. fakus", "Castilleja miniata subsp. fakus var. fake x cool",
+                     "Rafflesia arnoldi", 'Rafflesia arnoldi var. summi', 'Salix x ambigua']
+        parent_names = ["Castilleja miniata", "Castilleja miniata subsp. fakus", "Rafflesia",
+                        "Rafflesia arnoldi", "Salix"]
+        for index, tax_end in enumerate(tax_ends):
 
-                column_list = ['TimestampCreated',
-                               'TimestampModified',
-                               'Version',
-                               'Author',
-                               'FullName',
-                               'GUID',
-                               'Source',
-                               'IsAccepted',
-                               'IsHybrid',
-                               'Name',
-                               'RankID',
-                               'TaxonTreeDefID',
-                               'ParentID',
-                               'ModifiedByAgentID',
-                               'CreatedByAgentID',
-                               'TaxonTreeDefItemID']
+            name_pull = self.sql_csv_tools.get_one_match(id_col="Name", tab_name="taxon",
+                                                         key_col="FullName",
+                                                         match=full_name[index],
+                                                         match_type="string")
+            self.assertEqual(name_pull, tax_end)
 
-                value_list = [f"{time_utils.get_pst_time_now_string()}",
-                              f"{time_utils.get_pst_time_now_string()}",
-                              1,
-                              author_insert,
-                              f"{taxon}",
-                              f"{taxon_guid}",
-                              "World Checklist of Vascular Plants 2023",
-                              True,
-                              self.test_picturae_importer_lite.is_hybrid,
-                              f"{rank_end}",
-                              f"{rank_id}",
-                              1,
-                              f"{parent_id}",
-                              f"{self.test_picturae_importer_lite.created_by_agent}",
-                              f"{self.test_picturae_importer_lite.created_by_agent}",
-                              f"{tree_item_id}"
-                              ]
+        # checking parent id
 
-                value_list, column_list = remove_two_index(value_list, column_list)
+            parent_id= self.sql_csv_tools.get_one_match(id_col="ParentID", tab_name="taxon",
+                                                        key_col="FullName",
+                                                        match=full_name[index],
+                                                           match_type="string")
 
-                sql = self.sql_csv_tools.create_insert_statement(tab_name="taxon",
-                                                                 col_list=column_list,
-                                                                 val_list=value_list)
-                self.sql_csv_tools.insert_table_record(logger_int=self.logger, sql=sql)
+            parent_name = self.sql_csv_tools.get_one_match(id_col="FullName", tab_name="taxon",
+                                                           key_col="ParentID",
+                                                           match=parent_id,
+                                                           match_type="integer")
+            self.assertTrue(parent_names[index], parent_name)
 
+            # checking taxon id
+            pull_taxid = self.sql_csv_tools.get_one_match(id_col="TaxonID", tab_name="taxon",
+                                                          key_col="FullName",
+                                                          match=full_name[index],
+                                                          match_type="string")
 
-                # pulling sample taxon to make sure columns line up
-
-
-                # checking taxname
-                pull_name_end = self.sql_csv_tools.get_one_match(id_col="Name", tab_name="taxon",
-                                                                 key_col="FullName",
-                                                                 match=taxon,
-                                                                 match_type="string")
-
-                self.assertEqual(pull_name_end, rank_end)
-
-                # checking parent id
-
-                pull_parent = self.sql_csv_tools.get_one_match(id_col="ParentID", tab_name="taxon",
-                                                               key_col="FullName",
-                                                               match=taxon,
-                                                               match_type="string")
-
-                self.assertEqual(pull_parent, parent_id)
-
-
-                # checking taxon id
-                pull_taxid = self.sql_csv_tools.get_one_match(id_col="TaxonID", tab_name="taxon",
-                                                              key_col="FullName",
-                                                              match=taxon,
-                                                              match_type="string")
-
-                self.assertFalse(pd.isna(pull_taxid))
-
-                logging.info(f"test taxon: {taxon} created")
-
+            self.assertFalse(pd.isna(pull_taxid))
 
     def tearDown(self):
         del self.test_picturae_importer_lite
         # restoring db to original state removing backup
         shutil.copyfile("../tests/casbotany_backup.db", "../tests/casbotany_lite.db")
         os.remove("../tests/casbotany_backup.db")
-
 
 
 if __name__ == '__main__':

@@ -5,6 +5,7 @@ testing_tools.py: tools to create fake data and generate unique ids for them to 
 test classes:
     pic_csv_test_class.py: the test class of CsvCreatePicturae, with reduced init method for use in unittests.
     pic_importer_test_class.py: the test class of PicturaeImporter, with reduced init method for use in unittests.
+    sqlite_csv_utils.py: a test class of sql_csv_utils, for sqlite db compatibility
 
 tests for picturae_create_csv file:
     test_pic_dir.py : runs unittests for the functions : file_present
@@ -18,6 +19,7 @@ tests for picturae_importer file:
     test_file_hide.py: runs unittests on hide_unwanted_files and unhide_files
     test_taxontree.py: runs unittests for the populate taxon, generate taxon fields, and insert statements for taxon
                        into taxon tree.
+
 
 
 
