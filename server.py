@@ -12,14 +12,14 @@ import exifread
 import hmac
 import json
 import time
-from image_client.collection_definitions import COLLECTION_DIRS
+from collection_definitions import COLLECTION_DIRS
 from sh import convert
 from datetime import datetime
 import logging
 from bottle import Bottle, run
 
-from image_client.image_db import ImageDb
-from image_client.image_db import TIME_FORMAT
+from image_db import ImageDb
+from image_db import TIME_FORMAT
 
 app = application = Bottle()
 #logging.basicConfig(level=logging.DEBUG)
