@@ -7,7 +7,6 @@ ExifRead~=3.0.0
 filetype~=1.2.0
 idna==3.3
 iniconfig==1.1.1
-mysql-connector==2.2.9
 packaging==21.3
 parsing
 Paste==3.4.4

@@ -1,3 +1,0 @@
-SERVER_NAME = "10.4.32.170"
-SERVER_PORT = 80
-SERVER_KEY = 'redacted'

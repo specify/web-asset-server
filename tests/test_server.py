@@ -12,8 +12,8 @@ from client_utilities import update_time_delta
 from client_utilities import build_url
 from client_utilities import generate_token
 from client_utilities import get_timestamp
-from image_client.collection_definitions import COLLECTION_DIRS
-from image_client.image_db import TIME_FORMAT_NO_OFFESET
+from collection_definitions import COLLECTION_DIRS
+from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
 
 def get_file_md5(filename):
