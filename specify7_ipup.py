@@ -26,7 +26,7 @@ def set_direct():
     #current_directory = os.getcwd()
     # this is absolute path for running chron from bin
     current_directory = "/Users/mdelaroca/Documents/sandbox_db/" \
-                        "specify-sandbox/web-asset-server"
+                        "specify-sandbox/specify-asset-server"
     # set current directory
     os.chdir(current_directory)
 
@@ -60,14 +60,6 @@ def master_run():
     ip_replace('../specify7/docker-compose.yml')
 
     ip_replace('settings.py')
-
-    ip_replace('image_client/server_host_settings.py')
-
-    ip_replace('image_client/picturae_config.py')
-
-    ip_replace('image_client/botany_importer_config.py')
-
-    ip_replace('image_client/picdb_config.py')
 
 # running master function
 master_run()
