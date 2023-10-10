@@ -156,16 +156,10 @@ class ImageDb():
         update images set redacted = {is_redacted} where internal_filename = '{internal_filename}' 
         """
 
-        logging.debug(f"updating stop 0: {sql}")
+        logging.debug(f"update redacted: {sql}")
         cursor = self.get_cursor()
-        logging.debug(f"updating stop 1")
-
         cursor.execute(sql)
-        logging.debug(f"updating stop 2")
-
         self.cnx.commit()
-        logging.debug(f"updating stop 3")
-
         cursor.close()
 
     def get_record(self, where_clause):
