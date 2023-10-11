@@ -358,7 +358,7 @@ def testkey():
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
+    return template('web_asset_store.xml', host="%s" % (settings.SERVER_NAME))
 
 
 @route('/')
