@@ -1,8 +1,11 @@
+import os
+import ast
+
 # Sample Specify web asset server settings.
 
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 # This secret key is used to generate authentication tokens for requests.
 # The same key must be set in the Web Store Attachment Preferences in Specify.
@@ -10,26 +13,26 @@ DEBUG = True
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = 'test_attachment_key'
+KEY = os.environ.get('KEY', 'test_attachment_key')
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
 # Set to None to disable time validation.
-TIME_TOLERANCE = 150
+TIME_TOLERANCE = int(os.environ.get('TIME_TOLERANCE', '150'))
 
 # Set this to True to require authentication for downloads in addition
 # to uploads and deletes.  Static file access, if enabled, is not
 # affected by this setting.
-REQUIRE_KEY_FOR_GET = False
+REQUIRE_KEY_FOR_GET = os.environ.get('REQUIRE_KEY_FOR_GET', 'False').lower() == 'true'
 
 # This is required for use with the Web Portal.
 # Enables the 'getfileref' and '/static/...' URLs.
-ALLOW_STATIC_FILE_ACCESS = True
+ALLOW_STATIC_FILE_ACCESS = os.environ.get('ALLOW_STATIC_FILE_ACCESS', 'True').lower() == 'true'
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = 'localhost'
-PORT = 8080
+HOST = os.environ.get('HOST', 'localhost')
+PORT = int(os.environ.get('PORT', '8080'))
 
 SERVER_NAME = HOST
 SERVER_PORT = PORT
@@ -48,19 +51,20 @@ DEVELOPMENT_PORT = PORT
 #     'KUFishtissue': 'Ichthyology',
 # }
 
-COLLECTION_DIRS = None
+COLLECTION_DIRS = ast.literal_eval(os.environ.get('COLLECTION_DIRS', '{}'))
 
 # Base directory for all attachments.
-BASE_DIR = '/home/specify/attachments/'
+BASE_DIR = os.environ.get('BASE_DIR', '/home/specify/attachments/')
 
 # Originals and thumbnails are stored in separate directories.
-THUMB_DIR = 'thumbnails'
-ORIG_DIR = 'originals'
+THUMB_DIR = os.environb.get('THUMB_DIR', 'thumbnails')
+ORIG_DIR = os.environ.get('ORIG_DIR', 'originals')
 
 # Set of mime types that the server will try to thumbnail.
 CAN_THUMBNAIL = {'image/jpeg', 'image/gif', 'image/png', 'image/tiff', 'application/pdf'}
 
 # What HTTP server to use for stand-alone operation.
 # SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
-SERVER = 'wsgiref'  # For testing. Requires no extra packages.
+# SERVER = 'wsgiref'  # For testing. Requires no extra packages.
+SERVER = os.environ.get('SERVER', 'wsgiref')
 
