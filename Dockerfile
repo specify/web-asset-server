@@ -32,6 +32,9 @@ RUN echo \
         "\nSERVER_PORT = int(os.getenv('SERVER_PORT', 8080))" \
         "\nKEY = os.environ['ATTACHMENT_KEY']" \
         "\nDEBUG = os.getenv('DEBUG_MODE', 'false').lower() == 'true'" \
+        "\nCOLLECTION_DIRS = os.getenv('COLLECTION_DIRS', None)" \
+        "\nif COLLECTION_DIRS is not None:" \
+        "\nCOLLECTION_DIRS = eval(COLLECTION_DIRS)"\
         >> settings.py
 
 EXPOSE 8080
