@@ -13,7 +13,7 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 # Set KEY to None to disable security. This is NOT recommended since doing so
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
-KEY = os.environ.get('KEY', 'test_attachment_key')
+KEY = os.environ.get('KEY') or os.environ.get('ATTACHMENT_KEY') or 'test_attachment_key'
 
 # Auth token timestamp must be within this many seconds of server time
 # in order to be considered valid. This prevents replay attacks.
