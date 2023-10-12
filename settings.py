@@ -5,7 +5,7 @@ import ast
 
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = (os.environ.get('DEBUG') or os.environ.get('DEBUG_MODE', 'True')).lower() == 'true'
 
 # This secret key is used to generate authentication tokens for requests.
 # The same key must be set in the Web Store Attachment Preferences in Specify.
@@ -31,8 +31,8 @@ ALLOW_STATIC_FILE_ACCESS = os.environ.get('ALLOW_STATIC_FILE_ACCESS', 'True').lo
 
 # These values are interpolated into the web_asset_store.xml resource
 # so the client knows how to talk to the server.
-HOST = os.environ.get('HOST', 'localhost')
-PORT = int(os.environ.get('PORT', '8080'))
+HOST = os.environ.get('HOST') or os.environ.get('SERVER_NAME') or 'localhost'
+PORT = int(os.environ.get('PORT') or os.environ.get('SERVER_PORT') or '8080')
 
 SERVER_NAME = HOST
 SERVER_PORT = PORT
