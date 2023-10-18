@@ -57,7 +57,7 @@ COLLECTION_DIRS = ast.literal_eval(os.environ.get('COLLECTION_DIRS', '{}'))
 BASE_DIR = os.environ.get('BASE_DIR', '/home/specify/attachments/')
 
 # Originals and thumbnails are stored in separate directories.
-THUMB_DIR = os.environb.get('THUMB_DIR', 'thumbnails')
+THUMB_DIR = os.environ.get('THUMB_DIR', 'thumbnails')
 ORIG_DIR = os.environ.get('ORIG_DIR', 'originals')
 
 # Set of mime types that the server will try to thumbnail.
