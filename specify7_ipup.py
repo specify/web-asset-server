@@ -25,8 +25,7 @@ def set_direct():
     # get current directory
     #current_directory = os.getcwd()
     # this is absolute path for running chron from bin
-    current_directory = "/Users/mdelaroca/Documents/sandbox_db/" \
-                        "specify-sandbox/specify-asset-server"
+    current_directory = os.path.dirname(os.path.abspath(__file__))
     # set current directory
     os.chdir(current_directory)
 
@@ -47,10 +46,6 @@ def ip_replace(filename: str):
     with open(filename, 'w') as file:
         # Write the modified content back to the file
         file.write(new_content)
-
-
-
-#def ip_container_up():
 
 
 def master_run():
