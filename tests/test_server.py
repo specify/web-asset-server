@@ -35,7 +35,11 @@ dto = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.timezone(tz
 TEST_DATE = dto
 
 EXIF_DECODER_RING = {
-      "33432": "copyright california academy of sciences"}
+      "33432": "\u00A9 california academy of sciences",
+        "315": "Claude Monet",
+        "33437": "3/2"
+
+}
 
 
 def setup_module():
@@ -106,6 +110,23 @@ def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
     return r
 
 
+def get_exif_data():
+    """used to read test exif data from image on server"""
+    get_exif_params = {
+                        'filename': attach_loc,
+                        'datatype': 'image',
+                        'coll': list(COLLECTION_DIRS.keys())[0],
+                        'token': generate_token(get_timestamp(), attach_loc)
+                    }
+
+    r = requests.get(build_url("getmetadata"), params=get_exif_params)
+
+    exif_data = json.loads(r.text)
+
+    return exif_data
+
+
+
 @pytest.mark.dependency()
 def test_file_post():
     r = post_test_file()
@@ -163,19 +184,43 @@ def test_file_get():
 
 def test_update_metadata():
     r = post_test_file()
+
     assert r.status_code == 200
 
+    exif_data = get_exif_data()
+    # checking field not present before function execution
+
+    assert 'Copyright' not in exif_data[0]['Fields']
+
+    assert 'Artist' not in exif_data[0]['Fields']
+
+    assert exif_data[2]['Fields']['FNumber'] == "9/5"
+
+    # updating exif data
     data = {'filename': attach_loc,
             'coll': list(COLLECTION_DIRS.keys())[0],
             'token': generate_token(get_timestamp(), attach_loc),
             'exif_ring': json.dumps(EXIF_DECODER_RING)
     }
+
     url = build_url('updatemetadata')
 
     r = requests.post(url=url, data=data)
+
     assert r.status_code == 200
 
+    exif_data = get_exif_data()
+
+    # checking fields present after function execution
+
+    assert exif_data[0]['Fields']['Copyright'] == "\u00A9 california academy of sciences"
+
+    assert exif_data[0]['Fields']['Artist'] == "Claude Monet"
+
+    assert exif_data[2]['Fields']['FNumber'] == "3/2"
+
     r = delete_attach_loc()
+
     assert r.status_code == 200
 
 
