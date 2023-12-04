@@ -17,6 +17,7 @@ from sh import convert
 from datetime import datetime
 import logging
 from bottle import Bottle, run
+from server_metadata_tools import process_exif_ring
 
 from image_db import ImageDb
 from image_db import TIME_FORMAT
@@ -41,7 +42,6 @@ def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
     attachments directory for the given collection.
     """
-
     type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
     first_subdir = storename[0:2]
     second_subdir = storename[2:4]
@@ -61,6 +61,7 @@ def get_rel_path(coll, thumb_p, storename):
         abort(404, "Unknown collection: %r" % coll)
 
     return path.join(coll_dir, type_dir, first_subdir, second_subdir)
+
 
 
 def generate_token(timestamp, filename):
@@ -310,7 +311,7 @@ def fileget():
         log(f"Token validated for redacted record...")
     else:
         log(f"Not redacted, no check required")
-    log (f"Valid request: {request.query.filename}")
+    log(f"Valid request: {request.query.filename}")
     resolved_file = resolve_file(request.query.filename,
                                  request.query.coll,
                                  request.query['type'],
@@ -422,10 +423,12 @@ def filedelete():
     """
     image_db = get_image_db()
     storename = request.forms.filename
+
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
     thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
 
     pathname = path.join(basepath, storename)
+
     if not path.exists(pathname):
         abort(404)
 
@@ -484,10 +487,8 @@ def get_exif_metadata():
     basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False, storename=storename))
     pathname = path.join(basepath, storename)
     datatype = request.query.dt
-
     if not path.exists(pathname):
         abort(404)
-
     with open(pathname, 'rb') as f:
         try:
             tags = exifread.process_file(f)
@@ -519,6 +520,33 @@ def get_exif_metadata():
             for key, value in list(data.items())]
 
     return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
+
+
+@app.route('/updatemetadata', method='POST')
+@require_token('filename')
+def updatemetadata():
+    """Updates EXIF metadata"""
+    storename = request.forms.filename
+    exif_data = request.forms.exif_ring
+    exif_data = json.loads(exif_data)
+    base_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
+    thumb_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
+    orig_path = path.join(base_root, storename)
+    thumb_path = path.join(thumb_root, storename)
+    path_list = [orig_path, thumb_path]
+
+    for rel_path in path_list:
+
+        if not path.exists(rel_path):
+            abort(404)
+
+        if not exif_data:
+            abort(400)
+
+        process_exif_ring(exif_ring=exif_data, path=rel_path)
+
+        return f"{storename} updated with new exif metadata"
+
 
 
 @app.route('/testkey')

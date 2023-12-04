@@ -15,6 +15,7 @@ from client_utilities import get_timestamp
 from collection_definitions import COLLECTION_DIRS
 from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
+import time
 
 def get_file_md5(filename):
     with open(filename, 'rb') as f:
@@ -32,6 +33,9 @@ dt, tz = '2020-01-01 00:00:01 UTC'.rsplit(maxsplit=1)
 dto = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.timezone(tz))
 
 TEST_DATE = dto
+
+EXIF_DECODER_RING = {
+      "33432": "copyright california academy of sciences"}
 
 
 def setup_module():
@@ -153,6 +157,24 @@ def test_file_get():
         f.write(r.content)
     assert filecmp.cmp(image_filename, TEST_JPG)
     os.remove(image_filename)
+    r = delete_attach_loc()
+    assert r.status_code == 200
+
+
+def test_update_metadata():
+    r = post_test_file()
+    assert r.status_code == 200
+
+    data = {'filename': attach_loc,
+            'coll': list(COLLECTION_DIRS.keys())[0],
+            'token': generate_token(get_timestamp(), attach_loc),
+            'exif_ring': json.dumps(EXIF_DECODER_RING)
+    }
+    url = build_url('updatemetadata')
+
+    r = requests.post(url=url, data=data)
+    assert r.status_code == 200
+
     r = delete_attach_loc()
     assert r.status_code == 200
 
@@ -458,3 +480,4 @@ def test_store_shortname():
     uuid = "sh"
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 400
+
