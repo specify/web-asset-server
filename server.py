@@ -1,41 +1,41 @@
-import os.path
+
 from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
-from os import path, makedirs, remove
+from os import makedirs, path, remove
+from distutils.util import strtobool
 from urllib.parse import quote
 from urllib.request import pathname2url
-from distutils.util import strtobool
-from time import sleep
 import exifread
 import hmac
 import json
 import time
 from collection_definitions import COLLECTION_DIRS
-from sh import convert
 from datetime import datetime
 import logging
+from time import sleep
 from bottle import Bottle, run
-
 from image_db import ImageDb
 from image_db import TIME_FORMAT
-
-app = application = Bottle()
-#logging.basicConfig(level=logging.DEBUG)
-
+from sh import convert
 import settings
 from bottle import (
     Response, request, response, static_file, template, abort,
     HTTPResponse, route)
+
+# logging.basicConfig(level=logging.DEBUG)
 
 def get_image_db():
     image_db = ImageDb()
     return image_db
 
 
+
 def log(msg):
-    logging.debug(msg)
+    if settings.DEBUG:
+        print(msg)
+
 
 def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
@@ -63,6 +63,7 @@ def get_rel_path(coll, thumb_p, storename):
     return path.join(coll_dir, type_dir, first_subdir, second_subdir)
 
 
+
 def generate_token(timestamp, filename):
     """Generate the auth token for the given filename and timestamp.
     This is for comparing to the client submited token.
@@ -73,7 +74,6 @@ def generate_token(timestamp, filename):
     if filename is None:
         log(f"Missing filename, token generation failure.")
     mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), digestmod='md5')
-    log(f"Generated new token for {filename} at {timestamp}.")
     return ':'.join((mac.hexdigest(), timestamp))
 
 
@@ -94,7 +94,6 @@ def validate_token(token_in, filename):
     in settings. Checks that the token is within the time tolerance and
     is valid.
     """
-    log(f"Validating token: {token_in} for file {filename}")
     if settings.KEY is None:
         return
     if token_in == '':
@@ -116,6 +115,7 @@ def validate_token(token_in, filename):
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
     log(f"Valid token: {token_in} time: {timestr}")
+
 
 
 def require_token(filename_param, always=False):
@@ -240,7 +240,8 @@ def resolve_file(filename, collection, type, scale):
     return path.join(relpath, scaled_name)
 
 
-@app.route('/static/<path:path>')
+
+@route('/static/<path:path>')
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
@@ -269,8 +270,7 @@ def getFileUrl(filename, collection, image_type, scale):
                                                                  image_type,
                                                                  scale)))
 
-
-@app.route('/getfileref')
+@route('/getfileref')
 @allow_cross_origin
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
@@ -283,11 +283,12 @@ def getfileref():
                       request.query.scale)
 
 
-@app.route('/fileget')
+
+@route('/fileget')
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
-    log (f"fileget {request.query.filename}")
+    log(f"fileget {request.query.filename}")
     image_db=get_image_db()
     records = image_db.get_image_record_by_internal_filename(request.query.filename)
     log (f"Fileget complete")
@@ -325,21 +326,21 @@ def fileget():
     return r
 
 
-@app.route('/fileupload', method='OPTIONS')
+@route('/fileupload', method='OPTIONS')
 @allow_cross_origin
 def fileupload_options():
     response.content_type = "text/plain; charset=utf-8"
     return ''
 
 
-@app.route('/fileupload', method='POST')
+@route('/fileupload', method='POST')
 @allow_cross_origin
 @require_token('store')
 def fileupload():
     """Accept original file uploads and store them in the proper
     attachment subdirectory.
     """
-    image_db=get_image_db()
+    image_db = get_image_db()
     start_save = time.time()
     log(f"Post request for fileupload...")
     thumb_p = (request.forms['type'] == "T")
@@ -362,11 +363,10 @@ def fileupload():
 
     upload = list(request.files.values())[0]
     log(f"Saving upload: {upload}")
-    if os.path.isfile(pathname):
+    if path.isfile(pathname):
         log("Duplicate file; return failure:")
         response.content_type = 'text/plain; charset=utf-8'
         response.status = 409
-        return response
 
     upload.save(pathname, overwrite=True)
 
@@ -413,7 +413,7 @@ def fileupload():
     return 'Ok.'
 
 
-@app.route('/filedelete', method='POST')
+@route('/filedelete', method='POST')
 @require_token('filename')
 def filedelete():
     """Delete the file indicated by the query parameters. Returns 404
@@ -453,7 +453,7 @@ def json_datetime_handler(x):
 # file_string can be md5 of the original file, (search_type=md5)
 # the full file path or, (search_type=path)
 # the filename. (search_type=filename) default if param omitted
-@app.route('/getImageRecord')
+@route('/getImageRecord')
 @require_token('file_string', always=True)
 def get_image_record():
     image_db = get_image_db()
@@ -476,7 +476,7 @@ def get_image_record():
 
     return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
 
-@app.route('/getmetadata')
+@route('/getmetadata')
 @require_token('filename')
 def get_exif_metadata():
     """Provides access to EXIF metadata."""
@@ -517,11 +517,10 @@ def get_exif_metadata():
     response.content_type = 'application/json'
     data = [OrderedDict((('Name', key), ('Fields', value)))
             for key, value in list(data.items())]
-
     return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
 
 
-@app.route('/testkey')
+@route('/testkey')
 @require_token('random', always=True)
 def testkey():
     """If access to this resource succeeds, clients can conclude
@@ -531,35 +530,34 @@ def testkey():
     return 'Ok.'
 
 
-@app.route('/web_asset_store.xml')
+@route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
     return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
 
-
-@app.route('/')
+@route('/')
 def main_page():
     log("Hit root")
     return 'Specify attachment server'
 
 
 if __name__ == '__main__':
+    from bottle import run
     image_db = get_image_db()
     log("Starting up....")
     image_db = ImageDb()
     while image_db.connect() is not True:
         sleep(5)
         log("Retrying db connection....")
-    log("Db connected.")
     image_db.create_tables()
     log("running server...")
 
-    app.run(host='0.0.0.0',
-            port=settings.PORT,
-            server=settings.SERVER,
-            debug=settings.DEBUG,
-            reloader=settings.DEBUG)
+    run(host='0.0.0.0',
+        port=settings.PORT,
+        server=settings.SERVER,
+        debug=settings.DEBUG,
+        reloader=settings.DEBUG)
 
     log("Exiting.")
