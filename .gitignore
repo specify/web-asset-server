@@ -1,3 +1,4 @@
+attachments/
 **/tax_dump.sql
 **/run_picdb.sh
 **/dummy_cleaner.py
@@ -13,9 +14,6 @@
 **/iz_importer_config.py
 /unmatched_taxa/*
 **/picturae_purge_script.sql
-*.pyc
-.idea
-venv
 docker-compose.yml
 settings.py
 settings.production.py
@@ -33,3 +31,7 @@ settings.development.py
 *.TIF
 .hidden_*
 /tests/casbotany_lite.db
+*.pyc
+.idea
+venv
+

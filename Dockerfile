@@ -1,3 +1,4 @@
+
 FROM ubuntu:20.04
 
 RUN apt-get update \
@@ -16,4 +17,3 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 WORKDIR /code
 
 #CMD [ "python3", "./server.py" ]
-

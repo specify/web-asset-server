@@ -52,6 +52,7 @@ class ImageDb():
                                                host=settings.SQL_HOST,
                                                port=settings.SQL_PORT,
                                                database=settings.SQL_DATABASE)
+
         except mysql.connector.Error as err:
             if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
                 self.log(
@@ -145,6 +146,7 @@ class ImageDb():
                         "{int(redacted)}", 
                         "{datetime_record.strftime(TIME_FORMAT_NO_OFFESET)}",
                         "{original_image_md5}")""")
+
         self.log(f"Inserting imageInserting image record. SQL: {add_image}")
         cursor.execute(add_image)
         self.cnx.commit()
@@ -156,16 +158,10 @@ class ImageDb():
         update images set redacted = {is_redacted} where internal_filename = '{internal_filename}' 
         """
 
-        logging.debug(f"updating stop 0: {sql}")
+        logging.debug(f"update redacted: {sql}")
         cursor = self.get_cursor()
-        logging.debug(f"updating stop 1")
-
         cursor.execute(sql)
-        logging.debug(f"updating stop 2")
-
         self.cnx.commit()
-        logging.debug(f"updating stop 3")
-
         cursor.close()
 
     def get_record(self, where_clause):
@@ -193,7 +189,6 @@ class ImageDb():
                                 'datetime': datetime.strptime(datetime_record, TIME_FORMAT),
                                 'orig_md5': orig_md5
                                 })
-            print(f"of: {record_list}")
 
         cursor.close()
         return record_list
@@ -230,7 +225,6 @@ class ImageDb():
                                 'datetime': datetime_record.strftime(TIME_FORMAT),
                                 'orig_md5': orig_md5
                                 })
-            print(f"of: {record_list}")
 
         cursor.close()
         return record_list
