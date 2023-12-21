@@ -1,3 +1,5 @@
+import pandas as pd
+
 import settings
 import pytest
 import filecmp
@@ -24,7 +26,7 @@ def get_file_md5(filename):
             md5_hash.update(chunk)
     return md5_hash.hexdigest()
 
-attach_loc = None
+attach_loc = "None"
 TEST_JPG = "test.jpg"
 TEST_PATH = "/foo/bar/baz"
 TEST_NOTES = "alskeifhjais78yas8efhaisef87yaihrti478yfhudyhdrsifslfdhiju"
@@ -95,11 +97,12 @@ def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
         'store': attach_loc,
         'type': 'image',
         'coll': list(COLLECTION_DIRS.keys())[0],
-        'token': generate_token(get_timestamp(), attach_loc)
+        'token': generate_token(get_timestamp(), attach_loc),
+        'original_filename': local_filename
     }
     if md5:
         md5 = get_file_md5(TEST_JPG)
-        data['orig_md5']=md5
+        data['orig_md5']= md5
     merged_data = z = {**data, **supplementary_data}
 
     files = {
@@ -234,7 +237,8 @@ def test_file_get_no_key():
     params = {
         'filename': attach_loc,
         'type': 'image',
-        'coll': list(COLLECTION_DIRS.keys())[0]
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'original_filename': TEST_JPG
     }
 
     r = requests.get(build_url("fileget"), params=params)
@@ -245,9 +249,16 @@ def test_file_get_no_key():
     assert filecmp.cmp(image_filename, TEST_JPG)
     os.remove(image_filename)
 
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
 
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_thumbnail_get():
+    r = post_test_file()
+    assert r.status_code == 200
+
     thumb_filename = 'response.thumb.jpg'
     params = {
         'filename': attach_loc,
@@ -265,9 +276,17 @@ def test_thumbnail_get():
     assert not filecmp.cmp(thumb_filename, TEST_JPG)
     os.remove(thumb_filename)
 
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
 
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_get_static_url():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
     params = {
         'filename': attach_loc,
         'type': 'image',
@@ -282,9 +301,17 @@ def test_get_static_url():
     r = requests.get(url)
     assert r.status_code == 200
 
+    r = delete_attach_loc()
+    assert r.status_code == 200
+
 
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_get_exif():
+
+    r = post_test_file()
+
+    assert r.status_code == 200
+
     params = {
         'filename': attach_loc,
         'datatype': 'image',
@@ -298,13 +325,22 @@ def test_get_exif():
     exif_data = json.loads(r.text)
     assert exif_data[0]['Fields']['Model'] == "iPhone XR"
 
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
 
 @pytest.mark.dependency(depends=['test_file_post'])
 def test_delete_file():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
     data = {
         'filename': attach_loc,
         'coll': list(COLLECTION_DIRS.keys())[0],
-        'token': generate_token(get_timestamp(), attach_loc)
+        'token': generate_token(get_timestamp(), attach_loc),
+        'original_filename': TEST_JPG
     }
 
     r = requests.post(build_url("filedelete"), data=data)
@@ -374,7 +410,8 @@ def delete_attach_loc():
     data = {
         'filename': attach_loc,
         'coll': list(COLLECTION_DIRS.keys())[0],
-        'token': generate_token(get_timestamp(), attach_loc)
+        'token': generate_token(get_timestamp(), attach_loc),
+        'original_filename': TEST_JPG
     }
 
     r = requests.post(build_url("filedelete"), data=data)
@@ -500,6 +537,26 @@ def test_name_collision_failure():
     assert r.status_code == 200
 
 
+def test_duplicate_basename_failure():
+    global attach_loc
+
+    uuid = str(uuid4())
+
+    r = post_test_file(uuid_override=uuid)
+    assert r.status_code == 200
+
+    attach_loc = "test_string"
+
+    r = post_test_file(uuid_override=uuid)
+    assert r.status_code == 409
+
+    r = delete_attach_loc()
+    assert r.status_code == 200
+
+    attach_loc = "None"
+
+
+
 def test_static_redacted():
     global attach_loc
     r = post_with_metadata(redacted=True)
@@ -513,6 +570,7 @@ def test_static_redacted():
 
     r = requests.get(build_url("getfileref"), params=params)
     url = r.text;
+
     assert r.status_code == 200
     r = requests.get(url)
     assert r.status_code == 403

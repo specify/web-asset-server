@@ -289,7 +289,7 @@ def fileget():
     log(f"fileget {request.query.filename}")
     image_db=get_image_db()
     records = image_db.get_image_record_by_internal_filename(request.query.filename)
-    log (f"Fileget complete")
+    log(f"Fileget complete")
     if len(records) < 1:
         log(f"Record not found: {request.query.filename}")
         response.content_type = 'text/plain; charset=utf-8'
@@ -310,6 +310,7 @@ def fileget():
     else:
         log(f"Not redacted, no check required")
     log(f"Valid request: {request.query.filename}")
+
     resolved_file = resolve_file(request.query.filename,
                                  request.query.coll,
                                  request.query['type'],
@@ -359,9 +360,13 @@ def fileupload():
     if not path.exists(basepath):
         makedirs(basepath)
 
+    response_list = image_db.get_image_record_by_original_filename(original_filename=request.forms['original_filename'],
+                                                                   collection=request.forms.coll, exact=True)
     upload = list(request.files.values())[0]
+
     log(f"Saving upload: {upload}")
-    if path.isfile(pathname):
+
+    if path.isfile(pathname) or len(response_list) > 0:
         log("Duplicate file; return failure:")
         response.content_type = 'text/plain; charset=utf-8'
         response.status = 409
