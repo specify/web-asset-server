@@ -1,4 +1,5 @@
-
+import logging
+import sys
 from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
@@ -15,26 +16,35 @@ from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
 from server_metadata_tools import process_exif_ring
+from sh import convert
+from bottle import Bottle, run
+
 from image_db import ImageDb
 from image_db import TIME_FORMAT
-from sh import convert
+
+app = application = Bottle()
+
+
 import settings
+
+print("stop1")
+
 from bottle import (
     Response, request, response, static_file, template, abort,
     HTTPResponse, route)
 
-# logging.basicConfig(level=logging.DEBUG)
+print("stop2")
+
+# logger = logging.getLogger("server.py")
+# logger.setLevel(logging.DEBUG)
 
 def get_image_db():
     image_db = ImageDb()
     return image_db
 
-
-
 def log(msg):
     if settings.DEBUG:
-        print(msg)
-
+        logging.debug(msg)
 
 def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
@@ -59,7 +69,6 @@ def get_rel_path(coll, thumb_p, storename):
         abort(404, "Unknown collection: %r" % coll)
 
     return path.join(coll_dir, type_dir, first_subdir, second_subdir)
-
 
 
 def generate_token(timestamp, filename):
@@ -273,8 +282,11 @@ def getFileUrl(filename, collection, image_type, scale):
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
+        log("static file access denied")
         abort(404)
     response.content_type = 'text/plain; charset=utf-8'
+    log(f"{getFileUrl(request.query.filename,request.query.coll,request.query['type'],request.query.scale)}")
+
     return getFileUrl(request.query.filename,
                       request.query.coll,
                       request.query['type'],
@@ -522,6 +534,7 @@ def get_exif_metadata():
             for key, value in list(data.items())]
     return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
 
+
 @route('/updatemetadata', method='POST')
 @require_token('filename')
 def updatemetadata():
@@ -534,9 +547,8 @@ def updatemetadata():
     orig_path = path.join(base_root, storename)
     thumb_path = path.join(thumb_root, storename)
     path_list = [orig_path, thumb_path]
-
+    print(path_list)
     for rel_path in path_list:
-
         if not path.exists(rel_path):
             abort(404)
 
@@ -544,7 +556,6 @@ def updatemetadata():
             abort(400)
 
         process_exif_ring(exif_ring=exif_data, path=rel_path)
-
         return f"{storename} updated with new exif metadata"
 
 
@@ -573,6 +584,7 @@ def main_page():
 
 if __name__ == '__main__':
     from bottle import run
+    print("stop5")
     image_db = get_image_db()
     log("Starting up....")
     image_db = ImageDb()
