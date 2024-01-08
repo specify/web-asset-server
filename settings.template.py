@@ -4,7 +4,9 @@ import os
 
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
-DEBUG = False
+LOG_LEVEL = "INFO"
+
+DEBUG_APP = True
 
 # This secret key is used to generate authentication tokens for requests.
 # The same key must be set in the Web Store Attachment Preferences in Specify.

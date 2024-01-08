@@ -24,6 +24,8 @@ services:
     container_name: image-server
     environment:
       - EXTERNAL_IP=institution.org
+      - PYTHONUNBUFFERED=1
+      - LANG=C.UTF-8
     volumes:
       - ./:/code
     command: ['uwsgi', '--plugin', '/usr/lib/uwsgi/plugins/python3_plugin.so','--ini', 'uwsgi.ini']

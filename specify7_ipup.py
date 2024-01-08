@@ -56,6 +56,8 @@ def master_run():
 
     ip_replace('settings.py')
 
+    ip_replace('docker-compose.yml')
+
 # running master function
 master_run()
 

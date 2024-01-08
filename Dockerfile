@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get -y --no-install-recommends install \
+    && apt-get --no-install-recommends -y install \
         tzdata \
         imagemagick \
         uwsgi \
@@ -9,7 +9,6 @@ RUN apt-get update \
         libimage-exiftool-perl \
     python3 \
     python3-pip
-
 WORKDIR /tmp
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
