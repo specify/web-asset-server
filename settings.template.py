@@ -4,7 +4,9 @@ import os
 
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
-DEBUG = False
+LOG_LEVEL = "INFO"
+
+DEBUG_APP = True
 
 # This secret key is used to generate authentication tokens for requests.
 # The same key must be set in the Web Store Attachment Preferences in Specify.
@@ -38,22 +40,36 @@ if "EXTERNAL_IP" in os.environ:
     # print(f"Got external Ip from environment:{HOST}")
 else:
     import socket
+
+
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
     HOST = local_ip
     # print(f"Got external Ip from gethostbyname:{HOST}")
 
-
+# use this server name if on backend
+# HOST = 'http://instutution.org'
 PORT = 80
-HOST='http://instutution.org'
 SERVER_NAME = HOST
 SERVER_PORT = PORT
+print(f"Starting with host: {HOST}")
+DEVELOPMENT_PORT = PORT
+
 
 
 # Port the development test server should listen on.
 DEVELOPMENT_PORT = PORT
 
+# Map collection names to directories.  Set to None to store
+# everything in the same originals and thumbnail directories.  This is
+# recommended unless some provision is made to allow attachments for
+# items scoped above collections to be found.
 
+COLLECTION_DIRS = {
+    # 'COLLECTION_NAME': 'DIRECTORY_NAME',
+    'Botany': 'botany',
+    'Ichthyology': 'ichthyology',
+}
 
 # Base directory for all attachments.
 BASE_DIR = './attachments/'
@@ -72,6 +88,6 @@ SERVER = 'wsgiref'  # For testing. Requires no extra packages.
 #Image databse connection information
 SQL_USER='redacted'
 SQL_PASSWORD='redacted'
-SQL_HOST='ibss-images.calacademy.org'
+SQL_HOST='http://instutution.org'
 SQL_PORT=3306
 SQL_DATABASE='images'

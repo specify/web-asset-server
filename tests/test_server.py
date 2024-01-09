@@ -43,6 +43,13 @@ EXIF_DECODER_RING = {
 
 }
 
+@pytest.fixture(scope='function', autouse=True)
+def test_teardown(request):
+    try:
+        delete_attach_loc()
+    except:
+        pass
+
 
 def setup_module():
     update_time_delta()

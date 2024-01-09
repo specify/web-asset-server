@@ -15,7 +15,7 @@ class ImageDb():
         self.cnx = None
 
     def log(self, msg):
-        if settings.DEBUG:
+        if settings.DEBUG_APP:
             print(msg)
 
     def retry_if_operational_error(exception):

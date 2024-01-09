@@ -1,4 +1,6 @@
-
+import logging
+import os
+import sys
 from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
@@ -15,26 +17,32 @@ from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
 from server_metadata_tools import process_exif_ring
+from sh import convert
+from bottle import Bottle, run
+
 from image_db import ImageDb
 from image_db import TIME_FORMAT
-from sh import convert
+
+app = application = Bottle()
+
+# Configure logging
 import settings
+
+level = logging.getLevelName(settings.LOG_LEVEL)
+logging.basicConfig(filename='app.log', level=level)
+
+
 from bottle import (
     Response, request, response, static_file, template, abort,
-    HTTPResponse, route)
+    HTTPResponse)
 
-# logging.basicConfig(level=logging.DEBUG)
 
 def get_image_db():
     image_db = ImageDb()
     return image_db
 
-
-
 def log(msg):
-    if settings.DEBUG:
-        print(msg)
-
+    logging.debug(msg)
 
 def get_rel_path(coll, thumb_p, storename):
     """Return originals or thumbnails subdirectory of the main
@@ -59,7 +67,6 @@ def get_rel_path(coll, thumb_p, storename):
         abort(404, "Unknown collection: %r" % coll)
 
     return path.join(coll_dir, type_dir, first_subdir, second_subdir)
-
 
 
 def generate_token(timestamp, filename):
@@ -239,7 +246,7 @@ def resolve_file(filename, collection, type, scale):
 
 
 
-@route('/static/<path:path>')
+@app.route('/static/<path:path>')
 def static(path):
     """Serve static files to the client. Primarily for Web Portal."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
@@ -268,13 +275,16 @@ def getFileUrl(filename, collection, image_type, scale):
                                                                  image_type,
                                                                  scale)))
 
-@route('/getfileref')
+@app.route('/getfileref')
 @allow_cross_origin
 def getfileref():
     """Returns a URL to the static file indicated by the query parameters."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
+        log("static file access denied")
         abort(404)
     response.content_type = 'text/plain; charset=utf-8'
+    log(f"{getFileUrl(request.query.filename,request.query.coll,request.query['type'],request.query.scale)}")
+
     return getFileUrl(request.query.filename,
                       request.query.coll,
                       request.query['type'],
@@ -282,7 +292,7 @@ def getfileref():
 
 
 
-@route('/fileget')
+@app.route('/fileget')
 @require_token('filename')
 def fileget():
     """Returns the file data of the file indicated by the query parameters."""
@@ -325,14 +335,14 @@ def fileget():
     return r
 
 
-@route('/fileupload', method='OPTIONS')
+@app.route('/fileupload', method='OPTIONS')
 @allow_cross_origin
 def fileupload_options():
     response.content_type = "text/plain; charset=utf-8"
     return ''
 
 
-@route('/fileupload', method='POST')
+@app.route('/fileupload', method='POST')
 @allow_cross_origin
 @require_token('store')
 def fileupload():
@@ -416,7 +426,7 @@ def fileupload():
     return 'Ok.'
 
 
-@route('/filedelete', method='POST')
+@app.route('/filedelete', method='POST')
 @require_token('filename')
 def filedelete():
     """Delete the file indicated by the query parameters. Returns 404
@@ -458,7 +468,7 @@ def json_datetime_handler(x):
 # file_string can be md5 of the original file, (search_type=md5)
 # the full file path or, (search_type=path)
 # the filename. (search_type=filename) default if param omitted
-@route('/getImageRecord')
+@app.route('/getImageRecord')
 @require_token('file_string', always=True)
 def get_image_record():
     image_db = get_image_db()
@@ -481,7 +491,7 @@ def get_image_record():
 
     return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
 
-@route('/getmetadata')
+@app.route('/getmetadata')
 @require_token('filename')
 def get_exif_metadata():
     """Provides access to EXIF metadata."""
@@ -522,7 +532,8 @@ def get_exif_metadata():
             for key, value in list(data.items())]
     return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
 
-@route('/updatemetadata', method='POST')
+
+@app.route('/updatemetadata', method='POST')
 @require_token('filename')
 def updatemetadata():
     """Updates EXIF metadata"""
@@ -534,21 +545,22 @@ def updatemetadata():
     orig_path = path.join(base_root, storename)
     thumb_path = path.join(thumb_root, storename)
     path_list = [orig_path, thumb_path]
-
     for rel_path in path_list:
-
         if not path.exists(rel_path):
             abort(404)
 
         if not exif_data:
             abort(400)
 
-        process_exif_ring(exif_ring=exif_data, path=rel_path)
+        if isinstance(exif_data, dict):
+            process_exif_ring(exif_ring=exif_data, path=rel_path)
+        else:
+            log(f"exif_data is not a dictionary")
 
         return f"{storename} updated with new exif metadata"
 
 
-@route('/testkey')
+@app.route('/testkey')
 @require_token('random', always=True)
 def testkey():
     """If access to this resource succeeds, clients can conclude
@@ -558,14 +570,14 @@ def testkey():
     return 'Ok.'
 
 
-@route('/web_asset_store.xml')
+@app.route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
     return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
 
-@route('/')
+@app.route('/')
 def main_page():
     log("Hit root")
     return 'Specify attachment server'
@@ -585,7 +597,7 @@ if __name__ == '__main__':
     run(host='0.0.0.0',
         port=settings.PORT,
         server=settings.SERVER,
-        debug=settings.DEBUG,
-        reloader=settings.DEBUG)
+        debug=settings.DEBUG_APP,
+        reloader=settings.DEBUG_APP)
 
     log("Exiting.")
