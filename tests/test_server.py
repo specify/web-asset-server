@@ -210,7 +210,7 @@ def test_update_metadata():
     data = {'filename': attach_loc,
             'coll': list(COLLECTION_DIRS.keys())[0],
             'token': generate_token(get_timestamp(), attach_loc),
-            'exif_ring': json.dumps(EXIF_DECODER_RING)
+            'exif_dict': json.dumps(EXIF_DECODER_RING)
     }
 
     url = build_url('updatemetadata')

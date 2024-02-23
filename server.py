@@ -1,6 +1,4 @@
 import logging
-import os
-import sys
 from collections import defaultdict, OrderedDict
 from functools import wraps
 from glob import glob
@@ -16,9 +14,9 @@ import time
 from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
-from server_metadata_tools import process_exif_ring
+from server_metadata_tools import write_exif_tags
 from sh import convert
-from bottle import Bottle, run
+from bottle import Bottle
 
 from image_db import ImageDb
 from image_db import TIME_FORMAT
@@ -538,7 +536,7 @@ def get_exif_metadata():
 def updatemetadata():
     """Updates EXIF metadata"""
     storename = request.forms.filename
-    exif_data = request.forms.exif_ring
+    exif_data = request.forms.exif_dict
     exif_data = json.loads(exif_data)
     base_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
     thumb_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
@@ -553,7 +551,7 @@ def updatemetadata():
             abort(400)
 
         if isinstance(exif_data, dict):
-            process_exif_ring(exif_ring=exif_data, path=rel_path)
+            write_exif_tags(exif_dict=exif_data, path=rel_path)
         else:
             log(f"exif_data is not a dictionary")
 

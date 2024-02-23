@@ -4,7 +4,7 @@ import settings
 
 def build_url(endpoint):
     host = settings.SERVER_NAME
-    #host = 'ibss-images.calacademy.org'
+    # host = 'ibss-images.calacademy.org'
     port = settings.SERVER_PORT
     return f"http://{host}:{port}/{endpoint}"
 
