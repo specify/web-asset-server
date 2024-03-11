@@ -26,6 +26,7 @@ settings.development.py
 /image_client/server_host_settings.production.py
 /image_client/server_host_settings.py
 /data
+/mysql-specify-data
 /env
 *.JPG
 *.TIF

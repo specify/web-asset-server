@@ -23,7 +23,7 @@ def set_direct():
             none
             """
     # get current directory
-    #current_directory = os.getcwd()
+    # current_directory = os.getcwd()
     # this is absolute path for running chron from bin
     current_directory = os.path.dirname(os.path.abspath(__file__))
     # set current directory
@@ -62,3 +62,4 @@ def master_run():
 master_run()
 
 print(socket.gethostname())
+

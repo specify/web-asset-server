@@ -1,7 +1,9 @@
 import pandas as pd
-
-import settings
 import pytest
+import sys
+
+import server
+import settings
 import filecmp
 import requests
 from uuid import uuid4
@@ -17,7 +19,8 @@ from client_utilities import get_timestamp
 from collection_definitions import COLLECTION_DIRS
 from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
-import time
+from metadata_tools import MetadataTools
+
 
 def get_file_md5(filename):
     with open(filename, 'rb') as f:
@@ -36,7 +39,7 @@ dto = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.timezone(tz
 
 TEST_DATE = dto
 
-EXIF_DECODER_RING = {
+EXIF_DICT = {
       "33432": "\u00A9 california academy of sciences",
         "315": "Claude Monet",
         "33437": "3/2"
@@ -69,7 +72,7 @@ def test_web_asset_store():
     <url type="read"><![CDATA[http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/fileget]]></url>
     <url type="write"><![CDATA[http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/fileupload]]></url>
     <url type="delete"><![CDATA[http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/filedelete]]></url>
-    <url type="getmetadata"><![CDATA[http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/getmetadata]]></url>
+    <url type="getexifdata"><![CDATA[http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/getexifdata]]></url>
     <url type="testkey">http://{settings.SERVER_NAME}:{settings.SERVER_PORT}/testkey</url>
 </urls>
 """
@@ -87,6 +90,20 @@ def test_testkey():
                      params={'random': random, 'token': token})
 
     assert r.status_code == 200
+
+
+def delete_attach_loc():
+    data = {
+        'filename': attach_loc,
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'token': generate_token(get_timestamp(), attach_loc),
+        'original_filename': TEST_JPG
+    }
+
+    r = requests.post(build_url("filedelete"), data=data)
+
+    return r
+
 
 
 def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
@@ -129,7 +146,7 @@ def get_exif_data():
                         'token': generate_token(get_timestamp(), attach_loc)
                     }
 
-    r = requests.get(build_url("getmetadata"), params=get_exif_params)
+    r = requests.get(build_url("getexifdata"), params=get_exif_params)
 
     exif_data = json.loads(r.text)
 
@@ -192,7 +209,7 @@ def test_file_get():
     assert r.status_code == 200
 
 
-def test_update_metadata():
+def test_update_exifdata():
     r = post_test_file()
 
     assert r.status_code == 200
@@ -210,10 +227,10 @@ def test_update_metadata():
     data = {'filename': attach_loc,
             'coll': list(COLLECTION_DIRS.keys())[0],
             'token': generate_token(get_timestamp(), attach_loc),
-            'exif_ring': json.dumps(EXIF_DECODER_RING)
+            'exif_dict': json.dumps(EXIF_DICT)
     }
 
-    url = build_url('updatemetadata')
+    url = build_url('updateexifdata')
 
     r = requests.post(url=url, data=data)
 
@@ -223,11 +240,44 @@ def test_update_metadata():
 
     # checking fields present after function execution
 
+
     assert exif_data[0]['Fields']['Copyright'] == "\u00A9 california academy of sciences"
 
     assert exif_data[0]['Fields']['Artist'] == "Claude Monet"
 
     assert exif_data[2]['Fields']['FNumber'] == "3/2"
+
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
+def test_update_iptcdata():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
+    # updating iptc data
+    data = {'filename': attach_loc,
+            'coll': list(COLLECTION_DIRS.keys())[0],
+            'token': generate_token(get_timestamp(), attach_loc),
+            'iptc_dict': json.dumps({"by-line": "Picasso", 'Date Created': "2023-02-10"})
+            }
+
+    url = build_url('updateiptcdata')
+
+    r = requests.post(url=url, data=data)
+
+    assert r.status_code == 200
+
+    rel_path = settings.BASE_DIR + server.get_rel_path(storename=attach_loc, thumb_p=False, coll=list(COLLECTION_DIRS.keys())[0])
+
+    img_path = "." + rel_path + f"{os.sep}{attach_loc}"
+
+    md = MetadataTools(path=img_path)
+    info = md.read_iptc_metadata()
+
+    assert info['by-line'] == b"Picasso"
+    assert info['Date Created'] == b"2023-02-10"
 
     r = delete_attach_loc()
 
@@ -326,7 +376,7 @@ def test_get_exif():
         'token': generate_token(get_timestamp(), attach_loc)
     }
 
-    r = requests.get(build_url("getmetadata"), params=params)
+    r = requests.get(build_url("getexifdata"), params=params)
     assert r.status_code == 200
 
     exif_data = json.loads(r.text)
@@ -411,20 +461,6 @@ def post_with_metadata(redacted=True, uuid_override=None):
 
     r = requests.post(build_url("fileupload"), files=files, data=data)
     return r
-
-
-def delete_attach_loc():
-    data = {
-        'filename': attach_loc,
-        'coll': list(COLLECTION_DIRS.keys())[0],
-        'token': generate_token(get_timestamp(), attach_loc),
-        'original_filename': TEST_JPG
-    }
-
-    r = requests.post(build_url("filedelete"), data=data)
-
-    return r
-
 
 @pytest.mark.dependency(depends=['test_delete_file'])
 def test_file_post_with_metadata():

@@ -3,6 +3,6 @@
     <url type="read"><![CDATA[http://{{host}}/fileget]]></url>
     <url type="write"><![CDATA[http://{{host}}/fileupload]]></url>
     <url type="delete"><![CDATA[http://{{host}}/filedelete]]></url>
-    <url type="getmetadata"><![CDATA[http://{{host}}/getmetadata]]></url>
+    <url type="getexifdata"><![CDATA[http://{{host}}/getexifdata]]></url>
     <url type="testkey">http://{{host}}/testkey</url>
 </urls>
