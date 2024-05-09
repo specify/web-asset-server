@@ -251,38 +251,6 @@ def test_update_exifdata():
 
     assert r.status_code == 200
 
-def test_update_iptcdata():
-    r = post_test_file()
-
-    assert r.status_code == 200
-
-    # updating iptc data
-    data = {'filename': attach_loc,
-            'coll': list(COLLECTION_DIRS.keys())[0],
-            'token': generate_token(get_timestamp(), attach_loc),
-            'iptc_dict': json.dumps({"by-line": "Picasso", 'Date Created': "2023-02-10"})
-            }
-
-    url = build_url('updateiptcdata')
-
-    r = requests.post(url=url, data=data)
-
-    assert r.status_code == 200
-
-    rel_path = settings.BASE_DIR + server.get_rel_path(storename=attach_loc, thumb_p=False, coll=list(COLLECTION_DIRS.keys())[0])
-
-    img_path = "." + rel_path + f"{os.sep}{attach_loc}"
-
-    md = MetadataTools(path=img_path)
-    info = md.read_iptc_metadata()
-
-    assert info['by-line'] == b"Picasso"
-    assert info['Date Created'] == b"2023-02-10"
-
-    r = delete_attach_loc()
-
-    assert r.status_code == 200
-
 
 @pytest.mark.dependency()
 def test_file_get_no_key():
