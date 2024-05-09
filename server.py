@@ -8,7 +8,6 @@ from distutils.util import strtobool
 from urllib.parse import quote
 from urllib.request import pathname2url
 import exifread
-import traceback
 import hmac
 import json
 import time
@@ -339,7 +338,6 @@ def fileupload_options():
     response.content_type = "text/plain; charset=utf-8"
     return ''
 
-
 @app.route('/fileupload', method='POST')
 @allow_cross_origin
 @require_token('store')
@@ -368,8 +366,12 @@ def fileupload():
     if not path.exists(basepath):
         makedirs(basepath)
 
-    response_list = image_db.get_image_record_by_original_filename(original_filename=request.forms['original_filename'],
-                                                                   collection=request.forms.coll, exact=True)
+    if 'original_path' in request.forms.keys():
+        response_list = image_db.get_image_record_by_original_filename(original_filename=request.forms['original_filename'],
+                                                                       collection=request.forms.coll, exact=True)
+    else:
+        response_list = []
+
     upload = list(request.files.values())[0]
 
     log(f"Saving upload: {upload}")
@@ -392,6 +394,7 @@ def fileupload():
         log("original filename field set")
         original_filename = request.forms['original_filename']
     else:
+        notes = f"uploaded manually through specify portal at {datetime_now}"
         log("original filename field is not set")
     if 'original_path' in request.forms.keys():
         original_path = request.forms['original_path']
@@ -557,53 +560,6 @@ def updateexifdata():
 
         return f"{storename} updated with new exif metadata"
 
-
-# @app.route('/getiptcdata')
-# @require_token('filename')
-# def get_iptc_metadata():
-#     """reads IPTC metadata"""
-#     storename = request.query.filename
-#     basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False, storename=storename))
-#     pathname = path.join(basepath, storename)
-#     if not path.exists(pathname):
-#         abort(404)
-#     else:
-#         try:
-#             mt = MetadataTools(path=pathname)
-#             iptc_data = mt.read_iptc_metadata()
-#
-#             return iptc_data
-#         except LookupError:
-#             abort(404, "IPTC not found at path")
-
-
-@app.route('/updateiptcdata', method='POST')
-@require_token('filename')
-def updateiptcdata():
-    """Updates EXIF metadata"""
-    storename = request.forms.filename
-    iptc_data = request.forms.iptc_dict
-    iptc_data = json.loads(iptc_data)
-    base_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False, storename=storename))
-    thumb_root = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True, storename=storename))
-    orig_path = path.join(base_root, storename)
-    thumb_path = path.join(thumb_root, storename)
-    path_list = [orig_path, thumb_path]
-    for rel_path in path_list:
-        if not path.exists(rel_path):
-            abort(404)
-
-        if not iptc_data:
-            abort(400)
-
-        if isinstance(iptc_data, dict):
-            mt = MetadataTools(path=rel_path)
-            mt.write_iptc_tags(iptc_dict=iptc_data)
-        else:
-            log(f"exif_data is not a dictionary")
-
-        return f"{storename} updated with new exif metadata"
-
 @app.route('/testkey')
 @require_token('random', always=True)
 def testkey():
@@ -642,6 +598,7 @@ if __name__ == '__main__':
         port=settings.PORT,
         server=settings.SERVER,
         debug=settings.DEBUG_APP,
-        reloader=settings.DEBUG_APP)
+        reloader=settings.DEBUG_APP
+        )
 
     log("Exiting.")
