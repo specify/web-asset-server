@@ -1,7 +1,7 @@
 Web Asset Server
 =========
 
-This is a sample attachment server implementation for Specify. This implementation is targetted at Ubuntu flavors, but will work with minor modifications on other Linux systems. It is not expected to work without extensive adaptation on Windows systems.
+This is a sample attachment server implementation for Specify. This implementation is targeted at Ubuntu flavors, but will work with minor modifications on other Linux systems. It is not expected to work without extensive adaptation on Windows systems.
 
 The Specify Collections Consortium is funded by its member
 institutions. The Consortium web site is:
@@ -32,8 +32,6 @@ under GNU General Public License 2 (GPL2).
    * [Compatibility with older versions of Python](#compatibility-with-older-versions-of-python)
 
 
-
-
 # New Features:
 
 * Internal mysql database tracks all imports and allows querying to map a URL 
@@ -50,6 +48,14 @@ back to an original filename
 * Supports redacted images
 
 * Docker integration with nginx for performance and security
+
+* rate restriction options for external IPS to prevent server overload.
+
+# Rate Restrictions
+
+* For external users and IP addresses the current limit is set at 10r/m with burst set at = 2.
+* No rate limits for internal users on networks with addresses like 24 bit block: 10.0.0.0 , 
+  20 bit block: 172.16.0.0, 16 bit block: 192.168.0.0
 
 # Installation
 
