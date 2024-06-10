@@ -19,7 +19,9 @@ class MetadataTools:
         self.logger = logging.getLogger('MetadataTools')
         self.logger.setLevel(logging.DEBUG)
 
-    def read_exif(self):
+
+    def read_exif_tags(self):
+
         """Reads all EXIF tags from an image using ExifTool with advanced formatting and returns them as a dictionary."""
         command = ['exiftool', '-a', '-g', '-G', self.path]
         try:

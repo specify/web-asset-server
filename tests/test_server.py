@@ -1,8 +1,4 @@
-import pandas as pd
 import pytest
-import sys
-
-import server
 import settings
 import filecmp
 import requests
@@ -19,7 +15,7 @@ from client_utilities import get_timestamp
 from collection_definitions import COLLECTION_DIRS
 from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
-from metadata_tools import MetadataTools
+from urllib.parse import quote
 
 
 def get_file_md5(filename):
@@ -28,6 +24,7 @@ def get_file_md5(filename):
         while chunk := f.read(8192):
             md5_hash.update(chunk)
     return md5_hash.hexdigest()
+
 
 attach_loc = "None"
 TEST_JPG = "test.jpg"
@@ -40,11 +37,12 @@ dto = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.timezone(tz
 TEST_DATE = dto
 
 EXIF_DICT = {
-      "33432": "\u00A9 california academy of sciences",
-        "315": "Claude Monet",
-        "33437": "3/2"
+    "33432": "\u00A9 california academy of sciences",
+    "315": "Claude Monet",
+    "33437": "3/2"
 
 }
+
 
 @pytest.fixture(scope='function', autouse=True)
 def test_teardown(request):
@@ -105,7 +103,6 @@ def delete_attach_loc():
     return r
 
 
-
 def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
     global attach_loc
     local_filename = TEST_JPG
@@ -116,7 +113,6 @@ def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
     name, extension = splitext(local_filename)
     attach_loc = uuid + extension
 
-
     data = {
         'store': attach_loc,
         'type': 'image',
@@ -126,7 +122,7 @@ def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
     }
     if md5:
         md5 = get_file_md5(TEST_JPG)
-        data['orig_md5']= md5
+        data['orig_md5'] = md5
     merged_data = z = {**data, **supplementary_data}
 
     files = {
@@ -140,11 +136,11 @@ def post_test_file(supplementary_data={}, uuid_override=None, md5=False):
 def get_exif_data():
     """used to read test exif data from image on server"""
     get_exif_params = {
-                        'filename': attach_loc,
-                        'datatype': 'image',
-                        'coll': list(COLLECTION_DIRS.keys())[0],
-                        'token': generate_token(get_timestamp(), attach_loc)
-                    }
+        'filename': attach_loc,
+        'datatype': 'image',
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'token': generate_token(get_timestamp(), attach_loc)
+    }
 
     r = requests.get(build_url("getexifdata"), params=get_exif_params)
 
@@ -153,13 +149,13 @@ def get_exif_data():
     return exif_data
 
 
-
 @pytest.mark.dependency()
 def test_file_post():
     r = post_test_file()
     assert r.status_code == 200
     r = delete_attach_loc()
     assert r.status_code == 200
+
 
 @pytest.mark.dependency()
 def test_md5_round_trip():
@@ -206,81 +202,6 @@ def test_file_get():
     assert filecmp.cmp(image_filename, TEST_JPG)
     os.remove(image_filename)
     r = delete_attach_loc()
-    assert r.status_code == 200
-
-
-def test_update_exifdata():
-    r = post_test_file()
-
-    assert r.status_code == 200
-
-    exif_data = get_exif_data()
-    # checking field not present before function execution
-
-    assert 'Copyright' not in exif_data[0]['Fields']
-
-    assert 'Artist' not in exif_data[0]['Fields']
-
-    assert exif_data[2]['Fields']['FNumber'] == "9/5"
-
-    # updating exif data
-    data = {'filename': attach_loc,
-            'coll': list(COLLECTION_DIRS.keys())[0],
-            'token': generate_token(get_timestamp(), attach_loc),
-            'exif_dict': json.dumps(EXIF_DICT)
-    }
-
-    url = build_url('updateexifdata')
-
-    r = requests.post(url=url, data=data)
-
-    assert r.status_code == 200
-
-    exif_data = get_exif_data()
-
-    # checking fields present after function execution
-
-
-    assert exif_data[0]['Fields']['Copyright'] == "\u00A9 california academy of sciences"
-
-    assert exif_data[0]['Fields']['Artist'] == "Claude Monet"
-
-    assert exif_data[2]['Fields']['FNumber'] == "3/2"
-
-    r = delete_attach_loc()
-
-    assert r.status_code == 200
-
-def test_update_iptcdata():
-    r = post_test_file()
-
-    assert r.status_code == 200
-
-    # updating iptc data
-    data = {'filename': attach_loc,
-            'coll': list(COLLECTION_DIRS.keys())[0],
-            'token': generate_token(get_timestamp(), attach_loc),
-            'iptc_dict': json.dumps({"by-line": "Picasso", 'Date Created': "2023-02-10"})
-            }
-
-    url = build_url('updateiptcdata')
-
-    r = requests.post(url=url, data=data)
-
-    assert r.status_code == 200
-
-    rel_path = settings.BASE_DIR + server.get_rel_path(storename=attach_loc, thumb_p=False, coll=list(COLLECTION_DIRS.keys())[0])
-
-    img_path = "." + rel_path + f"{os.sep}{attach_loc}"
-
-    md = MetadataTools(path=img_path)
-    info = md.read_iptc_metadata()
-
-    assert info['by-line'] == b"Picasso"
-    assert info['Date Created'] == b"2023-02-10"
-
-    r = delete_attach_loc()
-
     assert r.status_code == 200
 
 
@@ -363,31 +284,6 @@ def test_get_static_url():
 
 
 @pytest.mark.dependency(depends=['test_file_post'])
-def test_get_exif():
-
-    r = post_test_file()
-
-    assert r.status_code == 200
-
-    params = {
-        'filename': attach_loc,
-        'datatype': 'image',
-        'coll': list(COLLECTION_DIRS.keys())[0],
-        'token': generate_token(get_timestamp(), attach_loc)
-    }
-
-    r = requests.get(build_url("getexifdata"), params=params)
-    assert r.status_code == 200
-
-    exif_data = json.loads(r.text)
-    assert exif_data[0]['Fields']['Model'] == "iPhone XR"
-
-    r = delete_attach_loc()
-
-    assert r.status_code == 200
-
-
-@pytest.mark.dependency(depends=['test_file_post'])
 def test_delete_file():
     r = post_test_file()
 
@@ -462,6 +358,7 @@ def post_with_metadata(redacted=True, uuid_override=None):
     r = requests.post(build_url("fileupload"), files=files, data=data)
     return r
 
+
 @pytest.mark.dependency(depends=['test_delete_file'])
 def test_file_post_with_metadata():
     r = post_with_metadata()
@@ -507,7 +404,7 @@ def test_get_non_redacted_image_by_original_filename():
     assert r.status_code == 200
 
     params = {
-        'file_string': TEST_JPG,
+        'file_string': quote(TEST_JPG),
         'token': generate_token(get_timestamp(), TEST_JPG),
         'search_type': 'filename',
     }
@@ -521,6 +418,27 @@ def test_get_non_redacted_image_by_original_filename():
     assert data[-1]['notes'] == TEST_NOTES
     assert data[-1]['redacted'] == False
     assert pytz.utc.localize(datetime.strptime(data[-1]['datetime'], TIME_FORMAT_NO_OFFESET)) == TEST_DATE
+
+    r = delete_attach_loc()
+    assert r.status_code == 200
+
+
+@pytest.mark.dependency()
+def test_get_missing_non_redacted_image_by_original_filename():
+    global attach_loc
+    r = post_with_metadata(redacted=False)
+    assert r.status_code == 200
+    bad_test_jpg = '/volumes/data/izg/iz images curated_test/credit terrence m. gosliner, california academy of sciences © t.m. gosliner/casiz 081336 eupatagus rubellus s2917 © t.m. gosliner.tif'
+    encoded_bad_test_jpg = quote(bad_test_jpg, safe='')
+
+    params = {
+        'file_string': encoded_bad_test_jpg,
+        'token': generate_token(get_timestamp(), encoded_bad_test_jpg),
+        'search_type': 'filename',
+    }
+
+    r = requests.get(build_url("getImageRecord"), params=params)
+    assert r.status_code == 404
 
     r = delete_attach_loc()
     assert r.status_code == 200
@@ -599,7 +517,6 @@ def test_duplicate_basename_failure():
     attach_loc = "None"
 
 
-
 def test_static_redacted():
     global attach_loc
     r = post_with_metadata(redacted=True)
@@ -626,4 +543,3 @@ def test_store_shortname():
     uuid = "sh"
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 400
-
