@@ -16,7 +16,7 @@ from collection_definitions import COLLECTION_DIRS
 from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
 from urllib.parse import quote
-
+from metadata_tools import MetadataTools
 
 def get_file_md5(filename):
     with open(filename, 'rb') as f:
@@ -180,6 +180,80 @@ def test_md5_round_trip():
     assert r.status_code == 200
 
 
+def test_update_exifdata():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
+    exif_data = get_exif_data()
+    # checking field not present before function execution
+
+    assert 'Copyright' not in exif_data[0]['Fields']
+
+    assert 'Artist' not in exif_data[0]['Fields']
+
+    assert exif_data[2]['Fields']['FNumber'] == "9/5"
+
+    # updating exif data
+    data = {'filename': attach_loc,
+            'coll': list(COLLECTION_DIRS.keys())[0],
+            'token': generate_token(get_timestamp(), attach_loc),
+            'exif_dict': json.dumps(EXIF_DICT)
+    }
+
+    url = build_url('updateexifdata')
+
+    r = requests.post(url=url, data=data)
+
+    assert r.status_code == 200
+
+    exif_data = get_exif_data()
+
+    # checking fields present after function execution
+
+
+    assert exif_data[0]['Fields']['Copyright'] == "\u00A9 california academy of sciences"
+
+    assert exif_data[0]['Fields']['Artist'] == "Claude Monet"
+
+    assert exif_data[2]['Fields']['FNumber'] == "3/2"
+
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
+def test_update_iptcdata():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
+    # updating iptc data
+    data = {'filename': attach_loc,
+            'coll': list(COLLECTION_DIRS.keys())[0],
+            'token': generate_token(get_timestamp(), attach_loc),
+            'iptc_dict': json.dumps({"by-line": "Picasso", 'Date Created': "2023-02-10"})
+            }
+
+    url = build_url('updateiptcdata')
+
+    r = requests.post(url=url, data=data)
+
+    assert r.status_code == 200
+
+    rel_path = settings.BASE_DIR + server.get_rel_path(storename=attach_loc, thumb_p=False, coll=list(COLLECTION_DIRS.keys())[0])
+
+    img_path = "." + rel_path + f"{os.sep}{attach_loc}"
+
+    md = MetadataTools(path=img_path)
+    info = md.read_iptc_metadata()
+
+    assert info['by-line'] == b"Picasso"
+    assert info['Date Created'] == b"2023-02-10"
+
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
 @pytest.mark.dependency()
 def test_file_get():
     r = post_test_file()
@@ -280,6 +354,31 @@ def test_get_static_url():
     assert r.status_code == 200
 
     r = delete_attach_loc()
+    assert r.status_code == 200
+
+
+@pytest.mark.dependency(depends=['test_file_post'])
+def test_get_exif():
+
+    r = post_test_file()
+
+    assert r.status_code == 200
+
+    params = {
+        'filename': attach_loc,
+        'datatype': 'image',
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'token': generate_token(get_timestamp(), attach_loc)
+    }
+
+    r = requests.get(build_url("getexifdata"), params=params)
+    assert r.status_code == 200
+
+    exif_data = json.loads(r.text)
+    assert exif_data[0]['Fields']['Model'] == "iPhone XR"
+
+    r = delete_attach_loc()
+
     assert r.status_code == 200
 
 

@@ -15,11 +15,7 @@ import time
 from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
-
 from metadata_tools import MetadataTools
-# from sh import convert
-# import sh
-# convert = sh.convert
 from bottle import Bottle
 from image_db import ImageDb
 from image_db import TIME_FORMAT
