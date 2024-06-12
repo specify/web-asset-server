@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
@@ -16,6 +16,7 @@ from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
 from metadata_tools import MetadataTools
+from sh import convert
 from bottle import Bottle
 from image_db import ImageDb
 from image_db import TIME_FORMAT
