@@ -7,17 +7,12 @@ import subprocess
 import traceback
 
 
-class UnknownEXIFString(Exception):
-    pass
-
-
 class MetadataTools:
 
     @timeout(20, os.strerror(errno.ETIMEDOUT))
     def __init__(self, path):
         self.path = path
         self.logger = logging.getLogger('MetadataTools')
-        self.logger.setLevel(logging.DEBUG)
 
 
     def read_exif_tags(self):
