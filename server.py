@@ -15,7 +15,7 @@ import time
 from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
-from metadata_tools import MetadataTools
+from metadata_tools.metadata_tools import MetadataTools
 from sh import convert
 from bottle import Bottle
 from image_db import ImageDb
@@ -519,9 +519,8 @@ def get_exif_metadata():
             abort(404, 'DateTime not found in EXIF')
 
     response.content_type = 'application/json'
-    data = [OrderedDict((('Name', key), ('Fields', value)))
-            for key, value in tags.items()]
-    return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
+
+    return json.dumps(tags, indent=4, sort_keys=True, default=json_datetime_handler)
 
 
 @app.route('/updateexifdata', method='POST')
@@ -544,8 +543,15 @@ def updateexifdata():
             abort(400)
 
         if isinstance(exif_data, dict):
-            mt = MetadataTools(path=rel_path)
-            mt.write_exif_tags(exif_dict=exif_data)
+            md = MetadataTools(path=rel_path)
+            try:
+                md.write_exif_tags(exif_dict=exif_data)
+            except:
+                response.content_type = 'text/plain; charset=utf-8'
+                response.status = 422
+                response.body = f"422 - metadata Tag not supported: {request.query.token}"
+                log(response.body)
+                return response
         else:
             log(f"exif_data is not a dictionary")
 

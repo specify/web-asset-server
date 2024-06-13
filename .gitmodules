@@ -1,0 +1,3 @@
+[submodule "metadata_tools"]
+	path = metadata_tools
+	url = https://github.com/calacademy-research/metadata_tools.git
