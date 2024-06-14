@@ -19,7 +19,7 @@ from client_utilities import get_timestamp
 from collection_definitions import COLLECTION_DIRS
 from image_db import TIME_FORMAT_NO_OFFESET
 import hashlib
-from metadata_tools import MetadataTools
+from metadata_tools.EXIF_constants import EXIFConstants
 
 
 def get_file_md5(filename):
@@ -30,7 +30,7 @@ def get_file_md5(filename):
     return md5_hash.hexdigest()
 
 attach_loc = "None"
-TEST_JPG = "test.jpg"
+TEST_JPG = "tests/test.jpg"
 TEST_PATH = "/foo/bar/baz"
 TEST_NOTES = "alskeifhjais78yas8efhaisef87yaihrti478yfhudyhdrsifslfdhiju"
 dt, tz = '2020-01-01 00:00:01 UTC'.rsplit(maxsplit=1)
@@ -40,10 +40,9 @@ dto = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.timezone(tz
 TEST_DATE = dto
 
 EXIF_DICT = {
-      "33432": "\u00A9 california academy of sciences",
-        "315": "Claude Monet",
-        "33437": "3/2"
-
+       EXIFConstants.IPTC_COPYRIGHT_NOTICE: "\u00A9 california academy of sciences",
+       EXIFConstants.XMP_CREATOR: "Claude Monet",
+       EXIFConstants.EXIF_CREATE_DATE: "2023:02:02 13:48:41"
 }
 
 @pytest.fixture(scope='function', autouse=True)
@@ -215,13 +214,14 @@ def test_update_exifdata():
     assert r.status_code == 200
 
     exif_data = get_exif_data()
+
     # checking field not present before function execution
 
-    assert 'Copyright' not in exif_data[0]['Fields']
+    assert exif_data[EXIFConstants.EXIF_CREATE_DATE] == '2022:02:02 13:48:41'
 
-    assert 'Artist' not in exif_data[0]['Fields']
+    assert EXIFConstants.XMP_CREATOR not in exif_data.keys()
 
-    assert exif_data[2]['Fields']['FNumber'] == "9/5"
+    assert exif_data[EXIFConstants.IPTC_COPYRIGHT_NOTICE] == "@CopyrightIPTC"
 
     # updating exif data
     data = {'filename': attach_loc,
@@ -240,16 +240,43 @@ def test_update_exifdata():
 
     # checking fields present after function execution
 
+    assert exif_data[EXIFConstants.EXIF_CREATE_DATE] == '2023:02:02 13:48:41'
 
-    assert exif_data[0]['Fields']['Copyright'] == "\u00A9 california academy of sciences"
+    assert exif_data[EXIFConstants.XMP_CREATOR] == 'Claude Monet'
 
-    assert exif_data[0]['Fields']['Artist'] == "Claude Monet"
-
-    assert exif_data[2]['Fields']['FNumber'] == "3/2"
+    assert exif_data[EXIFConstants.IPTC_COPYRIGHT_NOTICE] == "\u00A9 california academy of sciences"
 
     r = delete_attach_loc()
 
     assert r.status_code == 200
+
+
+def test_block_exifdata():
+    r = post_test_file()
+
+    assert r.status_code == 200
+
+    EXIF_DICT_copy = EXIF_DICT
+
+    EXIF_DICT_copy['FAKETAG1'] = 'FAKEVALUE1'
+
+    data = {'filename': attach_loc,
+            'coll': list(COLLECTION_DIRS.keys())[0],
+            'token': generate_token(get_timestamp(), attach_loc),
+            'exif_dict': json.dumps(EXIF_DICT_copy)
+            }
+
+    url = build_url('updateexifdata')
+
+    r = requests.post(url=url, data=data)
+
+    assert r.status_code == 422
+
+    r = delete_attach_loc()
+
+    assert r.status_code == 200
+
+
 
 
 @pytest.mark.dependency()
@@ -322,7 +349,6 @@ def test_get_static_url():
     r = requests.get(build_url("getfileref"), params=params)
     url = r.text;
     assert r.status_code == 200
-    # print(f"Got URL: {url}")
     r = requests.get(url)
     assert r.status_code == 200
 
@@ -348,7 +374,7 @@ def test_get_exif():
     assert r.status_code == 200
 
     exif_data = json.loads(r.text)
-    assert exif_data[0]['Fields']['Model'] == "iPhone XR"
+    assert exif_data["EXIF:CameraModelName"] == "iPhone XR"
 
     r = delete_attach_loc()
 

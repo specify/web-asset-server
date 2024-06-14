@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 import logging
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
@@ -7,14 +9,13 @@ from os import makedirs, path, remove
 from distutils.util import strtobool
 from urllib.parse import quote
 from urllib.request import pathname2url
-import exifread
 import hmac
 import json
 import time
 from collection_definitions import COLLECTION_DIRS
 from datetime import datetime
 from time import sleep
-from metadata_tools import MetadataTools
+from metadata_tools.metadata_tools import MetadataTools
 from sh import convert
 from bottle import Bottle
 from image_db import ImageDb
@@ -502,36 +503,25 @@ def get_exif_metadata():
     datatype = request.query.dt
     if not path.exists(pathname):
         abort(404)
-    with open(pathname, 'rb') as f:
-        try:
-            tags = exifread.process_file(f)
-        except:
-            log("Error reading exif data.")
-            tags = {}
+
+    exif_instance = MetadataTools(pathname)  # Assuming ExifTool class handles EXIF operations
+    try:
+        tags = exif_instance.read_exif_tags()
+
+    except Exception as e:
+        log(f"Error reading EXIF data: {e}")
+        tags = {}
 
     if datatype == 'date':
         try:
-            return str(tags['EXIF DateTimeOriginal'])
+            return str(tags['EXIF:DateTimeOriginal'])
         except KeyError:
             abort(404, 'DateTime not found in EXIF')
 
-    data = defaultdict(dict)
-    for key, value in list(tags.items()):
-        parts = key.split()
-        if len(parts) < 2: continue
-        try:
-            v = str(value).decode('ascii', 'replace').encode('utf-8')
-        except TypeError:
-            v = repr(value)
-        except AttributeError:
-            v = value
-
-        data[parts[0]][parts[1]] = str(v)
-
     response.content_type = 'application/json'
-    data = [OrderedDict((('Name', key), ('Fields', value)))
-            for key, value in list(data.items())]
-    return json.dumps(data, indent=4, sort_keys=True, default=json_datetime_handler)
+
+    return json.dumps(tags, indent=4, sort_keys=True, default=json_datetime_handler)
+
 
 @app.route('/updateexifdata', method='POST')
 @require_token('filename')
@@ -553,12 +543,20 @@ def updateexifdata():
             abort(400)
 
         if isinstance(exif_data, dict):
-            mt = MetadataTools(path=rel_path)
-            mt.write_exif_tags(exif_dict=exif_data)
+            md = MetadataTools(path=rel_path)
+            try:
+                md.write_exif_tags(exif_dict=exif_data)
+            except:
+                response.content_type = 'text/plain; charset=utf-8'
+                response.status = 422
+                response.body = f"422 - metadata Tag not supported: {request.query.token}"
+                log(response.body)
+                return response
         else:
             log(f"exif_data is not a dictionary")
 
         return f"{storename} updated with new exif metadata"
+
 
 @app.route('/testkey')
 @require_token('random', always=True)
@@ -594,7 +592,8 @@ if __name__ == '__main__':
     image_db.create_tables()
     log("running server...")
 
-    run(host='0.0.0.0',
+    run(app=application,
+        host='0.0.0.0',
         port=settings.PORT,
         server=settings.SERVER,
         debug=settings.DEBUG_APP,

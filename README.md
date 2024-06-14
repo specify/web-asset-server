@@ -233,7 +233,7 @@ WEB_ATTACHMENT_KEY = None
 
 # TODO
 
-  * Test with TIFF
-  * Test thumbnailing with TIFF
   * convert to universal URLS (n2t.net) and database same (images.universal_urls). Our id=42754. http://n2t.
     net/e/n2t_apidoc.html
+  * Support invisible watermarks and add API for same
+  * support updating all cached resized images, not just thumbanmils. 
