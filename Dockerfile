@@ -7,6 +7,8 @@ RUN apt-get update \
         uwsgi \
         uwsgi-plugin-python3 \
         libimage-exiftool-perl \
+        gcc-aarch64-linux-gnu \
+        python3-dev \
     python3 \
     python3-pip
 WORKDIR /tmp
