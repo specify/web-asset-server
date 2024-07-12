@@ -1,16 +1,16 @@
 #!/bin/bash
 image_password="test_password"
-python_path="path/to/repository"
+python_path=$(pwd)
 echo $(pwd)
 echo $PYTHONPATH
 
 setup() {
   echo "Running cleanup..."
-  sudo docker stop mysql-images && sudo docker rm mysql-images
-  sudo docker stop image-server && sudo docker rm image-server
-  sudo docker stop bottle-nginx && sudo docker rm bottle-nginx
-  sudo docker image prune -a -f
-  sudo rm -rf data/
+  docker stop mysql-images && docker rm mysql-images
+  docker stop image-server && docker rm image-server
+  docker stop bottle-nginx && docker rm bottle-nginx
+  docker image prune -a -f
+  rm -rf data/
 }
 
 # Call setup at beginning
@@ -32,22 +32,22 @@ pip install -r metadata_tools/requirements.txt
 
 # git submodule update --init
 
-sudo docker-compose up -d
+docker-compose up -d
 
-until sudo docker exec -i mysql-images mysql -u root -p"$image_password" -e "SELECT 1;" &>/dev/null; do
+until docker exec -i mysql-images mysql -u root -p"$image_password" -e "SELECT 1;" &>/dev/null; do
   echo "Waiting for MySQL to be ready..."
   sleep 5
 done
 
-sudo cp images_ddl.sql data/
+cp images_ddl.sql data/
 
-sudo docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABASE IF NOT EXISTS images;"
+docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABASE IF NOT EXISTS images;"
 
-sudo docker exec -i mysql-images mysql -u root -p"$image_password" images < data/images_ddl.sql
+docker exec -i mysql-images mysql -u root -p"$image_password" images < data/images_ddl.sql
 
 sleep 5
 
-sudo pytest --ignore="metadata_tools/tests"
+pytest --ignore="metadata_tools/tests"
 
 test_result=$?
 
