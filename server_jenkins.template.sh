@@ -1,5 +1,6 @@
 #!/bin/bash
 image_password="test_password"
+metadata_requirements_path="metadata_tools/requirements.txt"
 python_path=$(pwd)
 
 unset PYTHONPATH
@@ -25,6 +26,23 @@ python --version
 pip install --upgrade pip
 
 git submodule update --init
+
+# waiting for submodule to populate
+timeout=300
+interval=2
+elapsed=0
+
+while [ ! -f ${metadata_requirements_path} ]; do
+  if [ $elapsed -ge $timeout ]; then
+    echo "Timeout reached: ${metadata_requirements_path} not found"
+    exit 1
+  fi
+  echo "Waiting for ${metadata_requirements_path} to exist..."
+  sleep $interval
+  elapsed=$((elapsed + interval))
+done
+
+echo "${metadata_requirements_path} found"
 
 pip install -r requirements.txt
 
