@@ -4,7 +4,6 @@ pipeline {
     environment {
         BRANCH_NAME = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
         PARENT_PATH = "/var/jenkins_home/workspace"
-        RSYNC_PATH = "/usr/bin/rsync"
     }
 
     stages {
@@ -17,21 +16,15 @@ pipeline {
             }
         }
 
-//         stage('Reset to Origin') {
-//             steps {
-//                 script {
-//                     // Ensure the working directory matches the origin
-//                     sh "cd ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}"
-//                     sh "git reset --hard origin/${BRANCH_NAME}"
-//                 }
-//             }
-//         }
-
         stage('Copy non-tracked files') {
             steps {
                 script {
                     // Copy non-tracked files from web-asset-server-ci to rver_multibranch_<BRANCH_NAME>
-                    sh "${RSYNC_PATH} -av --ignore-existing ${PARENT_PATH}/web-asset-server-ci/ ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/settings.py ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/settings.py"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/server_jenkins.sh ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/server_jenkins.sh"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/docker-compose.yml ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/docker-compose.yml"
+
+
                 }
             }
         }
@@ -39,7 +32,6 @@ pipeline {
         stage('Run Script') {
             steps {
                 script {
-
                     // Run the provided shell script as root within the Docker container
                     sh "cd ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME} && ./server_jenkins.sh"
                 }
