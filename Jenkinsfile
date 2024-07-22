@@ -16,15 +16,28 @@ pipeline {
             }
         }
 
+        stage('Find and Save Directory') {
+            steps {
+                script {
+                    // Find the directory name containing the substring "multibranch_${BRANCH_NAME}" but not containing "@tmp"
+                    def dirName = sh(script: "find ${PARENT_PATH} -type d -name '*multibranch_${BRANCH_NAME}*' ! -name '*@tmp*' -print -quit", returnStdout: true).trim()
+                    if (dirName) {
+                        env.FOUND_DIR = dirName
+                    } else {
+                        error "Directory containing 'multibranch_${BRANCH_NAME}' and not containing '@tmp' not found"
+                    }
+                }
+            }
+        }
+
         stage('Copy non-tracked files') {
             steps {
                 script {
-                    // Copy non-tracked files from web-asset-server-ci to rver_multibranch_<BRANCH_NAME>
-                    sh "cp ${PARENT_PATH}/web-asset-server-ci/settings.py ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/settings.py"
-                    sh "cp ${PARENT_PATH}/web-asset-server-ci/server_jenkins.sh ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/server_jenkins.sh"
-                    sh "cp ${PARENT_PATH}/web-asset-server-ci/docker-compose.yml ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME}/docker-compose.yml"
-
-
+                    // Copy non-tracked files from web-asset-server-ci to the found directory
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/settings.py ${env.FOUND_DIR}/settings.py"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/server_jenkins.sh ${env.FOUND_DIR}/server_jenkins.sh"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/docker-compose.yml ${env.FOUND_DIR}/docker-compose.yml"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/images_ddl.sql ${env.FOUND_DIR}/images_ddl.sql"
                 }
             }
         }
@@ -33,7 +46,7 @@ pipeline {
             steps {
                 script {
                     // Run the provided shell script as root within the Docker container
-                    sh "cd ${PARENT_PATH}/rver_multibranch_${BRANCH_NAME} && ./server_jenkins.sh"
+                    sh "cd ${env.FOUND_DIR} && ./server_jenkins.sh"
                 }
             }
         }
