@@ -6,7 +6,7 @@ from functools import wraps
 from glob import glob
 from mimetypes import guess_type
 from os import makedirs, path, remove
-from distutils.util import strtobool
+from str2bool import str2bool
 from urllib.parse import quote
 from urllib.request import pathname2url
 import hmac
@@ -402,7 +402,7 @@ def fileupload():
     if 'notes' in request.forms.keys():
         notes = request.forms['notes']
     if 'redacted' in request.forms.keys():
-        redacted = strtobool(request.forms['redacted'])
+        redacted = str2bool(request.forms['redacted'])
     if 'datetime' in request.forms.keys():
         datetime_now = datetime.strptime(request.forms['datetime'], TIME_FORMAT)
     if 'orig_md5' in request.forms.keys():
@@ -476,11 +476,12 @@ def get_image_record():
     image_db = get_image_db()
     search_type = request.query.get('search_type', default='filename')
     query_string = request.query.get('file_string', default='')
+    exact = str(request.query.get('exact', default='False'))
 
     if search_type == 'filename':
-        record_list = image_db.get_image_record_by_original_filename(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
+        record_list = image_db.get_image_record_by_original_filename(query_string, exact=str2bool(exact), collection=request.query.get('coll'))
     elif search_type == 'path':
-        record_list = image_db.get_image_record_by_original_path(query_string, exact=strtobool(request.query.get('exact', default='False')), collection=request.query.get('coll'))
+        record_list = image_db.get_image_record_by_original_path(query_string, exact=str2bool(exact), collection=request.query.get('coll'))
     elif search_type == 'md5':
         record_list = image_db.get_image_record_by_original_image_md5(query_string, collection=request.query.get('coll'))
     else:
