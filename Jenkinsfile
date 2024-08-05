@@ -19,12 +19,11 @@ pipeline {
         stage('Find and Save Directory') {
             steps {
                 script {
-                    // Find the directory name containing the substring "multibranch_${BRANCH_NAME}" but not containing "@tmp"
-                    def dirName = sh(script: "find ${PARENT_PATH} -type d -name '*multibranch_${BRANCH_NAME}*' ! -name '*@tmp*' -print -quit", returnStdout: true).trim()
+                    def dirName = "${WORKSPACE}"
                     if (dirName) {
                         env.FOUND_DIR = dirName
                     } else {
-                        error "Directory containing 'multibranch_${BRANCH_NAME}' and not containing '@tmp' not found"
+                        error "Directory containing 'allbranch_${BRANCH_NAME}' and not containing '@tmp' not found"
                     }
                 }
             }
