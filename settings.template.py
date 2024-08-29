@@ -50,8 +50,9 @@ else:
 # use this server name if on backend
 # HOST = 'http://instutution.org'
 PORT = 80
-SERVER_NAME = HOST
+SERVER_NAME = f"{HOST}"
 SERVER_PORT = PORT
+SERVER_PROTOCOL = "https"
 print(f"Starting with host: {HOST}")
 DEVELOPMENT_PORT = PORT
 

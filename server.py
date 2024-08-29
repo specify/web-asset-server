@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import traceback
 from collections import OrderedDict
 from functools import wraps
 from glob import glob
@@ -267,11 +268,13 @@ def static(path):
 
 
 def getFileUrl(filename, collection, image_type, scale):
-    return "http://%s:%d/static/%s" % (settings.SERVER_NAME, settings.SERVER_PORT,
-                                       pathname2url(resolve_file(filename,
-                                                                 collection,
-                                                                 image_type,
-                                                                 scale)))
+    return '%s://%s/static/%s' % (settings.SERVER_PROTOCOL, settings.SERVER_NAME,
+                                  pathname2url(resolve_file(filename,
+                                                            collection,
+                                                            image_type,
+                                                            scale)))
+
+
 
 @app.route('/getfileref')
 @allow_cross_origin
