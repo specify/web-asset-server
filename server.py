@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import traceback
 from collections import OrderedDict
 from functools import wraps
 from glob import glob
