@@ -476,25 +476,33 @@ def json_datetime_handler(x):
 @require_token('file_string', always=True)
 def get_image_record():
     image_db = get_image_db()
-    search_type = request.query.get('search_type', default='filename')
-    query_string = request.query.get('file_string', default='')
-    exact = str(request.query.get('exact', default='False'))
+    query_params = request.query
 
-    if search_type == 'filename':
-        record_list = image_db.get_image_record_by_original_filename(query_string, exact=str2bool(exact), collection=request.query.get('coll'))
-    elif search_type == 'path':
-        record_list = image_db.get_image_record_by_original_path(query_string, exact=str2bool(exact), collection=request.query.get('coll'))
-    elif search_type == 'md5':
-        record_list = image_db.get_image_record_by_original_image_md5(query_string, collection=request.query.get('coll'))
-    else:
+    search_type = query_params.get('search_type', default='filename')
+    query_string = query_params.get('file_string', default='')
+    exact = str2bool(query_params.get('exact', default='False'))
+    collection = query_params.get('coll')
+
+    search_functions = {
+        'filename': lambda: image_db.get_image_record_by_original_filename(query_string, exact=exact,
+                                                                           collection=collection),
+        'path': lambda: image_db.get_image_record_by_original_path(query_string, exact=exact, collection=collection),
+        'md5': lambda: image_db.get_image_record_by_original_image_md5(query_string, collection=collection)
+    }
+
+    search_function = search_functions.get(search_type)
+    if not search_function:
         abort(400, 'Invalid search type')
 
+    record_list = search_function()
     log(f"Record list: {record_list}")
-    if len(record_list) == 0:
+
+    if not record_list:
         log("Image not found, returning 404")
         abort(404)
 
     return json.dumps(record_list, indent=4, sort_keys=True, default=json_datetime_handler)
+
 
 @app.route('/getexifdata')
 @require_token('filename')
