@@ -40,7 +40,7 @@ python --version
 
 pip install --upgrade pip
 
-git submodule update --init
+git submodule update --init --remote --force
 
 # waiting for submodule to populate
 timeout=300
