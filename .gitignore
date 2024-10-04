@@ -1,4 +1,4 @@
-server_jenkins.sh
+server_jenkins_config.sh
 attachments/
 **/tax_dump.sql
 **/run_picdb.sh
