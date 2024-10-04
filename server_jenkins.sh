@@ -1,20 +1,12 @@
 #!/bin/bash
-image_password="test_password"
-metadata_requirements_path="metadata_tools/requirements.txt"
-python_path=$(pwd)
-lockfile="/tmp/$(basename "$0").lock"
-
-
-# Function to remove the lockfile
-cleanup() {
-    rm -f "$lockfile"
-    echo "Lockfile removed."
-}
-
 # cleanup lockfile on exit
+source ./server_jenkins_config.sh
+
 trap cleanup EXIT
 
+
 # checking lock
+
 exec 200>$lockfile
 flock -n 200 || { echo "Another instance of the script is already running. Exiting."; exit 1; }
 
@@ -37,6 +29,8 @@ echo "Python version:"
 python --version
 
 # Upgrade pip and install requirements
+
+git config --global --add safe.directory "$(pwd)"
 
 pip install --upgrade pip
 
