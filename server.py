@@ -366,9 +366,6 @@ def fileupload():
     if thumb_p:
         return 'Ignoring thumbnail upload!'
 
-    if not path.exists(basepath):
-        makedirs(basepath)
-
     if 'original_path' in request.forms.keys():
         response_list = image_db.get_image_record_by_original_filename(original_filename=request.forms['original_filename'],
                                                                        collection=request.forms.coll, exact=True)
@@ -383,6 +380,10 @@ def fileupload():
         log("Duplicate file; return failure:")
         response.content_type = 'text/plain; charset=utf-8'
         response.status = 409
+        return 409
+
+    if not path.exists(basepath):
+        makedirs(basepath)
 
     upload.save(pathname, overwrite=True)
 
