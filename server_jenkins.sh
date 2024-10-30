@@ -57,11 +57,25 @@ pip install -r requirements.txt
 
 pip install -r metadata_tools/requirements.txt
 
+
 docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABASE IF NOT EXISTS images;"
 
 docker exec -i mysql-images mysql -u root -p"$image_password" images < images_ddl.sql
 
-python3 server.py &
+ssl_cert_path="/etc/ssl/certs/dynamic_cert.pem"
+ssl_key_path="/etc/ssl/private/dynamic_key.pem"
+
+echo "Generating SSL certificates..."
+openssl req -newkey rsa:2048 -nodes -keyout "$ssl_key_path" \
+    -x509 -days 1 -out "$ssl_cert_path" \
+    -subj "/C=US/ST=California/L=San Francisco/O=YourOrg/OU=IT/CN=localhost"
+
+echo "SSL certificates generated at:"
+echo "Certificate: $ssl_cert_path"
+echo "Key: $ssl_key_path"
+
+
+python3 server.py > output_log.txt 2>&1 &
 
 SERVER_PID=$!
 
