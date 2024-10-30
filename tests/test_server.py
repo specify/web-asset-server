@@ -570,8 +570,25 @@ def test_name_collision_failure():
     r = post_test_file(uuid_override=uuid)
     assert r.status_code == 409
 
+    params = {
+        'file_string': TEST_JPG,
+        'coll': list(COLLECTION_DIRS.keys())[0],
+        'exact': True,
+        'token': generate_token(get_timestamp(), TEST_JPG),
+        'search_type': 'filename'
+    }
+
+    r = requests.get(build_url("getImageRecord"), params=params)
+
+    if r.status_code == 200:
+        # If the file exists, ensure the response data only contains a single entry
+        records = r.json()
+        assert isinstance(records, list), "Expected a list of records"
+        assert len(records) == 1, f"Expected 1 record, got {len(records)}"
+
     r = delete_attach_loc()
     assert r.status_code == 200
+
 
 
 def test_duplicate_basename_failure():
