@@ -8,8 +8,9 @@ RUN apt-get update \
         uwsgi-plugin-python3 \
         libimage-exiftool-perl \
         gcc-aarch64-linux-gnu \
-        python3-dev \
-    python3 \
+    python3.12 \
+    python3.12-dev \
+    python31.2-distutils \
     python3-pip
 WORKDIR /tmp
 COPY requirements.txt requirements.txt

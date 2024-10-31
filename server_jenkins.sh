@@ -20,7 +20,7 @@ rm -r venv
 
 sleep 5
 
-python3 -m venv venv
+python3.12 -m venv venv
 
 source venv/bin/activate
 
@@ -58,24 +58,36 @@ pip install -r requirements.txt
 pip install -r metadata_tools/requirements.txt
 
 
+docker-compose up -d
+
+
 docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABASE IF NOT EXISTS images;"
 
 docker exec -i mysql-images mysql -u root -p"$image_password" images < images_ddl.sql
 
-ssl_cert_path="/etc/ssl/certs/dynamic_cert.pem"
-ssl_key_path="/etc/ssl/private/dynamic_key.pem"
+# Generate SSL certificates at the required paths
+#ssl_cert_path="/etc/ssl/certs/wildcard_calacademy_org.pem"
+#ssl_key_path="/etc/ssl/private/wildcard_calacademy_org.key"
+#
+#echo "Generating SSL certificates..."
+#mkdir -p /etc/ssl/certs /etc/ssl/private
+#
+#openssl req -newkey rsa:2048 -nodes -keyout "$ssl_key_path" \
+#    -x509 -days 1 -out "$ssl_cert_path" \
+#    -subj "/C=US/ST=California/L=San Francisco/O=YourOrg/OU=IT/CN=localhost"
+#
+#echo "SSL certificates generated at:"
+#echo "Certificate: $ssl_cert_path"
+#echo "Key: $ssl_key_path"
+#
+## Start the server with SSL
+#python3 server.py --ssl-cert "$ssl_cert_path" --ssl-key "$ssl_key_path" > output_log.txt 2>&1 &
+#SERVER_PID=$!
 
-echo "Generating SSL certificates..."
-openssl req -newkey rsa:2048 -nodes -keyout "$ssl_key_path" \
-    -x509 -days 1 -out "$ssl_cert_path" \
-    -subj "/C=US/ST=California/L=San Francisco/O=YourOrg/OU=IT/CN=localhost"
+echo "Server started with PID $SERVER_PID"
 
-echo "SSL certificates generated at:"
-echo "Certificate: $ssl_cert_path"
-echo "Key: $ssl_key_path"
-
-
-python3 server.py > output_log.txt 2>&1 &
+# Give the server some time to initialize
+sleep 5
 
 SERVER_PID=$!
 

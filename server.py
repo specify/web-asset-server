@@ -514,7 +514,7 @@ def get_exif_metadata():
     if not path.exists(pathname):
         abort(404)
 
-    exif_instance = MetadataTools(pathname)  # Assuming ExifTool class handles EXIF operations
+    exif_instance = MetadataTools(pathname, encoding=settings.ENCODING)  # Assuming ExifTool class handles EXIF operations
     try:
         tags = exif_instance.read_exif_tags()
 
@@ -553,7 +553,7 @@ def updateexifdata():
             abort(400)
 
         if isinstance(exif_data, dict):
-            md = MetadataTools(path=rel_path)
+            md = MetadataTools(path=rel_path, encoding=settings.ENCODING)
             try:
                 md.write_exif_tags(exif_dict=exif_data)
             except:

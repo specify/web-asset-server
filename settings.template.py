@@ -56,6 +56,7 @@ SERVER_PROTOCOL = "https"
 print(f"Starting with host: {HOST}")
 DEVELOPMENT_PORT = PORT
 
+ENCODING = "C.UTF-8"
 
 
 # Port the development test server should listen on.
