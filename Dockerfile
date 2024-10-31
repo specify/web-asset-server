@@ -10,7 +10,7 @@ RUN apt-get update \
         gcc-aarch64-linux-gnu \
     python3.12 \
     python3.12-dev \
-    python31.2-distutils \
+    python3.12-distutils \
     python3-pip
 WORKDIR /tmp
 COPY requirements.txt requirements.txt

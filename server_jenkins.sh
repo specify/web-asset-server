@@ -66,25 +66,28 @@ docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABAS
 docker exec -i mysql-images mysql -u root -p"$image_password" images < images_ddl.sql
 
 # Generate SSL certificates at the required paths
-#ssl_cert_path="/etc/ssl/certs/wildcard_calacademy_org.pem"
-#ssl_key_path="/etc/ssl/private/wildcard_calacademy_org.key"
-#
-#echo "Generating SSL certificates..."
-#mkdir -p /etc/ssl/certs /etc/ssl/private
-#
-#openssl req -newkey rsa:2048 -nodes -keyout "$ssl_key_path" \
-#    -x509 -days 1 -out "$ssl_cert_path" \
-#    -subj "/C=US/ST=California/L=San Francisco/O=YourOrg/OU=IT/CN=localhost"
-#
-#echo "SSL certificates generated at:"
-#echo "Certificate: $ssl_cert_path"
-#echo "Key: $ssl_key_path"
-#
-## Start the server with SSL
-#python3 server.py --ssl-cert "$ssl_cert_path" --ssl-key "$ssl_key_path" > output_log.txt 2>&1 &
-#SERVER_PID=$!
 
-echo "Server started with PID $SERVER_PID"
+# Define the paths for the certificate and key
+CERT_PATH="/etc/ssl/certs/wildcard_calacademy_org.pem"
+KEY_PATH="/etc/ssl/private/wildcard_calacademy_org.key"
+
+# Check if the certificate and key already exist
+if [[ ! -f "$CERT_PATH" && ! -f "$KEY_PATH" ]]; then
+    # Generate the SSL certificate and key if they don't exist
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout wildcard_calacademy_org.key \
+        -out wildcard_calacademy_org.pem \
+        -subj "/C=US/ST=California/L=YourCity/O=YourOrganization/CN=*.calacademy.org"
+
+    # Copy the generated files to the appropriate directories
+    sudo cp wildcard_calacademy_org.pem "$CERT_PATH"
+    sudo cp wildcard_calacademy_org.key "$KEY_PATH"
+
+    echo "SSL certificate and key created and copied to $CERT_PATH and $KEY_PATH."
+else
+    echo "SSL certificate and/or key already exist at the specified paths."
+fi
+
 
 # Give the server some time to initialize
 sleep 5
