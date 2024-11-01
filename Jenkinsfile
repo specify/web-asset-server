@@ -40,6 +40,7 @@ pipeline {
                     sh "cp ${PARENT_PATH}/web-asset-server-ci/server_jenkins_config.sh ${env.FOUND_DIR}/server_jenkins_config.sh"
                     sh "cp ${PARENT_PATH}/web-asset-server-ci/docker-compose.yml ${env.FOUND_DIR}/docker-compose.yml"
                     sh "cp ${PARENT_PATH}/web-asset-server-ci/images_ddl.sql ${env.FOUND_DIR}/images_ddl.sql"
+                    sh "cp ${PARENT_PATH}/web-asset-server-ci/nginx_test.conf ${env.FOUND_DIR}/nginx.conf"
                 }
             }
         }

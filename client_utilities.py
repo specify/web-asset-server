@@ -1,12 +1,13 @@
 import requests, hmac
 import time
 import settings
+from distutils.util import strtobool
 
 def build_url(endpoint):
     host = settings.SERVER_NAME
     # host = 'ibss-images.calacademy.org'
     port = settings.SERVER_PORT
-    return f"http://{host}:{port}/{endpoint}"
+    return f"{settings.SERVER_PROTOCOL}://{host}:{port}/{endpoint}"
 
 def update_time_delta_from_response(response):
     global server_time_delta
@@ -18,7 +19,6 @@ def update_time_delta_from_response(response):
 
     server_time_delta = int(timestamp) - int(time.time())
     print(f"Updated server time delta to {server_time_delta}")
-
 
 def get_timestamp():
     """Return an integer timestamp with one second resolution for
