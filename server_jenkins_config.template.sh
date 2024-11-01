@@ -7,6 +7,9 @@ lockfile="/tmp/jenkins_script.lock"
 cleanup() {
     rm -f "$lockfile"
     echo "Lockfile removed."
+    rm -r venv
+    # cleanup tmp pip files
+    rm -rf /tmp/pip-*
 }
 
 

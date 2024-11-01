@@ -1,7 +1,6 @@
 import requests, hmac
 import time
 import settings
-from distutils.util import strtobool
 
 def build_url(endpoint):
     host = settings.SERVER_NAME

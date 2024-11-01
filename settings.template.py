@@ -56,11 +56,11 @@ SERVER_PROTOCOL = "https"
 print(f"Starting with host: {HOST}")
 DEVELOPMENT_PORT = PORT
 
+# set to TRUE when using port other than 80 on http or 443 on https, as requests defaults to 80/443 in the url
+OVERRIDE_PORT = False
+
+# default text encoding for command line level subprocesses.
 ENCODING = "C.UTF-8"
-
-
-# Port the development test server should listen on.
-DEVELOPMENT_PORT = PORT
 
 # Map collection names to directories.  Set to None to store
 # everything in the same originals and thumbnail directories.  This is

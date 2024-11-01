@@ -1,6 +1,7 @@
 FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get --no-install-recommends install -y \
+        ca-certificates \
         software-properties-common \
         python-setuptools \
         tzdata \
@@ -16,10 +17,10 @@ RUN apt-get update && apt-get --no-install-recommends install -y \
         libgdbm-dev \
         liblzma-dev \
         imagemagick \
-        uwsgi \
-        uwsgi-plugin-python3 \
         libimage-exiftool-perl \
         gcc-aarch64-linux-gnu \
+        uwsgi \
+        uwsgi-plugin-python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -44,6 +45,7 @@ RUN python3 --version
 #install pip under 3.12
 RUN python3.12 -m pip install --upgrade pip setuptools wheel
 
+# re-installing uwsgi so that it uses 3.12
 RUN python3.12 -m pip install uwsgi
 
 # Install Python packages

@@ -283,11 +283,12 @@ def static(path):
 
 
 def getFileUrl(filename, collection, image_type, scale):
-    return '%s://%s/static/%s' % (settings.SERVER_PROTOCOL, settings.SERVER_NAME,
-                                  pathname2url(resolve_file(filename,
-                                                            collection,
-                                                            image_type,
-                                                            scale)))
+    server_name = f"{settings.SERVER_NAME}:{settings.SERVER_PORT}" if settings.OVERRIDE_PORT else settings.SERVER_NAME
+
+    return '%s://%s/static/%s' % (settings.SERVER_PROTOCOL,
+                                  server_name,
+                                  pathname2url(resolve_file(filename, collection, image_type, scale))
+                                  )
 
 
 
