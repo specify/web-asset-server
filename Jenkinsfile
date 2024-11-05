@@ -4,16 +4,33 @@ pipeline {
     environment {
         BRANCH_NAME = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
         PARENT_PATH = "/var/jenkins_home/workspace"
+        REPO_URL = "https://github.com/calacademy-research/cas-web-asset-server.git"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 script {
-                    // Checkout the branch related to the PR
-                    checkout scm
-                    sh "git fetch --all"
-                    sh "git reset --hard origin/${BRANCH_NAME}"
+                    // Use a conditional to check if this is a PR
+                    if (env.CHANGE_ID) {
+                        // Fetch and checkout the PR branch
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "FETCH_HEAD"]],
+                            extensions: [],
+                            userRemoteConfigs: [[
+                                url: env.REPO_URL,
+                                refspec: "+refs/pull/${env.CHANGE_ID}/head"
+                            ]]
+                        ])
+                        // Checkout the fetched PR branch using FETCH_HEAD
+                        sh "git checkout FETCH_HEAD"
+                    } else {
+                        // For normal branch checkout
+                        checkout scm
+                        sh "git fetch --all"
+                        sh "git reset --hard origin/${BRANCH_NAME}"
+                    }
                 }
             }
         }
@@ -48,7 +65,6 @@ pipeline {
         stage('Run Script') {
             steps {
                 script {
-                    // Run the provided shell script as root within the Docker container
                     sh "cd ${env.FOUND_DIR} && ./server_jenkins.sh"
                 }
             }
