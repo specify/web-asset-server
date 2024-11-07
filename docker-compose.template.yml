@@ -30,7 +30,7 @@ services:
       - LANG=C.UTF-8
     volumes:
       - ./:/code
-    command: ['uwsgi', '--plugin', '/usr/lib/uwsgi/plugins/python3_plugin.so','--ini', 'uwsgi.ini']
+    command: ['uwsgi', '--init', '/usr/lib/uwsgi/plugins/python312_plugin.so','--ini', 'uwsgi.ini']
 
     restart: always
 

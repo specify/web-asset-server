@@ -9,12 +9,14 @@ RUN apt-get update && apt-get install -y \
     gcc-aarch64-linux-gnu uwsgi uwsgi-plugin-python3 python3.12-venv\
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /code
+WORKDIR /tmp
+# Create virtual environment in a different directory
 RUN python3.12 -m venv venv
-ENV PATH="/venv/bin:$PATH"
-COPY requirements.txt requirements.txt
-COPY metadata_tools/requirements.txt /metadata_tools/requirements.txt
-RUN /code/venv/bin/pip install --no-cache-dir -r requirements.txt
-RUN /code/venv/bin/pip install --no-cache-dir -r /metadata_tools/requirements.txt
+ENV PATH="/tmp/venv/bin:$PATH"
+COPY requirements.txt /tmp/requirements.txt
+COPY metadata_tools/requirements.txt /tmp/metadata_tools/requirements.txt
+RUN /tmp/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+RUN /tmp/venv/bin/pip install --no-cache-dir -r /tmp/metadata_tools/requirements.txt
 ENV TZ=America/Los_Angeles
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+WORKDIR /code
