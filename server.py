@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
-from collections import OrderedDict
 from functools import wraps
 from glob import glob
 from mimetypes import guess_type
 from os import makedirs, path, remove
-from str2bool import str2bool
 from urllib.parse import quote
 from urllib.request import pathname2url
 import hmac
@@ -65,6 +63,24 @@ def get_rel_path(coll, thumb_p, storename):
         abort(404, "Unknown collection: %r" % coll)
 
     return path.join(coll_dir, type_dir, first_subdir, second_subdir)
+
+def str2bool(value, raise_exc=False):
+    """converts diverse string values into boolean True or False,
+       replaces deprecated distutils and str2bool."""
+    true_set = {'yes', 'true', 't', 'y', '1'}
+    false_set = {'no', 'false', 'f', 'n', '0'}
+
+    if isinstance(value, str):
+        value = value.lower()
+        if value in true_set:
+            return True
+        if value in false_set:
+            return False
+
+    if raise_exc:
+        raise ValueError('Expected "%s"' % '", "'.join(true_set | false_set))
+    return None
+
 
 
 def generate_token(timestamp, filename):
@@ -267,11 +283,12 @@ def static(path):
 
 
 def getFileUrl(filename, collection, image_type, scale):
-    return '%s://%s/static/%s' % (settings.SERVER_PROTOCOL, settings.SERVER_NAME,
-                                  pathname2url(resolve_file(filename,
-                                                            collection,
-                                                            image_type,
-                                                            scale)))
+    server_name = f"{settings.SERVER_NAME}:{settings.SERVER_PORT}" if settings.OVERRIDE_PORT else settings.SERVER_NAME
+
+    return '%s://%s/static/%s' % (settings.SERVER_PROTOCOL,
+                                  server_name,
+                                  pathname2url(resolve_file(filename, collection, image_type, scale))
+                                  )
 
 
 
@@ -514,7 +531,7 @@ def get_exif_metadata():
     if not path.exists(pathname):
         abort(404)
 
-    exif_instance = MetadataTools(pathname)  # Assuming ExifTool class handles EXIF operations
+    exif_instance = MetadataTools(pathname, encoding=settings.ENCODING)
     try:
         tags = exif_instance.read_exif_tags()
 
@@ -553,7 +570,7 @@ def updateexifdata():
             abort(400)
 
         if isinstance(exif_data, dict):
-            md = MetadataTools(path=rel_path)
+            md = MetadataTools(path=rel_path, encoding=settings.ENCODING)
             try:
                 md.write_exif_tags(exif_dict=exif_data)
             except:

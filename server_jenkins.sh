@@ -20,7 +20,7 @@ rm -r venv
 
 sleep 5
 
-python3 -m venv venv
+python3.12 -m venv venv
 
 source venv/bin/activate
 
@@ -61,7 +61,13 @@ docker exec -i mysql-images mysql -u root -p"$image_password" -e "CREATE DATABAS
 
 docker exec -i mysql-images mysql -u root -p"$image_password" images < images_ddl.sql
 
-python3 server.py &
+# replace https with http in pytest and xml files
+convert_to_http
+
+# run server
+python3 server.py > output_file.txt 2>&1 &
+# Give the server some time to initialize
+sleep 5
 
 SERVER_PID=$!
 

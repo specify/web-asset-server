@@ -1,0 +1,53 @@
+FROM jenkins/jenkins:lts
+
+USER root
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install necessary dependencies
+RUN apt-get update \
+    && apt-get --no-install-recommends -y install \
+        curl \
+        build-essential \
+        libssl-dev \
+        libbz2-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libffi-dev \
+        zlib1g-dev \
+        libjpeg-dev \
+        wget \
+        tk-dev \
+        liblzma-dev
+
+# Install Python 3.12 from source
+RUN wget https://www.python.org/ftp/python/3.12.0/Python-3.12.0.tgz \
+    && tar -xzf Python-3.12.0.tgz \
+    && cd Python-3.12.0 \
+    && ./configure --enable-optimizations \
+    && make altinstall \
+    && cd .. \
+    && rm -rf Python-3.12.0 Python-3.12.0.tgz
+
+# Verify installation
+RUN python3.12 --version
+
+# Install pip for Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+
+# Install other necessary packages
+RUN apt-get --no-install-recommends -y install \
+        tzdata \
+        imagemagick \
+        uwsgi \
+        uwsgi-plugin-python3 \
+        libimage-exiftool-perl \
+        gcc-aarch64-linux-gnu \
+        docker.io \
+        rsync \
+        python3.12-venv
+
+# Install docker-compose
+RUN curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose
+
+USER jenkins
