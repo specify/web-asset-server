@@ -29,9 +29,10 @@ logging.basicConfig(filename='app.log', level=level)
 
 
 from bottle import (
-    Response, request, response, static_file, template, abort,
+    Response, BaseRequest, request, response, static_file, template, abort,
     HTTPResponse)
 
+BaseRequest.MEMFILE_MAX = 10 * 1024 * 1024
 
 def get_image_db():
     image_db = ImageDb()
