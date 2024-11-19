@@ -32,7 +32,7 @@ from bottle import (
     Response, BaseRequest, request, response, static_file, template, abort,
     HTTPResponse)
 
-BaseRequest.MEMFILE_MAX = 10 * 1024 * 1024
+BaseRequest.MEMFILE_MAX = 300 * 1024 * 1024
 
 def get_image_db():
     image_db = ImageDb()
