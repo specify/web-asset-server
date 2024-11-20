@@ -44,7 +44,9 @@ RUN apt-get --no-install-recommends -y install \
         gcc-aarch64-linux-gnu \
         docker.io \
         rsync \
-        python3.12-venv
+        python3.12-venv \
+        mariadab-client \
+        sqlite3
 
 # Install docker-compose
 RUN curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
