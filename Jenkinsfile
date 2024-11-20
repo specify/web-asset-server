@@ -5,13 +5,13 @@ pipeline {
         BRANCH_NAME = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
         PARENT_PATH = "/var/jenkins_home/workspace"
         REPO_URL = "https://github.com/calacademy-research/cas-web-asset-server.git"
+        LOCKFILE = "/tmp/jenkins_script.lock"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 script {
-                    // Use a conditional to check if this is a PR
                     if (env.CHANGE_ID) {
                         // Fetch and checkout the PR branch
                         checkout([
@@ -65,9 +65,41 @@ pipeline {
         stage('Run Script') {
             steps {
                 script {
-                    sh "cd ${env.FOUND_DIR} && ./server_jenkins.sh"
+                    // Retry logic: check for lockfile and wait if another instance is running
+                    def lockFile = env.LOCKFILE
+                    def retries = 10
+                    def waitTime = 30 // seconds
+
+                    while (fileExists(lockFile) && retries > 0) {
+                        echo "Lockfile detected, waiting for ${waitTime} seconds before retrying..."
+                        sleep(waitTime)
+                        retries--
+                    }
+
+                    if (retries == 0) {
+                        error "Another instance of the script is already running. Timeout reached."
+                    } else {
+                        // No lockfile, proceed with running the script
+                        sh "cd ${env.FOUND_DIR} && ./server_jenkins.sh"
+                    }
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            // Clean up workspace with specified options
+            cleanWs(
+                cleanWhenNotBuilt: false,
+                deleteDirs: true,
+                disableDeferredWipeout: true,
+                notFailBuild: true,
+                patterns: [
+                    [pattern: '.gitignore', type: 'INCLUDE'],
+                    [pattern: '.propsfile', type: 'EXCLUDE']
+                ]
+            )
         }
     }
 }
