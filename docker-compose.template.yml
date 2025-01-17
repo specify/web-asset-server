@@ -2,7 +2,9 @@ version: '3.4'
 services:
 
   nginx:
-    image: nginx:latest
+    build:
+      context: ./
+      dockerfile: Dockerfile.nginx
     container_name: bottle-nginx
     ports:
       - '80:80'
@@ -21,8 +23,9 @@ services:
     restart: always
 
   image-server:
-#    image: ghcr.io/garutilorenzo/bottle-be:dev
-    build: ./
+    build:
+      context: ./
+      dockerfile: Dockerfile.images
     container_name: image-server
     environment:
       - EXTERNAL_IP=institution.org

@@ -1,0 +1,47 @@
+# Use the latest official Nginx image as the base
+FROM nginx:latest
+
+# (Optional) to avoid interactive prompts in some distros:
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install any additional packages you need (cron, wget, etc.)
+RUN apt-get update && apt-get install -y \
+    wget \
+    cron \
+    libpcre3 \
+    libpcre3-dev \
+    dnsutils \
+    && apt-get clean
+
+# Copy your main nginx.conf into the container
+COPY nginx.conf /etc/nginx/
+COPY ibss-images.conf /etc/nginx/conf.d/
+
+# Download and install the Nginx Ultimate Bad Bot Blocker 'install-ngxblocker' script
+RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker \
+    -O /usr/local/sbin/install-ngxblocker \
+ && chmod +x /usr/local/sbin/install-ngxblocker
+
+# Run install-ngxblocker, telling it to place files in conf.d and bots.d
+RUN /usr/local/sbin/install-ngxblocker -x -c /etc/nginx/conf.d -b /etc/nginx/bots.d
+
+# Download and install the setup/update scripts
+RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/setup-ngxblocker \
+    -O /usr/local/sbin/setup-ngxblocker \
+ && wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/update-ngxblocker \
+    -O /usr/local/sbin/update-ngxblocker \
+ && chmod +x /usr/local/sbin/setup-ngxblocker \
+ && chmod +x /usr/local/sbin/update-ngxblocker
+
+# Run setup-ngxblocker and applying changes (-x)
+RUN /usr/local/sbin/setup-ngxblocker \
+    -x \
+    -c /etc/nginx/conf.d/ \
+    -b /etc/nginx/bots.d/
+
+
+# (Optional) Add a crontab job to periodically update the blocker
+RUN echo "00 22 * * * /usr/local/sbin/update-ngxblocker -e youremail@example.org" >> /etc/crontab
+
+# Expose NGINX ports
+EXPOSE 80 443
