@@ -39,6 +39,8 @@ RUN /usr/local/sbin/setup-ngxblocker \
     -c /etc/nginx/conf.d/ \
     -b /etc/nginx/bots.d/
 
+# adding custom whitelists to botblocker
+COPY botblocker-settings/whitelist-domains.conf botblocker-settings/whitelist-ips.conf /etc/nginx/bots.d/
 
 # (Optional) Add a crontab job to periodically update the blocker
 RUN echo "00 22 * * * /usr/local/sbin/update-ngxblocker -e youremail@example.org" >> /etc/crontab
