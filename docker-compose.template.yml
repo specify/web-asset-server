@@ -25,7 +25,7 @@ services:
   image-server:
     build:
       context: ./
-      dockerfile: Dockerfile.images
+      dockerfile: Dockerfile.server
     container_name: image-server
     environment:
       - EXTERNAL_IP=institution.org
