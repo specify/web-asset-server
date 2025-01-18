@@ -40,8 +40,6 @@ if "EXTERNAL_IP" in os.environ:
     # print(f"Got external Ip from environment:{HOST}")
 else:
     import socket
-
-
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
     HOST = local_ip

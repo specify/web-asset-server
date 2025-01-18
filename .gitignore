@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 server_jenkins_config.sh
 attachments/
 **/tax_dump.sql
@@ -36,5 +37,4 @@ settings.development.py
 *.pyc
 .idea
 venv
-
 app.log
