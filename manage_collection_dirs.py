@@ -16,12 +16,12 @@ import os
 import subprocess
 
 def add_collection_dir(collection_dir_names):
-	# This creates a new directory for the collection
+    # This creates a new directory for the collection
     attachments_dir = 'attachments'
     if not os.path.exists(attachments_dir):
         os.mkdir(attachments_dir)
     for collection_dir_name in collection_dir_names:
-        dir_path = f'{attachments_dir}/{collection_dir_name}'
+        dir_path = '{}/{}'.format(attachments_dir, collection_dir_name)  # Replaced f-string
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
     with open("settings.py", "r+") as f:
@@ -29,7 +29,7 @@ def add_collection_dir(collection_dir_names):
         for i, line in enumerate(lines):
             if line.startswith("COLLECTION_DIRS = {"):
                 for collection_dir_name in collection_dir_names:
-                    lines.insert(i+1, f"    '{collection_dir_name}': '{collection_dir_name}',\n")
+                    lines.insert(i+1, "    '{}': '{}',\n".format(collection_dir_name, collection_dir_name))  # Replaced f-string
                 break
         f.seek(0)
         f.truncate()
@@ -40,7 +40,7 @@ def remove_collection_dir(collection_dir_names):
         lines = f.readlines()
         for i, line in enumerate(lines):
             for collection_dir_name in collection_dir_names:
-                if line.startswith(f"    '{collection_dir_name}': '{collection_dir_name}',"):
+                if line.startswith("    '{}': '{}',".format(collection_dir_name, collection_dir_name)):  # Replaced f-string
                     lines.pop(i)
                     break
         f.seek(0)

@@ -45,7 +45,7 @@ def generate_token(timestamp, filename):
     This is for comparing to the client submited token.
     """
     timestamp = str(timestamp)
-    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), 'md5')
+    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode())
     return ':'.join((mac.hexdigest(), timestamp))
 
 
@@ -369,5 +369,5 @@ def main_page():
 if __name__ == '__main__':
     from bottle import run
 
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
+    run(host='127.0.0.1', port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)
