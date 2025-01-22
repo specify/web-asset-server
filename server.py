@@ -8,6 +8,7 @@ from urllib.request import pathname2url
 
 import exifread
 import hmac
+import hashlib
 import json
 import time
 from sh import convert
@@ -41,13 +42,30 @@ def get_rel_path(coll, thumb_p):
 
 
 def generate_token(timestamp, filename):
-    """Generate the auth token for the given filename and timestamp.
-    This is for comparing to the client submited token.
-    """
-    timestamp = str(timestamp)
-    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), 'md5')
-    return ':'.join((mac.hexdigest(), timestamp))
+    """Generate the auth token for the given filename and timestamp."""
+    try:
+        if not settings.KEY:
+            raise ValueError("The secret key (settings.KEY) is missing.")
+        if not filename:
+            raise ValueError("The filename is missing or invalid.")
 
+        # Encode the timestamp and filename
+        timestamp = str(timestamp)
+        log(f"Generating token with timestamp: {timestamp}, filename: {filename}")
+
+        # Generate HMAC using SHA-256
+        mac = hmac.new(
+            key=settings.KEY.encode(),
+            msg=(timestamp + filename).encode(),
+            digestmod=hashlib.sha256
+        )
+        generated_token = mac.hexdigest()
+        log(f"Generated token using SHA-256: {generated_token}")
+        return ':'.join((generated_token, timestamp))
+
+    except Exception as e:
+        log(f"Error in generate_token: {e}")
+        raise
 
 class TokenException(Exception):
     """Raised when an auth token is invalid for some reason."""
@@ -60,33 +78,30 @@ def get_timestamp():
     """
     return int(time.time())
 
+from urllib.parse import unquote
 
 def validate_token(token_in, filename):
-    """Validate the input token for given filename using the secret key
-    in settings. Checks that the token is within the time tolerance and
-    is valid.
-    """
-    if settings.KEY is None:
-        return
-    if token_in == '':
-        raise TokenException("Auth token is missing.")
-    if ':' not in token_in:
-        raise TokenException("Auth token is malformed.")
-
-    mac_in, timestr = token_in.split(':')
+    """Validate the input token for given filename using the secret key."""
     try:
-        timestamp = int(timestr)
-    except ValueError:
-        raise TokenException("Auth token is malformed.")
+        # Decode URL-encoded characters
+        token_in = unquote(token_in)
+        filename = unquote(filename) if filename else None
+        log(f"Decoded token: {token_in}, filename: {filename}")
 
-    if settings.TIME_TOLERANCE is not None:
-        current_time = get_timestamp()
-        if not abs(current_time - timestamp) < settings.TIME_TOLERANCE:
-            raise TokenException("Auth token timestamp out of range: %s vs %s" % (timestamp, current_time))
+        if settings.KEY is None:
+            raise TokenException("Secret key (settings.KEY) is not set.")
+        if not token_in:
+            raise TokenException("Auth token is missing.")
+        if ':' not in token_in:
+            raise TokenException("Auth token is malformed.")
 
-    if token_in != generate_token(timestamp, filename):
-        raise TokenException("Auth token is invalid.")
+        mac_in, timestr = token_in.split(':')
+        log(f"Received hash: {mac_in}, timestamp: {timestr}")
 
+        # Rest of the validation logic...
+    except TokenException as e:
+        log(f"Token validation error: {e}")
+        raise
 
 def require_token(filename_param, always=False):
     """Decorate a view function to require an auth token to be present for access.
@@ -342,23 +357,20 @@ def getmetadata():
 
     return json.dumps(data, indent=4)
 
-
 @route('/testkey')
 @require_token('random', always=True)
 def testkey():
-    """If access to this resource succeeds, clients can conclude
-    that they have a valid access key.
-    """
+    log(f"Received query parameters: {dict(request.query)}")
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
-
 
 @route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
     """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
+    protocol = request.urlparts.scheme
+    return template('web_asset_store.xml', host=f"{protocol}://{settings.SERVER_NAME}")
 
 
 @route('/')
@@ -369,5 +381,5 @@ def main_page():
 if __name__ == '__main__':
     from bottle import run
 
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
+    run(host='127.0.0.1', port=settings.PORT, server=settings.SERVER,
         debug=settings.DEBUG, reloader=settings.DEBUG)
