@@ -1,7 +1,7 @@
 Web Asset Server
 =========
 
-This is a sample attachment server implementation for Specify. This implementation is targetted at Ubuntu flavors, but will work with minor modifications on other Linux systems. It is not expected to work without extensive adaptation on Windows systems.
+This is the official attachment server implementation for Specify. It is designed for Ubuntu flavors but can work with minor modifications on other Linux systems.
 
 The Specify Collections Consortium is funded by its member
 institutions. The Consortium web site is:
