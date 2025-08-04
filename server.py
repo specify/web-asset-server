@@ -3,7 +3,7 @@ from functools import wraps
 from glob import glob
 from mimetypes import guess_type
 from os import path, mkdir
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from io import BytesIO
 
 import exifread
@@ -16,53 +16,28 @@ from botocore.exceptions import ClientError
 
 import settings
 from bottle import (
-    Response, request, response, abort,
-    route, HTTPResponse, static_file, template)
+    Response, request, response, static_file, template, abort,
+    HTTPResponse, route
+)
 
-# Initialize S3 client
+
+# S3 client (shared)
 s3 = boto3.client('s3')
-BUCKET = settings.S3_BUCKET
-PREFIX = settings.S3_PREFIX.rstrip('/')
 
 
 def log(msg):
-    if settings.DEBUG:
+    if getattr(settings, "DEBUG", False):
         print(msg)
 
 
-def get_rel_path(coll, thumb_p):
-    """Return the collection subdirectory for originals or thumbnails."""
-    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
-    if settings.COLLECTION_DIRS is None:
-        return type_dir
-    try:
-        coll_dir = settings.COLLECTION_DIRS[coll]
-    except KeyError:
-        abort(404, f"Unknown collection: {coll!r}")
-    return path.join(coll_dir, type_dir)
-
-
-def make_s3_key(relpath, filename=''):
-    """Build a POSIX-style S3 key under optional PREFIX."""
-    key = relpath.replace(path.sep, '/')
-    if filename:
-        key = f"{key}/{filename}" if key else filename
-    if PREFIX:
-        key = f"{PREFIX}/{key}" if key else PREFIX
-    return key.lstrip('/')
-
-
+### Token/Auth helpers (unchanged semantics) ###
 def generate_token(timestamp, filename):
     """Generate the auth token for the given filename and timestamp.
     This is for comparing to the client submited token.
     """
     timestamp = str(timestamp)
-    mac = hmac.new(
-        settings.KEY.encode(),
-        timestamp.encode() + filename.encode(),
-        'md5'
-    )
-    return f"{mac.hexdigest()}:{timestamp}"
+    mac = hmac.new(settings.KEY.encode(), timestamp.encode() + filename.encode(), 'md5')
+    return ':'.join((mac.hexdigest(), timestamp))
 
 
 class TokenException(Exception):
@@ -92,9 +67,11 @@ def validate_token(token_in, filename):
     except ValueError:
         raise TokenException("Auth token is malformed.")
     if settings.TIME_TOLERANCE is not None:
-        now = get_timestamp()
-        if abs(now - timestamp) >= settings.TIME_TOLERANCE:
-            raise TokenException("Auth token timestamp out of range.")
+        current_time = get_timestamp()
+        if not abs(current_time - timestamp) < settings.TIME_TOLERANCE:
+            raise TokenException(
+                "Auth token timestamp out of range: %s vs %s" % (timestamp, current_time)
+            )
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
 
@@ -115,8 +92,8 @@ def require_token(filename_param, always=False):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if always or request.method not in ('GET','HEAD') or settings.REQUIRE_KEY_FOR_GET:
-                params = request.forms if request.method=='POST' else request.query
+            if always or request.method not in ('GET', 'HEAD') or settings.REQUIRE_KEY_FOR_GET:
+                params = request.forms if request.method == 'POST' else request.query
                 try:
                     validate_token(params.token, params.get(filename_param))
                 except TokenException as e:
@@ -150,116 +127,171 @@ def allow_cross_origin(func):
         try:
             result = func(*args, **kwargs)
         except HTTPResponse as r:
-            r.set_header('Access-Control-Allow-Origin','*')
+            r.set_header('Access-Control-Allow-Origin', '*')
             raise
         target = result if isinstance(result, Response) else response
-        target.set_header('Access-Control-Allow-Origin','*')
+        target.set_header('Access-Control-Allow-Origin', '*')
         return result
     return wrapper
 
 
+### S3 URI / key helpers ###
+def parse_s3_uri(s3_uri):
+    """
+    Parse s3://bucket/prefix and return (bucket, prefix_without_trailing_slash)
+    """
+    parsed = urlparse(s3_uri)
+    if parsed.scheme != 's3' or not parsed.netloc:
+        raise ValueError(f"Invalid S3 URI: {s3_uri!r}")
+    bucket = parsed.netloc
+    prefix = parsed.path.lstrip('/').rstrip('/')
+    return bucket, prefix
+
+
+def get_collection_base(coll):
+    """
+    Return (bucket, base_prefix) for the collection, or 404 if unknown.
+    """
+    try:
+        s3_uri = settings.COLLECTION_S3_PATHS[coll]
+    except Exception:
+        abort(404, f"Unknown collection: {coll!r}")
+    try:
+        return parse_s3_uri(s3_uri)
+    except ValueError as e:
+        abort(500, str(e))
+
+
+def make_s3_key(coll, thumb_p, filename=''):
+    """
+    Build bucket and key for given collection, thumb/orig, and filename.
+    """
+    bucket, base_prefix = get_collection_base(coll)
+    subdir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+    parts = []
+    if base_prefix:
+        parts.append(base_prefix)
+    parts.append(subdir)
+    if filename:
+        parts.append(filename)
+    key = '/'.join(p.strip('/') for p in parts if p)
+    return bucket, key
+
+
+def stream_s3_object(bucket, key):
+    """Retrieve object from S3, abort 404 if missing."""
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
+            abort(404, f"Missing object: {key}")
+        raise
+    return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
+
+
 def resolve_s3_key():
-    thumb_p = (request.query.get('type')=='T')
+    """
+    Determine bucket+key for requested file or thumbnail. Generate thumbnail if needed.
+    Returns (bucket, key).
+    """
+    thumb_p = (request.query.get('type') == "T")
     coll = request.query.coll
     name = request.query.filename
-    rel = get_rel_path(coll, thumb_p)
 
     if not thumb_p:
-        return make_s3_key(rel, name)
+        return make_s3_key(coll, False, name)
 
-    # thumbnail: check cache, else generate
+    # Thumbnail logic
     scale = int(request.query.scale)
     root, ext = path.splitext(name)
-    if ext.lower() in ('.pdf','.tiff','.tif'):
+    if ext.lower() in ('.pdf', '.tiff', '.tif'):
         ext = '.png'
     thumb_name = f"{root}_{scale}{ext}"
-    thumb_key = make_s3_key(rel, thumb_name)
+    bucket, thumb_key = make_s3_key(coll, True, thumb_name)
 
-    # cached?
+    # If thumbnail exists, return it
     try:
-        s3.head_object(Bucket=BUCKET, Key=thumb_key)
-        log(f"Cached thumbnail: {thumb_key}")
-        return thumb_key
+        s3.head_object(Bucket=bucket, Key=thumb_key)
+        log(f"Serving cached thumbnail {thumb_key}")
+        return bucket, thumb_key
     except ClientError as e:
-        if e.response['Error']['Code'] not in ('404','NoSuchKey'):
+        if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
             raise
 
-    # fetch original
-    orig_key = make_s3_key(get_rel_path(coll, False), name)
+    # Need to generate thumbnail: fetch original
+    orig_bucket, orig_key = make_s3_key(coll, False, name)
     try:
-        obj = s3.get_object(Bucket=BUCKET, Key=orig_key)
+        obj = s3.get_object(Bucket=orig_bucket, Key=orig_key)
     except ClientError as e:
-        code = e.response['Error']['Code']
-        if code in ('404','NoSuchKey'):
+        if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
             abort(404, f"Missing original: {orig_key}")
         raise
     data = obj['Body'].read()
 
-    # write temp files
+    # Write temp files for ImageMagick processing
     from tempfile import gettempdir
     tmp = gettempdir()
-    local_in = path.join(tmp, name)
-    local_out = path.join(tmp, thumb_name)
-    with open(local_in,'wb') as f:
+    local_orig = path.join(tmp, name)
+    local_thumb = path.join(tmp, thumb_name)
+    with open(local_orig, 'wb') as f:
         f.write(data)
 
-    args = ['-resize', f"{scale}x{scale}>"]
-    if obj['ContentType']=='application/pdf':
-        args += ['-background','white','-flatten']
-        local_in += '[0]'
-    convert(local_in, *args, local_out)
+    convert_args = ['-resize', f"{scale}x{scale}>"]
+    if obj.get('ContentType', '') == 'application/pdf':
+        convert_args += ['-background', 'white', '-flatten']
+        local_orig_with_page = local_orig + '[0]'
+    else:
+        local_orig_with_page = local_orig
 
-    # upload thumbnail
-    ctype, _ = guess_type(local_out)
-    with open(local_out,'rb') as f:
+    log(f"Scaling thumbnail to {scale}")
+    convert(local_orig_with_page, *convert_args, local_thumb)
+
+    # Upload generated thumbnail
+    ctype, _ = guess_type(local_thumb)
+    with open(local_thumb, 'rb') as f:
         s3.put_object(
-            Bucket=BUCKET,
+            Bucket=bucket,
             Key=thumb_key,
             Body=f,
             ContentType=ctype or 'application/octet-stream'
         )
-    return thumb_key
+
+    return bucket, thumb_key
 
 
-def stream_s3_object(key):
-    try:
-        obj = s3.get_object(Bucket=BUCKET, Key=key)
-    except ClientError as e:
-        if e.response['Error']['Code'] in ('404','NoSuchKey'):
-            abort(404, f"Missing object: {key}")
-        raise
-    return obj['Body'].read(), obj['ContentType']
-
-
+### Routes ###
 @route('/static/<path:path>')
-def static(path):
-    """Serve static files to the client. Primarily for Web Portal."""
+def static_handler(path):
+    """Serve local static files (unchanged)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    return static_file(path, root=settings.BASE_DIR)
+    return static_file(path, root=getattr(settings, 'BASE_DIR', '/'))
 
 
 @route('/getfileref')
 @allow_cross_origin
 def getfileref():
-    """Returns a URL to the static file indicated by the query parameters."""
+    """Return the fileget URL for the requested attachment (client will append token etc)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    response.content_type='text/plain; charset=utf-8'
-    key = resolve_s3_key()
-    return f"http://{settings.HOST}:{settings.PORT}/static/{quote(key)}"
+    response.content_type = 'text/plain; charset=utf-8'
+    # build minimal URL that points to fileget with same query parameters needed
+    coll = request.query.coll
+    filename = request.query.filename
+    return f"http://{settings.HOST}:{settings.PORT}/fileget?coll={quote(coll)}&filename={quote(filename)}"
 
 
 @route('/fileget')
 @require_token('filename')
 def fileget():
-    key = resolve_s3_key()
-    data, ctype = stream_s3_object(key)
+    """Serve object from S3 (original or thumbnail)."""
+    bucket, key = resolve_s3_key()
+    data, content_type = stream_s3_object(bucket, key)
     r = Response(body=data)
-    r.content_type = ctype
-    dl = request.query.get('downloadname')
-    if dl:
-        dl = quote(path.basename(dl).encode('ascii','replace'))
+    r.content_type = content_type
+    download_name = request.query.get('downloadname')
+    if download_name:
+        dl = quote(path.basename(download_name).encode('ascii', 'replace'))
         r.set_header('Content-Disposition', f"inline; filename*=utf-8''{dl}")
     return r
 
@@ -267,7 +299,7 @@ def fileget():
 @route('/fileupload', method='OPTIONS')
 @allow_cross_origin
 def fileupload_options():
-    response.content_type='text/plain; charset=utf-8'
+    response.content_type = "text/plain; charset=utf-8"
     return ''
 
 
@@ -275,75 +307,96 @@ def fileupload_options():
 @allow_cross_origin
 @require_token('store')
 def fileupload():
-    thumb_p = (request.forms['type']=='T')
+    """Upload a new original (thumbnails are derived later)."""
+    thumb_p = (request.forms.get('type') == "T")
     coll = request.forms.coll
     name = request.forms.store
-    key = make_s3_key(get_rel_path(coll, thumb_p), name)
+
+    if thumb_p:
+        return 'Ignoring thumbnail upload!'
+
+    bucket, key = make_s3_key(coll, False, name)
     upload = list(request.files.values())[0]
     body = upload.file.read()
-    ctype = upload.content_type or 'application/octet-stream'
-    s3.put_object(Bucket=BUCKET, Key=key, Body=body, ContentType=ctype)
-    response.content_type='text/plain; charset=utf-8'
+    content_type = upload.content_type or 'application/octet-stream'
+
+    s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
+
+    response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
 
 @route('/filedelete', method='POST')
 @require_token('filename')
 def filedelete():
+    """Delete original + derived thumbnails for a collection."""
     coll = request.forms.coll
     name = request.forms.filename
-    orig_key = make_s3_key(get_rel_path(coll,False), name)
-    s3.delete_object(Bucket=BUCKET, Key=orig_key)
-    # delete thumbnails
-    thumb_prefix = make_s3_key(get_rel_path(coll,True), '')
-    base = name.split('.',1)[0] + '_'
+
+    # Delete original
+    bucket, orig_key = make_s3_key(coll, False, name)
+    s3.delete_object(Bucket=bucket, Key=orig_key)
+
+    # Delete matching thumbnails (prefix: basename_)
+    thumb_bucket, thumb_prefix_base = make_s3_key(coll, True, '')
+    base = name.split('.', 1)[0] + '_'
     paginator = s3.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=BUCKET, Prefix=thumb_prefix+base):
-        for obj in page.get('Contents',[]):
-            s3.delete_object(Bucket=BUCKET, Key=obj['Key'])
-    response.content_type='text/plain; charset=utf-8'
+    for page in paginator.paginate(Bucket=thumb_bucket, Prefix=f"{thumb_prefix_base}{base}"):
+        for obj in page.get('Contents', []):
+            s3.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
+
+    response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
 
 @route('/getmetadata')
 @require_token('filename')
 def getmetadata():
+    """Fetch original from S3 and return EXIF metadata."""
     coll = request.query.coll
     name = request.query.filename
-    key = make_s3_key(get_rel_path(coll,False), name)
-    data, _ = stream_s3_object(key)
+    bucket, key = make_s3_key(coll, False, name)
+    data, _ = stream_s3_object(bucket, key)
     f = BytesIO(data)
     try:
         tags = exifread.process_file(f)
     except:
         log("Error reading EXIF data.")
         tags = {}
-    if request.query.dt=='date':
+
+    if request.query.get('dt') == 'date':
         try:
             return str(tags['EXIF DateTimeOriginal'])
         except KeyError:
-            abort(404,'DateTime not found in EXIF')
+            abort(404, 'DateTime not found in EXIF')
+
     out = defaultdict(dict)
-    for k,v in tags.items():
-        parts=k.split()
-        if len(parts)<2: continue
-        out.setdefault(parts[0],{})[parts[1]] = str(v)
-    result = [OrderedDict((('Name',k),('Fields',f))) for k,f in out.items()]
-    response.content_type='application/json'
+    for k, v in tags.items():
+        parts = k.split()
+        if len(parts) < 2:
+            continue
+        out.setdefault(parts[0], {})[parts[1]] = str(v)
+
+    result = [OrderedDict((('Name', k), ('Fields', f))) for k, f in out.items()]
+    response.content_type = 'application/json'
     return json.dumps(result, indent=4)
 
 
 @route('/testkey')
+@require_token('random', always=True)
 def testkey():
-    response.content_type='text/plain; charset=utf-8'
+    response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
 
 @route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
-    response.content_type='text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host=f"{settings.SERVER_NAME}:{settings.SERVER_PORT}")
+    response.content_type = 'text/xml; charset=utf-8'
+    return template(
+        'web_asset_store.xml',
+        host=f"{settings.SERVER_NAME}:{settings.SERVER_PORT}"
+    )
 
 
 @route('/')
@@ -351,8 +404,12 @@ def main_page():
     return 'It works!'
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     from bottle import run
-    run(host='0.0.0.0', port=settings.PORT,
-        server=settings.SERVER, debug=settings.DEBUG,
-        reloader=settings.DEBUG)
+    run(
+        host='0.0.0.0',
+        port=settings.PORT,
+        server=settings.SERVER,
+        debug=settings.DEBUG,
+        reloader=settings.DEBUG
+    )
