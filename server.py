@@ -1,8 +1,7 @@
 from collections import defaultdict, OrderedDict
 from functools import wraps
-from glob import glob
 from mimetypes import guess_type
-from os import path, mkdir
+from os import path
 from urllib.parse import quote, urlparse
 from io import BytesIO
 
@@ -17,8 +16,18 @@ from botocore.exceptions import ClientError
 import settings
 from bottle import (
     Response, request, response, static_file, template, abort,
-    HTTPResponse, route
+    HTTPResponse, route, redirect
 )
+
+
+from bottle import error
+
+@error(500)
+def show_500(exc):
+    import traceback
+    tb = traceback.format_exc()
+    print(tb)                 # prints in your console
+    return "<h1>500 Internal Server Error</h1><pre>" + tb + "</pre>"
 
 
 # S3 client (shared)
@@ -26,9 +35,9 @@ s3 = boto3.client('s3')
 
 
 def log(msg):
-    if getattr(settings, "DEBUG", False):
-        print(msg)
-
+    print(msg)
+    # if getattr(settings, "DEBUG", False):
+    #     print(msg)
 
 ### Token/Auth helpers (unchanged semantics) ###
 def generate_token(timestamp, filename):
@@ -143,10 +152,7 @@ def parse_s3_uri(s3_uri):
     parsed = urlparse(s3_uri)
     if parsed.scheme != 's3' or not parsed.netloc:
         raise ValueError(f"Invalid S3 URI: {s3_uri!r}")
-    bucket = parsed.netloc
-    prefix = parsed.path.lstrip('/').rstrip('/')
-    return bucket, prefix
-
+    return parsed.netloc, parsed.path.lstrip('/').rstrip('/')
 
 def get_collection_base(coll):
     """
@@ -154,7 +160,7 @@ def get_collection_base(coll):
     """
     try:
         s3_uri = settings.COLLECTION_S3_PATHS[coll]
-    except Exception:
+    except KeyError:
         abort(404, f"Unknown collection: {coll!r}")
     try:
         return parse_s3_uri(s3_uri)
@@ -162,19 +168,19 @@ def get_collection_base(coll):
         abort(500, str(e))
 
 
-def make_s3_key(coll, thumb_p, filename=''):
+def make_s3_key(coll, thumb, filename=''):
     """
     Build bucket and key for given collection, thumb/orig, and filename.
     """
     bucket, base_prefix = get_collection_base(coll)
-    subdir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+    subdir = settings.THUMB_DIR if thumb else settings.ORIG_DIR
     parts = []
     if base_prefix:
         parts.append(base_prefix)
     parts.append(subdir)
     if filename:
         parts.append(filename)
-    key = '/'.join(p.strip('/') for p in parts if p)
+    key = '/'.join(p.strip('/') for p in parts)
     return bucket, key
 
 
@@ -265,7 +271,22 @@ def static_handler(path):
     """Serve local static files (unchanged)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    return static_file(path, root=getattr(settings, 'BASE_DIR', '/'))
+
+    parts = path.split('/', 1)
+    if len(parts) != 2:
+        abort(404, f"Bad static path: {path!r}")
+
+    coll, rest = parts
+    try:
+        bucket, base_prefix = parse_s3_uri(settings.COLLECTION_S3_PATHS[coll])
+    except KeyError:
+        abort(404, f"Unknown collection: {coll!r}")
+
+    key = '/'.join(p for p in (base_prefix, rest) if p)
+    data, ctype = stream_s3_object(bucket, key)
+
+    response.content_type = ctype
+    return data
 
 
 @route('/getfileref')
@@ -274,26 +295,35 @@ def getfileref():
     """Return the fileget URL for the requested attachment (client will append token etc)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    response.content_type = 'text/plain; charset=utf-8'
-    # build minimal URL that points to fileget with same query parameters needed
+
     coll = request.query.coll
     filename = request.query.filename
-    return f"http://{settings.HOST}:{settings.PORT}/fileget?coll={quote(coll)}&filename={quote(filename)}"
+
+    # URL-encode the “collection/filename” into a single static path
+    static_path = f"{quote(coll)}/{quote(filename)}"
+    url = f"http://{settings.HOST}:{settings.PORT}/static/{static_path}"
+
+    response.content_type = 'text/plain; charset=utf-8'
+    return url
 
 
 @route('/fileget')
 @require_token('filename')
 def fileget():
-    """Serve object from S3 (original or thumbnail)."""
     bucket, key = resolve_s3_key()
     data, content_type = stream_s3_object(bucket, key)
-    r = Response(body=data)
-    r.content_type = content_type
+
+    response.content_type = content_type
+
     download_name = request.query.get('downloadname')
     if download_name:
         dl = quote(path.basename(download_name).encode('ascii', 'replace'))
-        r.set_header('Content-Disposition', f"inline; filename*=utf-8''{dl}")
-    return r
+        response.set_header(
+            'Content-Disposition',
+            f"inline; filename*=utf-8''{dl}"
+        )
+
+    return data
 
 
 @route('/fileupload', method='OPTIONS')
@@ -360,12 +390,13 @@ def getmetadata():
     f = BytesIO(data)
     try:
         tags = exifread.process_file(f)
-    except:
-        log("Error reading EXIF data.")
+    except Exception as e:
+        log(f"Error reading EXIF data: {e}")
         tags = {}
 
     if request.query.get('dt') == 'date':
         try:
+            response.content_type = 'text/plain; charset=utf-8'
             return str(tags['EXIF DateTimeOriginal'])
         except KeyError:
             abort(404, 'DateTime not found in EXIF')
@@ -378,7 +409,7 @@ def getmetadata():
         out.setdefault(parts[0], {})[parts[1]] = str(v)
 
     result = [OrderedDict((('Name', k), ('Fields', f))) for k, f in out.items()]
-    response.content_type = 'application/json'
+    response.content_type = 'application/json; charset=utf-8'
     return json.dumps(result, indent=4)
 
 
@@ -393,10 +424,8 @@ def testkey():
 @include_timestamp
 def web_asset_store():
     response.content_type = 'text/xml; charset=utf-8'
-    return template(
-        'web_asset_store.xml',
-        host=f"{settings.SERVER_NAME}:{settings.SERVER_PORT}"
-    )
+    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
+    return template('web_asset_store.xml', host=f"{protocol}://{settings.SERVER_NAME}")
 
 
 @route('/')
