@@ -40,6 +40,16 @@ COLLECTION_S3_PATHS = {
     # ... add all your collections here ...
 }
 
+S3_ENDPOINTS = {
+    # Geneva
+    "my-bucket-geneva": "https://sos-ch-gva-2.exo.io",
+    # Zurich
+    "my-bucket-zurich":  "https://sos-ch-dk-2.exo.io",
+}
+
+S3_ADDRESSING_STYLE = "path"
+DEFAULT_S3_ENDPOINT = None
+
 # Local BASE_DIR no longer used for attachments; kept for static assets
 BASE_DIR = '/home/specify/attachments'
 
