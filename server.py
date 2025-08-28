@@ -12,6 +12,7 @@ import time
 from sh import convert
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 import settings
 from bottle import (
@@ -31,7 +32,38 @@ def show_500(exc):
 
 
 # S3 client (shared)
-s3 = boto3.client('s3')
+# s3 = boto3.client('s3')
+
+_s3_clients = {}  # cache by (endpoint_url)
+_cfg = Config(s3={"addressing_style": getattr(settings, "S3_ADDRESSING_STYLE", "path")})
+
+def _endpoint_for_bucket(bucket: str) -> str:
+    # Prefer explicit bucket->endpoint mapping
+    if hasattr(settings, "S3_ENDPOINTS") and bucket in settings.S3_ENDPOINTS:
+        return settings.S3_ENDPOINTS[bucket]
+
+    # Or derive from region map + format, if you opted for that style
+    if hasattr(settings, "S3_REGION_MAP") and hasattr(settings, "S3_ENDPOINT_FMT"):
+        region = settings.S3_REGION_MAP.get(bucket)
+        if region:
+            return settings.S3_ENDPOINT_FMT.format(region=region)
+
+    # Fallback default (optional)
+    if getattr(settings, "DEFAULT_S3_ENDPOINT", None):
+        return settings.DEFAULT_S3_ENDPOINT
+
+    raise RuntimeError(f"No endpoint configured for bucket: {bucket}")
+
+def s3_for_bucket(bucket: str):
+    endpoint = _endpoint_for_bucket(bucket)
+    # log(f"[S3] bucket={bucket} endpoint={endpoint}")
+    key = (endpoint,)
+    client = _s3_clients.get(key)
+    if client is None:
+        # region_name is not strictly required for Exoscale; endpoint decides.
+        client = boto3.client("s3", endpoint_url=endpoint, config=_cfg)
+        _s3_clients[key] = client
+    return client
 
 
 def log(msg):
@@ -186,6 +218,7 @@ def make_s3_key(coll, thumb, filename=''):
 
 def stream_s3_object(bucket, key):
     """Retrieve object from S3, abort 404 if missing."""
+    s3 = s3_for_bucket(bucket)
     try:
         obj = s3.get_object(Bucket=bucket, Key=key)
     except ClientError as e:
@@ -217,7 +250,9 @@ def resolve_s3_key():
 
     # If thumbnail exists, return it
     try:
-        s3.head_object(Bucket=bucket, Key=thumb_key)
+        # s3.head_object(Bucket=bucket, Key=thumb_key)
+        s3_thumb = s3_for_bucket(bucket)
+        s3_thumb.head_object(Bucket=bucket, Key=thumb_key)
         log(f"Serving cached thumbnail {thumb_key}")
         return bucket, thumb_key
     except ClientError as e:
@@ -227,7 +262,9 @@ def resolve_s3_key():
     # Need to generate thumbnail: fetch original
     orig_bucket, orig_key = make_s3_key(coll, False, name)
     try:
-        obj = s3.get_object(Bucket=orig_bucket, Key=orig_key)
+        # obj = s3.get_object(Bucket=orig_bucket, Key=orig_key)
+        s3_orig = s3_for_bucket(orig_bucket)
+        obj = s3_orig.get_object(Bucket=orig_bucket, Key=orig_key)
     except ClientError as e:
         if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
             abort(404, f"Missing original: {orig_key}")
@@ -255,7 +292,7 @@ def resolve_s3_key():
     # Upload generated thumbnail
     ctype, _ = guess_type(local_thumb)
     with open(local_thumb, 'rb') as f:
-        s3.put_object(
+        s3_thumb.put_object(
             Bucket=bucket,
             Key=thumb_key,
             Body=f,
@@ -350,6 +387,8 @@ def fileupload():
     body = upload.file.read()
     content_type = upload.content_type or 'application/octet-stream'
 
+    # s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
+    s3 = s3_for_bucket(bucket)
     s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
 
     response.content_type = 'text/plain; charset=utf-8'
@@ -365,15 +404,20 @@ def filedelete():
 
     # Delete original
     bucket, orig_key = make_s3_key(coll, False, name)
+    # s3.delete_object(Bucket=bucket, Key=orig_key)
+    s3 = s3_for_bucket(bucket)
     s3.delete_object(Bucket=bucket, Key=orig_key)
 
     # Delete matching thumbnails (prefix: basename_)
     thumb_bucket, thumb_prefix_base = make_s3_key(coll, True, '')
     base = name.split('.', 1)[0] + '_'
-    paginator = s3.get_paginator('list_objects_v2')
+    # paginator = s3.get_paginator('list_objects_v2')
+    s3_thumb = s3_for_bucket(thumb_bucket)
+    paginator = s3_thumb.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=thumb_bucket, Prefix=f"{thumb_prefix_base}{base}"):
         for obj in page.get('Contents', []):
-            s3.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
+            # s3.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
+            s3_thumb.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
