@@ -1,0 +1,13 @@
+name: Dockerize
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  dockerize:
+    uses: specify/workflows/.github/workflows/dockerize.yml@main
+    with:
+      username: ${{ secrets.DOCKERHUB_USERNAME }}
+      password: ${{ secrets.DOCKERHUB_TOKEN }}
+      registry-service: specifyconsortium/specify-asset-service
