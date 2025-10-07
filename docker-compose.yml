@@ -1,0 +1,19 @@
+services: 
+  asset-server:
+    restart: unless-stopped
+    build:
+      context: ./.
+    init: true
+    volumes:
+      - "attachments:/home/specify/attachments"
+      - './settings.py:/home/specify/settings.py'
+    environment:
+      - SERVER_NAME=localhost
+      - SERVER_PORT=8080
+      - ATTACHMENT_KEY=test_attachment_key
+      - DEBUG_MODE=true
+    ports:
+      - "8080:8080"
+
+volumes:
+  attachments:
