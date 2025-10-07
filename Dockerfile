@@ -14,8 +14,6 @@ RUN groupadd -g 999 specify && \
 
 RUN mkdir -p /home/specify && chown specify.specify /home/specify
 
-# COPY policy.xml /etc/ImageMagick-6/policy.xml
-
 USER specify
 WORKDIR /home/specify
 
