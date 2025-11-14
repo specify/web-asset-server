@@ -112,7 +112,7 @@ def require_token(filename_param, always=False):
                 except TokenException as e:
                     response.content_type = 'text/plain; charset=utf-8'
                     response.status = 403
-                    return e
+                    return response
             return func(*args, **kwargs)
 
         return wrapper

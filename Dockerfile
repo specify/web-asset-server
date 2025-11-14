@@ -1,12 +1,12 @@
-FROM ubuntu:18.04
+FROM ubuntu:24.04
 
 LABEL maintainer="Specify Collections Consortium <github.com/specify>"
 
 RUN apt-get update && apt-get -y install --no-install-recommends \
         ghostscript \
         imagemagick \
-        python3.6 \
-        python3-venv \
+        python3.12 \
+        python3.12-venv \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 999 specify && \
@@ -19,7 +19,7 @@ WORKDIR /home/specify
 
 COPY --chown=specify:specify requirements.txt .
 
-RUN python3.6 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
+RUN python3.12 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=specify:specify *.py views ./
 
@@ -34,5 +34,4 @@ RUN echo \
         "\nDEBUG = os.getenv('DEBUG_MODE', 'false').lower() == 'true'" \
         >> settings.py
 
-EXPOSE 8080
-CMD ve/bin/python server.py
+CMD ["ve/bin/python", "server.py"]
