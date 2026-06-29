@@ -1,3 +1,6 @@
 *.pyc
 .idea
 venv
+attachments/*
+*.zip
+.DS_Store
