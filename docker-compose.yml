@@ -1,0 +1,28 @@
+services: 
+  asset-server:
+    restart: unless-stopped
+    build:
+      context: ./.
+    init: true
+    volumes:
+      - "attachments:/home/specify/attachments"
+      # If you need to use the settings.py file, uncomment the following line.
+      # On container start-up, this bind mount will overwrite the changes made
+      # to the settings file during the Build process (e.g., parsing and 
+      # "applying" the environment variables)
+      # - './settings.py:/home/specify/settings.py'
+    environment:
+      - SERVER_NAME=host.docker.internal
+      - SERVER_PORT=8080
+      - ATTACHMENT_KEY=test_attachment_key
+      - DEBUG_MODE=true
+    ports:
+    # Instead of exposing the host machine's port, you can add this container
+    # to an existing Docker network (e.g., one that the Specify 7 instance is 
+    # on)
+    # See:
+    # https://docs.docker.com/compose/how-tos/networking/#use-an-existing-network
+      - "8080:8080"
+
+volumes:
+  attachments:
