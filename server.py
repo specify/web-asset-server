@@ -177,8 +177,8 @@ def resolve_file():
 
     root, ext = path.splitext(storename)
 
-    if mimetype in ('application/pdf', 'image/tiff'):
-        # use PNG for PDF thumbnails
+    if mimetype in ('application/pdf', 'image/tiff', 'image/heic', 'image/heif'):
+        # use PNG for PDF and HEIC thumbnails (ImageMagick can only read HEIC, not write)
         ext = '.png'
 
     scaled_name = "%s_%d%s" % (root, scale, ext)
