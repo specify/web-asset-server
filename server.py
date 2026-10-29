@@ -210,7 +210,8 @@ def resolve_s3_key():
     # Thumbnail logic
     scale = int(request.query.scale)
     root, ext = path.splitext(name)
-    if ext.lower() in ('.pdf', '.tiff', '.tif'):
+    # ImageMagick reads HEIC/HEIF; generate PNG thumbnails for these formats.
+    if ext.lower() in ('.pdf', '.tiff', '.tif', '.heic', '.heif'):
         ext = '.png'
     thumb_name = f"{root}_{scale}{ext}"
     bucket, thumb_key = make_s3_key(coll, True, thumb_name)

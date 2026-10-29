@@ -45,9 +45,10 @@ BASE_DIR = '/home/specify/attachments'
 
 THUMB_DIR = 'thumbnails'
 ORIG_DIR = 'originals'
+# Set of mime types that the server will try to thumbnail.
 CAN_THUMBNAIL = {
-    'image/jpeg','image/gif','image/png',
-    'image/tiff','application/pdf'
+    'image/jpeg', 'image/gif', 'image/png', 'image/tiff',
+    'application/pdf', 'image/heic', 'image/heif',
 }
 
 # What HTTP server to use for stand-alone operation.

@@ -1,12 +1,13 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 LABEL maintainer="Specify Collections Consortium <github.com/specify>"
 
 RUN apt-get update && apt-get -y install --no-install-recommends \
         ghostscript \
         imagemagick \
-        python3.12 \
-        python3.12-venv \
+        libheif-plugin-libde265 \
+        python3.14 \
+        python3.14-venv \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 999 specify && \
@@ -19,7 +20,7 @@ WORKDIR /home/specify
 
 COPY --chown=specify:specify requirements.txt .
 
-RUN python3.12 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
+RUN python3.14 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=specify:specify *.py views ./
 
