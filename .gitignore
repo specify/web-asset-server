@@ -4,3 +4,7 @@ venv
 attachments/*
 *.zip
 .DS_Store
+
+# Private deployment settings and production snapshots
+settings_local.py
+.production-snapshot/

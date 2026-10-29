@@ -30,15 +30,8 @@ SERVER_NAME = HOST
 SERVER_PORT = PORT
 DEVELOPMENT_PORT = PORT # Port the development test server should listen on.
 
-# Map collection names to directories.  Set to None to store
-# everything in the same originals and thumbnail directories.  This is
-# recommended unless some provision is made to allow attachments for
-# items scoped above collections to be found.
-COLLECTION_S3_PATHS = {
-    'coll1': 's3://my-bucket/path/to/coll1',
-    'coll2': 's3://my-bucket/path/to/coll2',
-    # ... add all your collections here ...
-}
+# Institution-specific S3 mappings belong in settings_local.py.
+COLLECTION_S3_PATHS = {}
 
 # Local BASE_DIR no longer used for attachments; kept for static assets
 BASE_DIR = '/home/specify/attachments'
@@ -55,3 +48,22 @@ CAN_THUMBNAIL = {
 # SERVER = 'paste' # Requires python-paste package. Fast, and seems to work good.
 # use wsgiref for testing. Requires no extra packages.
 SERVER = 'paste'  # or 'wsgiref'
+
+ALT_DIR = None
+
+ALT_DIR_COLLECTIONS = {}
+
+# Institution-specific overrides; see CONFIGURATION.md.
+try:
+    import settings_local as _local_settings
+except ModuleNotFoundError as exc:
+    if exc.name != 'settings_local':
+        raise
+else:
+    for _name in dir(_local_settings):
+        if _name.isupper() and not _name.startswith('_'):
+            globals()[_name] = getattr(_local_settings, _name)
+    # Derive these after overrides unless the institution explicitly sets them.
+    SERVER_NAME = getattr(_local_settings, 'SERVER_NAME', HOST)
+    SERVER_PORT = getattr(_local_settings, 'SERVER_PORT', PORT)
+    DEVELOPMENT_PORT = getattr(_local_settings, 'DEVELOPMENT_PORT', PORT)

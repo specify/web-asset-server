@@ -35,6 +35,8 @@ under GNU General Public License 2 (GPL2).
 
 # Installation
 
+For institution-specific S3 configuration, see [Configuration](CONFIGURATION.md).
+
 ## Docker
 
 Docker in the preferred installation method for Web Asset Server.
