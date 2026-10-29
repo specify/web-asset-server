@@ -1,5 +1,10 @@
 # Institution configuration
 
+S3 downloads stream in 64 KiB chunks and support HEAD and single byte ranges
+(including open-ended and suffix ranges). Unsatisfiable ranges return 416;
+multipart ranges fall back to a full response. If-Range honors an exact ETag or
+Last-Modified value. Thumbnail inputs are streamed to isolated temporary files.
+
 Copy `settings_local.example.py` to `settings_local.py` beside `settings.py`.
 Set `HOST` to the public hostname (without scheme or path), and `KEY` to the
 secret configured in Specify attachment preferences. Keep this file private;

@@ -12,7 +12,8 @@ class StorageTests(unittest.TestCase):
             store.put_object(Bucket=root, Key='originals/a.att.jpg', Body=b'original')
             store.put_object(Bucket=root, Key='thumbnails/a.att_100.jpg', Body=b'thumb')
             store.put_object(Bucket=root, Key='thumbnails/other_100.jpg', Body=b'other')
-            self.assertEqual(store.get_object(Bucket=root, Key='originals/a.att.jpg')['Body'].read(), b'original')
+            with store.get_object(Bucket=root, Key='originals/a.att.jpg')['Body'] as body:
+                self.assertEqual(body.read(), b'original')
             pages = list(store.paginate(Bucket=root, Prefix='thumbnails/a.att_'))
             self.assertEqual(pages[0]['Contents'], [{'Key': 'thumbnails/a.att_100.jpg'}])
             store.delete_object(Bucket=root, Key='originals/a.att.jpg')

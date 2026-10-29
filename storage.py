@@ -24,7 +24,7 @@ class LocalStorage:
     def get_object(self, *, Bucket, Key):
         self.head_object(Bucket=Bucket, Key=Key)
         target = self._path(Bucket, Key)
-        return {'Body': BytesIO(target.read_bytes()),
+        return {'Body': target.open('rb'),
                 'ContentType': guess_type(str(target))[0] or 'application/octet-stream'}
 
     def put_object(self, *, Bucket, Key, Body, ContentType=None):

@@ -206,7 +206,10 @@ def stream_s3_object(bucket, key):
         if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
             abort(404, f"Missing object: {key}")
         raise
-    return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
+    try:
+        return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
+    finally:
+        obj['Body'].close()
 
 
 def public_origin():
@@ -223,9 +226,8 @@ def serve_object(bucket, key):
     if storage_backend == 'local':
         target = s3._path(bucket, key)
         return static_file(target.name, root=str(target.parent))
-    data, content_type = stream_s3_object(bucket, key)
-    response.content_type = content_type
-    return data
+    from s3_http import serve_s3
+    return serve_s3(s3, bucket, key)
 
 
 def resolve_s3_key():
@@ -271,15 +273,15 @@ def resolve_s3_key():
         if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
             abort(404, f"Missing original: {orig_key}")
         raise
-    data = obj['Body'].read()
-
     # Write temp files for ImageMagick processing
     from tempfile import TemporaryDirectory
-    with TemporaryDirectory(prefix='asset-thumbnail-') as tmp:
+    from contextlib import closing
+    import shutil
+    with closing(obj['Body']) as body, TemporaryDirectory(prefix='asset-thumbnail-') as tmp:
         local_orig = path.join(tmp, 'original' + path.splitext(name)[1])
         local_thumb = path.join(tmp, 'thumbnail' + ext)
         with open(local_orig, 'wb') as f:
-            f.write(data)
+            shutil.copyfileobj(body, f, length=64 * 1024)
         convert_args = ['-resize', f"{scale}x{scale}>"]
         if path.splitext(name)[1].lower() == '.pdf':
             convert_args += ['-background', 'white', '-flatten']
@@ -315,10 +317,7 @@ def static_handler(path):
         abort(404, f"Unknown collection: {coll!r}")
 
     key = '/'.join(p for p in (base_prefix, rest) if p)
-    data, ctype = stream_s3_object(bucket, key)
-
-    response.content_type = ctype
-    return data
+    return serve_object(bucket, key)
 
 
 @route('/getfileref')
