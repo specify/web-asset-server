@@ -285,7 +285,9 @@ def resolve_s3_key():
         convert_args = ['-resize', f"{scale}x{scale}>"]
         if path.splitext(name)[1].lower() == '.pdf':
             convert_args += ['-background', 'white', '-flatten']
-            local_orig += '[0]'
+        # PR #35: select the first TIFF layer so ImageMagick writes one output
+        # rather than numbered -0/-1 files. This also covers PDFs and sequences.
+        local_orig += '[0]'
         convert(local_orig, *convert_args, local_thumb)
         ctype, _ = guess_type(local_thumb)
         with open(local_thumb, 'rb') as f:
