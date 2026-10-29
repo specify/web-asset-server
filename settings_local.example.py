@@ -4,7 +4,7 @@ KEY = 'replace-with-your-own-secret'  # Must match Specify attachment preference
 
 # Local storage is the default.
 STORAGE_BACKEND = 'local'
-BASE_DIR = '/srv/attachments'
+BASE_DIR = '/home/specify/attachments'
 COLLECTION_DIRS = None  # Collections share originals/ and thumbnails/.
 # Or isolate collections under the base directory:
 # COLLECTION_DIRS = {'Example Collection': 'example'}
@@ -17,4 +17,5 @@ COLLECTION_DIRS = None  # Collections share originals/ and thumbnails/.
 
 # PORT = 8080
 # SERVER_NAME = HOST
+# SERVER_PORT = 443
 # DEBUG = False

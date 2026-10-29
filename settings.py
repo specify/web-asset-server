@@ -15,7 +15,7 @@ DEBUG = False
 # will allow anyone on the internet to use the attachment server to store
 # arbitrary files.
 KEY = 'test_attachment_key'
-TIME_TOLERANCE = 600
+TIME_TOLERANCE = 150
 REQUIRE_KEY_FOR_GET = False
 
 # This is required for use with the Web Portal.
@@ -55,6 +55,21 @@ ALT_DIR = None
 
 ALT_DIR_COLLECTIONS = {}
 
+# 1. Environment overrides shared defaults. 
+# 2. Private file overrides environment.
+for _name in ('HOST', 'SERVER_NAME', 'STORAGE_BACKEND', 'BASE_DIR'):
+    if _name in os.environ:
+        globals()[_name] = os.environ[_name]
+for _name in ('PORT', 'SERVER_PORT'):
+    if _name in os.environ:
+        globals()[_name] = int(os.environ[_name])
+if 'ATTACHMENT_KEY' in os.environ:
+    KEY = os.environ['ATTACHMENT_KEY']
+if 'DEBUG_MODE' in os.environ:
+    DEBUG = os.environ['DEBUG_MODE'].lower() == 'true'
+SERVER_NAME = os.environ.get('SERVER_NAME', HOST)
+SERVER_PORT = int(os.environ.get('SERVER_PORT', PORT))
+
 # Institution-specific overrides; see CONFIGURATION.md.
 try:
     import settings_local as _local_settings
@@ -66,6 +81,8 @@ else:
         if _name.isupper() and not _name.startswith('_'):
             globals()[_name] = getattr(_local_settings, _name)
     # Derive these after overrides unless the institution explicitly sets them.
-    SERVER_NAME = getattr(_local_settings, 'SERVER_NAME', HOST)
-    SERVER_PORT = getattr(_local_settings, 'SERVER_PORT', PORT)
+    SERVER_NAME = getattr(_local_settings, 'SERVER_NAME',
+                          HOST if hasattr(_local_settings, 'HOST') else SERVER_NAME)
+    SERVER_PORT = getattr(_local_settings, 'SERVER_PORT',
+                          PORT if hasattr(_local_settings, 'PORT') else SERVER_PORT)
     DEVELOPMENT_PORT = getattr(_local_settings, 'DEVELOPMENT_PORT', PORT)

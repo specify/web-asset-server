@@ -26,7 +26,7 @@ def show_500(exc):
     import traceback
     tb = traceback.format_exc()
     print(tb)                 # prints in your console
-    return "<h1>500 Internal Server Error</h1><pre>" + tb + "</pre>"
+    return 'Internal Server Error'
 
 
 # S3 client (shared)
@@ -99,6 +99,7 @@ def require_token(filename_param, always=False):
     """
 
     def decorator(func):
+        @include_timestamp
         @wraps(func)
         def wrapper(*args, **kwargs):
             if always or request.method not in ('GET', 'HEAD') or settings.REQUIRE_KEY_FOR_GET:
@@ -121,7 +122,11 @@ def include_timestamp(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
+        try:
+            result = func(*args, **kwargs)
+        except HTTPResponse as result:
+            result.set_header('X-Timestamp', str(get_timestamp()))
+            raise
         target = result if isinstance(result, Response) else response
         target.set_header('X-Timestamp', str(get_timestamp()))
         return result
@@ -179,6 +184,8 @@ def make_s3_key(coll, thumb, filename=''):
     """
     Build bucket and key for given collection, thumb/orig, and filename.
     """
+    if filename and (filename in ('.', '..') or '/' in filename or '\\' in filename or '\x00' in filename):
+        abort(400, 'Attachment filename must be a single filename')
     bucket, base_prefix = get_collection_base(coll)
     subdir = settings.THUMB_DIR if thumb else settings.ORIG_DIR
     parts = []
@@ -202,6 +209,25 @@ def stream_s3_object(bucket, key):
     return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
 
 
+def public_origin():
+    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
+    host = settings.SERVER_NAME
+    # Explicit ports in SERVER_NAME remain supported, including IPv6 literals.
+    parsed = urlparse('//' + host)
+    if parsed.port is None and settings.SERVER_PORT != (443 if protocol == 'https' else 80):
+        host += ':' + str(settings.SERVER_PORT)
+    return f'{protocol}://{host}'
+
+
+def serve_object(bucket, key):
+    if storage_backend == 'local':
+        target = s3._path(bucket, key)
+        return static_file(target.name, root=str(target.parent))
+    data, content_type = stream_s3_object(bucket, key)
+    response.content_type = content_type
+    return data
+
+
 def resolve_s3_key():
     """
     Determine bucket+key for requested file or thumbnail. Generate thumbnail if needed.
@@ -215,7 +241,12 @@ def resolve_s3_key():
         return make_s3_key(coll, False, name)
 
     # Thumbnail logic
-    scale = int(request.query.scale)
+    try:
+        scale = int(request.query.scale)
+    except (TypeError, ValueError):
+        abort(400, 'Thumbnail scale must be an integer')
+    if not 1 <= scale <= 4096:
+        abort(400, 'Thumbnail scale must be between 1 and 4096')
     root, ext = path.splitext(name)
     # ImageMagick reads HEIC/HEIF; generate PNG thumbnails for these formats.
     if ext.lower() in ('.pdf', '.tiff', '.tif', '.heic', '.heif'):
@@ -243,32 +274,21 @@ def resolve_s3_key():
     data = obj['Body'].read()
 
     # Write temp files for ImageMagick processing
-    from tempfile import gettempdir
-    tmp = gettempdir()
-    local_orig = path.join(tmp, name)
-    local_thumb = path.join(tmp, thumb_name)
-    with open(local_orig, 'wb') as f:
-        f.write(data)
-
-    convert_args = ['-resize', f"{scale}x{scale}>"]
-    if obj.get('ContentType', '') == 'application/pdf':
-        convert_args += ['-background', 'white', '-flatten']
-        local_orig_with_page = local_orig + '[0]'
-    else:
-        local_orig_with_page = local_orig
-
-    log(f"Scaling thumbnail to {scale}")
-    convert(local_orig_with_page, *convert_args, local_thumb)
-
-    # Upload generated thumbnail
-    ctype, _ = guess_type(local_thumb)
-    with open(local_thumb, 'rb') as f:
-        s3.put_object(
-            Bucket=bucket,
-            Key=thumb_key,
-            Body=f,
-            ContentType=ctype or 'application/octet-stream'
-        )
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory(prefix='asset-thumbnail-') as tmp:
+        local_orig = path.join(tmp, 'original' + path.splitext(name)[1])
+        local_thumb = path.join(tmp, 'thumbnail' + ext)
+        with open(local_orig, 'wb') as f:
+            f.write(data)
+        convert_args = ['-resize', f"{scale}x{scale}>"]
+        if path.splitext(name)[1].lower() == '.pdf':
+            convert_args += ['-background', 'white', '-flatten']
+            local_orig += '[0]'
+        convert(local_orig, *convert_args, local_thumb)
+        ctype, _ = guess_type(local_thumb)
+        with open(local_thumb, 'rb') as f:
+            s3.put_object(Bucket=bucket, Key=thumb_key, Body=f,
+                          ContentType=ctype or 'application/octet-stream')
 
     return bucket, thumb_key
 
@@ -279,6 +299,10 @@ def static_handler(path):
     """Serve local static files (unchanged)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
+    if storage_backend == 'local':
+        # Preserve master URLs relative to BASE_DIR.
+        target = s3._path(settings.BASE_DIR, path)
+        return static_file(target.name, root=str(target.parent))
 
     parts = path.split('/', 1)
     if len(parts) != 2:
@@ -311,9 +335,13 @@ def getfileref():
     bucket, key = resolve_s3_key()
     _, prefix = get_collection_base(coll)
     relative = key[len(prefix.strip('/') + '/'):] if prefix else key
-    static_path = f"{quote(coll, safe='')}/{quote(relative)}"
-    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
-    url = f"{protocol}://{settings.SERVER_NAME}/static/{static_path}"
+    if storage_backend == 'local':
+        import os
+        relative = os.path.relpath(s3._path(bucket, key), path.realpath(settings.BASE_DIR))
+        static_path = quote(relative)
+    else:
+        static_path = f"{quote(coll, safe='')}/{quote(relative)}"
+    url = f"{public_origin()}/static/{static_path}"
 
     response.content_type = 'text/plain; charset=utf-8'
     return url
@@ -323,19 +351,18 @@ def getfileref():
 @require_token('filename')
 def fileget():
     bucket, key = resolve_s3_key()
-    data, content_type = stream_s3_object(bucket, key)
-
-    response.content_type = content_type
+    result = serve_object(bucket, key)
 
     download_name = request.query.get('downloadname')
     if download_name:
         dl = quote(path.basename(download_name).encode('ascii', 'replace'))
-        response.set_header(
+        target = result if isinstance(result, HTTPResponse) else response
+        target.set_header(
             'Content-Disposition',
             f"inline; filename*=utf-8''{dl}"
         )
 
-    return data
+    return result
 
 
 @route('/fileupload', method='OPTIONS')
@@ -359,10 +386,9 @@ def fileupload():
 
     bucket, key = make_s3_key(coll, False, name)
     upload = list(request.files.values())[0]
-    body = upload.file.read()
     content_type = upload.content_type or 'application/octet-stream'
 
-    s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
+    s3.put_object(Bucket=bucket, Key=key, Body=upload.file, ContentType=content_type)
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
@@ -436,8 +462,7 @@ def testkey():
 @include_timestamp
 def web_asset_store():
     response.content_type = 'text/xml; charset=utf-8'
-    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
-    return template('web_asset_store.xml', host=f"{protocol}://{settings.SERVER_NAME}")
+    return template('web_asset_store.xml', host=public_origin())
 
 
 @route('/')

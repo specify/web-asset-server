@@ -30,7 +30,21 @@ class LocalStorage:
     def put_object(self, *, Bucket, Key, Body, ContentType=None):
         target = self._path(Bucket, Key)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(Body.read() if hasattr(Body, 'read') else Body)
+        import shutil
+        import os
+        from tempfile import NamedTemporaryFile
+        temporary = None
+        try:
+            with NamedTemporaryFile(dir=target.parent, delete=False) as output:
+                temporary = output.name
+                if hasattr(Body, 'read'):
+                    shutil.copyfileobj(Body, output)
+                else:
+                    output.write(Body)
+            os.replace(temporary, target)
+        finally:
+            if temporary:
+                Path(temporary).unlink(missing_ok=True)
 
     def delete_object(self, *, Bucket, Key):
         self._path(Bucket, Key).unlink(missing_ok=True)

@@ -27,9 +27,14 @@ select S3. Invalid backend values cause startup to fail.
 
 ## Server settings
 
-Uppercase local settings override shared defaults. `SERVER_NAME` defaults to
+Precedence is shared defaults, environment variables, then the private file.
+Uppercase local settings override both defaults and environment. `SERVER_NAME` defaults to
 the overridden `HOST`; server/development ports default to `PORT`.
-Restart after changing configuration. For HTTPS, configure the reverse proxy
+Set `SERVER_PORT` to the public port (443 for standard HTTPS).
+Run `docker compose up -d --force-recreate` after changing configuration.
+The private file must be readable by container UID/GID 999; on Linux, one option
+is `sudo chgrp 999 settings_local.py` followed by `chmod 640 settings_local.py`.
+For HTTPS, configure the reverse proxy
 to send `X-Forwarded-Proto`.
 
 For the included Dockerfile, mount local settings read-only at
