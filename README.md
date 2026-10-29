@@ -7,7 +7,7 @@ The Specify Collections Consortium is funded by its member
 institutions. The Consortium web site is:
 http://www.specifysoftware.org
 
-Web Asset Server Copyright © 2021 Specify Collections Consortium. Specify
+Web Asset Server Copyright © 2026 Specify Collections Consortium. Specify
 comes with ABSOLUTELY NO WARRANTY.  This is free software licensed
 under GNU General Public License 2 (GPL2).
 
