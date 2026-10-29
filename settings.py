@@ -32,8 +32,10 @@ DEVELOPMENT_PORT = PORT # Port the development test server should listen on.
 
 # Institution-specific S3 mappings belong in settings_local.py.
 COLLECTION_S3_PATHS = {}
+STORAGE_BACKEND = 'local'  # Set to 's3' explicitly to use object storage.
+COLLECTION_DIRS = None  # Local: shared root, or {collection: relative directory}.
 
-# Local BASE_DIR no longer used for attachments; kept for static assets
+# Root directory for local attachments.
 BASE_DIR = '/home/specify/attachments'
 
 THUMB_DIR = 'thumbnails'

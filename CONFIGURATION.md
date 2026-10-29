@@ -1,13 +1,37 @@
 # Institution configuration
 
-1. Copy `settings_local.example.py` to `settings_local.py` beside `settings.py`.
-2. Set `HOST` to the public hostname (no `https://` or path), and `KEY` to the same secret used in Specify attachment preferences.
-3. Map each exact collection name to its `s3://bucket/prefix` in `COLLECTION_S3_PATHS`. Originals and thumbnails live under `prefix/originals/` and `prefix/thumbnails/`.
-4. Configure AWS credentials through the usual boto3 credential chain (for example, an instance IAM role or AWS profile). The server needs permission to read, write, delete, and list the configured objects.
-5. Restart the application after changing configuration. Behind HTTPS, configure the reverse proxy to send `X-Forwarded-Proto`.
+Copy `settings_local.example.py` to `settings_local.py` beside `settings.py`.
+Set `HOST` to the public hostname (without scheme or path), and `KEY` to the
+secret configured in Specify attachment preferences. Keep this file private;
+Git ignores it.
 
-`settings.py` contains shared defaults. Uppercase values in `settings_local.py` override them; `SERVER_NAME` defaults to the overridden `HOST`, and server/development ports default to `PORT`. You can explicitly override these too.
+## Local storage (default)
 
-Keep `settings_local.py` private; Git ignores it. Share the example file instead. The existing local file retains this installation’s production configuration. Without a local file, the defaults have no collection mappings and are not a configured deployment.
+Set `BASE_DIR` to a writable directory, such as `/srv/attachments`.
+With `COLLECTION_DIRS = None`, all collections share its `originals/` and
+`thumbnails/` directories. To isolate collections, set
+`COLLECTION_DIRS = {'Example Collection': 'example'}`; each relative directory
+contains its own `originals/` and `thumbnails/`. No AWS credentials are used.
 
-For Docker, mount the file read-only at `/home/specify/settings_local.py` for the included Dockerfile. Do not bake secrets into a shared image.
+## S3 storage (optional)
+
+Set `STORAGE_BACKEND = 's3'` explicitly and define `COLLECTION_S3_PATHS` using
+exact collection names and `s3://bucket/prefix` values. Objects are stored under
+`prefix/originals/` and `prefix/thumbnails/`. Configure AWS credentials through
+the boto3 credential chain, such as an instance IAM role or AWS profile, with
+read, write, delete, and list permissions for those objects.
+
+S3 deployments upgrading from automatic selection must add
+`STORAGE_BACKEND = 's3'` before restarting; collection mappings alone no longer
+select S3. Invalid backend values cause startup to fail.
+
+## Server settings
+
+Uppercase local settings override shared defaults. `SERVER_NAME` defaults to
+the overridden `HOST`; server/development ports default to `PORT`.
+Restart after changing configuration. For HTTPS, configure the reverse proxy
+to send `X-Forwarded-Proto`.
+
+For the included Dockerfile, mount local settings read-only at
+`/home/specify/settings_local.py` and mount persistent storage at `BASE_DIR`
+when using local mode. Do not bake secrets into shared images.

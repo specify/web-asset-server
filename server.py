@@ -10,7 +10,6 @@ import hmac
 import json
 import time
 from sh import convert
-import boto3
 from botocore.exceptions import ClientError
 
 import settings
@@ -31,7 +30,8 @@ def show_500(exc):
 
 
 # S3 client (shared)
-s3 = boto3.client('s3')
+from storage import create_storage
+s3, storage_backend = create_storage(settings)
 
 
 def log(msg):
@@ -158,6 +158,13 @@ def get_collection_base(coll):
     """
     Return (bucket, base_prefix) for the collection, or 404 if unknown.
     """
+    if storage_backend == 'local':
+        directories = getattr(settings, 'COLLECTION_DIRS', None)
+        if directories is None:
+            return settings.BASE_DIR, ''
+        if coll not in directories:
+            abort(404, f'Unknown collection: {coll!r}')
+        return path.join(settings.BASE_DIR, directories[coll]), ''
     try:
         s3_uri = settings.COLLECTION_S3_PATHS[coll]
     except KeyError:
@@ -279,7 +286,7 @@ def static_handler(path):
 
     coll, rest = parts
     try:
-        bucket, base_prefix = parse_s3_uri(settings.COLLECTION_S3_PATHS[coll])
+        bucket, base_prefix = get_collection_base(coll)
     except KeyError:
         abort(404, f"Unknown collection: {coll!r}")
 
@@ -301,8 +308,12 @@ def getfileref():
     filename = request.query.filename
 
     # URL-encode the “collection/filename” into a single static path
-    static_path = f"{quote(coll)}/{quote(filename)}"
-    url = f"http://{settings.HOST}:{settings.PORT}/static/{static_path}"
+    bucket, key = resolve_s3_key()
+    _, prefix = get_collection_base(coll)
+    relative = key[len(prefix.strip('/') + '/'):] if prefix else key
+    static_path = f"{quote(coll, safe='')}/{quote(relative)}"
+    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
+    url = f"{protocol}://{settings.SERVER_NAME}/static/{static_path}"
 
     response.content_type = 'text/plain; charset=utf-8'
     return url
@@ -370,9 +381,9 @@ def filedelete():
 
     # Delete matching thumbnails (prefix: basename_)
     thumb_bucket, thumb_prefix_base = make_s3_key(coll, True, '')
-    base = name.split('.', 1)[0] + '_'
+    base = path.splitext(name)[0] + '_'
     paginator = s3.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=thumb_bucket, Prefix=f"{thumb_prefix_base}{base}"):
+    for page in paginator.paginate(Bucket=thumb_bucket, Prefix=f"{thumb_prefix_base}/{base}"):
         for obj in page.get('Contents', []):
             s3.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
 

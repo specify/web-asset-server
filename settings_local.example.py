@@ -1,16 +1,20 @@
-# Copy to settings_local.py and customize for your institution!
-HOST = 'assets.example.edu'  # Asset server hostname
-KEY = 'replace-with-your-own-secret'  # Must match the one configured in the Specify environment 
+# Copy to settings_local.py and customize for your institution.
+HOST = 'assets.example.edu'
+KEY = 'replace-with-your-own-secret'  # Must match Specify attachment preferences.
 
-# Map collection names to directories.  Set to None to store
-# everything in the same originals and thumbnail directories.  This is
-# recommended unless some provision is made to allow attachments for
-# items scoped above collections to be found.
-COLLECTION_S3_PATHS = {
-    'Example Collection': 's3://your-bucket/your-prefix',
-}
+# Local storage is the default.
+STORAGE_BACKEND = 'local'
+BASE_DIR = '/srv/attachments'
+COLLECTION_DIRS = None  # Collections share originals/ and thumbnails/.
+# Or isolate collections under the base directory:
+# COLLECTION_DIRS = {'Example Collection': 'example'}
 
-# Optional overrides:
+# Optional: use S3 instead of local storage.
+# STORAGE_BACKEND = 's3'
+# COLLECTION_S3_PATHS = {
+#     'Example Collection': 's3://your-bucket/your-prefix',
+# }
+
 # PORT = 8080
 # SERVER_NAME = HOST
 # DEBUG = False
