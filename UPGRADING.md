@@ -50,3 +50,12 @@ that user. For example, on Linux use `sudo chgrp 999 settings_local.py` and
 `chmod 640 settings_local.py`. Run the helper with sudo when preserving a group your user does not belong to.
 The helper preserves existing ownership and mode and removes temporary files on failure.
 New files are created with mode 600; grant container access before deployment.
+
+## Host bind address
+
+Compose now defaults `ASSET_BIND_ADDRESS` to `127.0.0.1`, rather than listening
+on every host interface. This works for a reverse proxy on the same host.
+Remote clients and off-host proxies must set an appropriate host address in
+`.env`, for example `ASSET_BIND_ADDRESS=0.0.0.0` to listen on all interfaces,
+and configure their firewall accordingly. Apply with `docker compose up -d`
+and verify connectivity from the actual client or proxy host.
