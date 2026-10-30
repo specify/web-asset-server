@@ -87,6 +87,11 @@ class RequestLogging:
                                        'server_error' if status >= 500 else
                                        'client_error' if status >= 400 else
                                        'redirect' if status >= 300 else 'success'))
+                reason = environ.get('asset.error_reason')
+                if reason:
+                    fields['reason'] = reason
+                elif status >= 400:
+                    fields['reason'] = {400: 'bad_request', 403: 'forbidden', 404: 'not_found', 416: 'invalid_range'}.get(status, 'internal_error' if status >= 500 else 'request_rejected')
                 if fields['route'] in ('/fileget', '/getmetadata', '/getfileref'):
                     try:
                         query = parse_qs(environ.get('QUERY_STRING', ''), max_num_fields=100)
@@ -106,3 +111,9 @@ class RequestLogging:
                 level = logging.ERROR if status >= 500 else logging.WARNING if status >= 400 or not completed else logging.INFO
                 logger.log(level, 'request_finished', extra={'fields': fields})
                 request_id.reset(token)
+
+
+def abort_with_reason(status, reason, message):
+    from bottle import request, abort
+    request.environ['asset.error_reason'] = reason
+    abort(status, message)

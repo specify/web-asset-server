@@ -20,7 +20,7 @@ from bottle import (
 
 
 from bottle import error
-from app_logging import configure_logging, logger, RequestLogging
+from app_logging import configure_logging, logger, RequestLogging, abort_with_reason
 configure_logging(settings.LOG_LEVEL)
 
 @error(500)
@@ -48,7 +48,9 @@ def generate_token(timestamp, filename):
 
 class TokenException(Exception):
     """Raised when an auth token is invalid for some reason."""
-    pass
+    def __init__(self, message, reason='invalid_token'):
+        super().__init__(message)
+        self.reason = reason
 
 
 def get_timestamp():
@@ -66,17 +68,18 @@ def validate_token(token_in, filename):
     if settings.KEY is None:
         return
     if not token_in or ':' not in token_in:
-        raise TokenException("Auth token is missing or malformed.")
+        raise TokenException("Auth token is missing or malformed.",
+                             "missing_token" if not token_in else "malformed_token")
     mac_in, timestr = token_in.split(':', 1)
     try:
         timestamp = int(timestr)
     except ValueError:
-        raise TokenException("Auth token is malformed.")
+        raise TokenException("Auth token is malformed.", "malformed_token")
     if settings.TIME_TOLERANCE is not None:
         current_time = get_timestamp()
         if not abs(current_time - timestamp) < settings.TIME_TOLERANCE:
             raise TokenException(
-                "Auth token timestamp out of range: %s vs %s" % (timestamp, current_time)
+                "Auth token timestamp out of range: %s vs %s" % (timestamp, current_time), "expired_token"
             )
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
@@ -104,6 +107,7 @@ def require_token(filename_param, always=False):
                 try:
                     validate_token(params.token, params.get(filename_param))
                 except TokenException as e:
+                    request.environ['asset.error_reason'] = e.reason
                     response.content_type = 'text/plain; charset=utf-8'
                     response.status = 403
                     return str(e)
@@ -165,16 +169,16 @@ def get_collection_base(coll):
         if directories is None:
             return settings.BASE_DIR, ''
         if coll not in directories:
-            abort(404, f'Unknown collection: {coll!r}')
+            abort_with_reason(404, 'unknown_collection', 'Unknown collection')
         return path.join(settings.BASE_DIR, directories[coll]), ''
     try:
         s3_uri = settings.COLLECTION_S3_PATHS[coll]
     except KeyError:
-        abort(404, f"Unknown collection: {coll!r}")
+        abort_with_reason(404, 'unknown_collection', 'Unknown collection')
     try:
         return parse_s3_uri(s3_uri)
     except ValueError as e:
-        abort(500, str(e))
+        abort_with_reason(500, 'invalid_storage_configuration', 'Invalid storage configuration')
 
 
 def make_s3_key(coll, thumb, filename=''):
@@ -182,7 +186,7 @@ def make_s3_key(coll, thumb, filename=''):
     Build bucket and key for given collection, thumb/orig, and filename.
     """
     if filename and (filename in ('.', '..') or '/' in filename or '\\' in filename or '\x00' in filename):
-        abort(400, 'Attachment filename must be a single filename')
+        abort_with_reason(400, 'invalid_filename', 'Attachment filename must be a single filename')
     bucket, base_prefix = get_collection_base(coll)
     subdir = settings.THUMB_DIR if thumb else settings.ORIG_DIR
     parts = []
@@ -201,7 +205,7 @@ def stream_s3_object(bucket, key):
         obj = s3.get_object(Bucket=bucket, Key=key)
     except ClientError as e:
         if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
-            abort(404, f"Missing object: {key}")
+            abort_with_reason(404, 'asset_not_found', 'Attachment not found')
         raise
     try:
         return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
@@ -243,9 +247,9 @@ def resolve_s3_key():
     try:
         scale = int(request.query.scale)
     except (TypeError, ValueError):
-        abort(400, 'Thumbnail scale must be an integer')
+        abort_with_reason(400, 'invalid_thumbnail_scale', 'Thumbnail scale must be an integer')
     if not 1 <= scale <= 4096:
-        abort(400, 'Thumbnail scale must be between 1 and 4096')
+        abort_with_reason(400, 'invalid_thumbnail_scale', 'Thumbnail scale must be between 1 and 4096')
     root, ext = path.splitext(name)
     # ImageMagick reads HEIC/HEIF; generate PNG thumbnails for these formats.
     if ext.lower() in ('.pdf', '.tiff', '.tif', '.heic', '.heif'):
@@ -268,7 +272,7 @@ def resolve_s3_key():
         obj = s3.get_object(Bucket=orig_bucket, Key=orig_key)
     except ClientError as e:
         if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
-            abort(404, f"Missing original: {orig_key}")
+            abort_with_reason(404, 'original_not_found', 'Original attachment not found')
         raise
     # Write temp files for ImageMagick processing
     from tempfile import TemporaryDirectory
@@ -315,7 +319,7 @@ def static_handler(path):
     try:
         bucket, base_prefix = get_collection_base(coll)
     except KeyError:
-        abort(404, f"Unknown collection: {coll!r}")
+        abort_with_reason(404, 'unknown_collection', 'Unknown collection')
 
     key = '/'.join(p for p in (base_prefix, rest) if p)
     return serve_object(bucket, key)
@@ -437,7 +441,7 @@ def getmetadata():
             response.content_type = 'text/plain; charset=utf-8'
             return str(tags['EXIF DateTimeOriginal'])
         except KeyError:
-            abort(404, 'DateTime not found in EXIF')
+            abort_with_reason(404, 'metadata_date_not_found', 'DateTime not found in EXIF')
 
     out = defaultdict(dict)
     for k, v in tags.items():

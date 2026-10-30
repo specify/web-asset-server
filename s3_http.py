@@ -1,3 +1,4 @@
+from app_logging import abort_with_reason
 """Bounded S3 response bodies and HTTP byte-range handling."""
 import re
 from datetime import timezone
@@ -69,9 +70,9 @@ def serve_s3(client, bucket, key):
     except ClientError as exc:
         code = exc.response['Error']['Code']
         if code in ('404', 'NoSuchKey', 'NotFound'):
-            abort(404, 'Attachment not found')
+            abort_with_reason(404, 'asset_not_found', 'Attachment not found')
         if code in ('PreconditionFailed', '412'):
-            abort(412, 'Attachment changed; retry the request')
+            abort_with_reason(412, 'asset_changed', 'Attachment changed; retry the request')
         raise
     headers = object_headers(obj)
     if selected:

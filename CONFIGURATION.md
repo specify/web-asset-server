@@ -62,3 +62,5 @@ when using local mode. Do not bake secrets into shared images.
 See [Docker deployment](deploy/README.md) for the standard Compose setup, optional AWS credential mount, startup on reboot, and daily restart timer. Institution-specific paths and ownership go in ignored `.env`; application settings stay in ignored `settings_local.py`.
 
 Request records distinguish HTTP outcome (`success`, `redirect`, `not_found`, `client_error`, `server_error`) from `response_completed`, which only indicates whether the response body finished sending. Interrupted responses have outcome `transfer_incomplete`. For errors, `bytes_sent` counts the error response body, not asset bytes.
+
+Error summaries include a safe `reason` code: authentication (`missing_token`, `malformed_token`, `expired_token`, `invalid_token`), request validation (`unknown_collection`, `invalid_filename`, `invalid_thumbnail_scale`), storage (`asset_not_found`, `original_not_found`, `asset_changed`, `invalid_storage_configuration`), or metadata (`metadata_date_not_found`). Unclassified errors retain generic status-based reasons. Codes contain no tokens or exception messages.
