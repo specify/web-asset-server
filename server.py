@@ -478,7 +478,8 @@ def main_page():
 
 
 from bottle import default_app
-app = RequestLogging(default_app(), storage_backend)
+app = RequestLogging(default_app(), storage_backend,
+                     getattr(settings, 'TRUSTED_PROXY_IPS', ()))
 
 if __name__ == '__main__':
     from bottle import run

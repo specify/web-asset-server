@@ -26,3 +26,14 @@ The watchdog checks every minute and restarts only a container Docker has marked
 For named AWS profiles, set `AWS_PROFILE=institution` in `.env` or export it
 in the host environment. The S3 Compose override passes that selection into
 the container; otherwise it uses the `default` profile.
+
+## Requester identification
+
+Logs include `client_ip` and a user agent limited to 512 characters. User agents
+are caller-supplied claims, not verified identities. By default the IP is the
+direct connection peer; arbitrary forwarded headers are ignored. Behind nginx,
+set `proxy_set_header X-Real-IP $remote_addr;` in every proxied location (nginx
+must overwrite the header), then list only nginx's exact connection peer IPs in
+`TRUSTED_PROXY_IPS = ['172.18.0.1']` in private settings. The example IP is a
+Docker gateway; inspect your network for its actual address. Recreate the
+container after changing settings. Do not trust an entire public network.

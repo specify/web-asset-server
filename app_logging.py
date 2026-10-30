@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import uuid
+from ipaddress import ip_address
 from urllib.parse import parse_qs
 
 request_id = ContextVar('request_id', default=None)
@@ -59,9 +60,10 @@ class RedactedErrorStream:
 
 
 class RequestLogging:
-    def __init__(self, application, backend):
+    def __init__(self, application, backend, trusted_proxy_ips=()):
         self.application = application
         self.backend = backend
+        self.trusted_proxy_ips = {str(ip_address(value)) for value in trusted_proxy_ips}
 
     def __call__(self, environ, start_response):
         environ = dict(environ)
@@ -112,6 +114,23 @@ class RequestLogging:
                                        'server_error' if status >= 500 else
                                        'client_error' if status >= 400 else
                                        'redirect' if status >= 300 else 'success'))
+                peer = environ.get('REMOTE_ADDR', '')
+                try:
+                    peer = str(ip_address(peer))
+                except ValueError:
+                    peer = None
+                client = peer
+                if peer in self.trusted_proxy_ips:
+                    # nginx must overwrite this header, never append client input.
+                    try:
+                        client = str(ip_address(environ.get('HTTP_X_REAL_IP', '')))
+                    except ValueError:
+                        pass
+                if client:
+                    fields['client_ip'] = client
+                agent = environ.get('HTTP_USER_AGENT', '')
+                if agent:
+                    fields['user_agent'] = ''.join(c for c in agent[:512] if c.isprintable())
                 reason = environ.get('asset.error_reason')
                 if reason:
                     fields['reason'] = reason

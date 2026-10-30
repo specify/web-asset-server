@@ -176,3 +176,26 @@ class LoggingTests(unittest.TestCase):
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)
+
+    def test_requester_fields_trust_only_configured_proxy(self):
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        def application(env, start):
+            start('200 OK', [])
+            return [b'ok']
+        try:
+            for peer, forwarded, expected in [('192.0.2.1', '198.51.100.2', '192.0.2.1'), ('172.18.0.1', '198.51.100.2', '198.51.100.2'), ('172.18.0.1', 'invalid, spoofed', '172.18.0.1')]:
+                output.seek(0); output.truncate()
+                env = dict(REMOTE_ADDR=peer, HTTP_X_REAL_IP=forwarded, HTTP_X_FORWARDED_FOR='203.0.113.5', HTTP_USER_AGENT='Bot\n' + 'x' * 600)
+                list(RequestLogging(application, 's3', ['172.18.0.1'])(env, lambda *args: None))
+                record = json.loads(output.getvalue())
+                self.assertEqual(record['client_ip'], expected)
+                self.assertLessEqual(len(record['user_agent']), 512)
+                self.assertNotIn('\n', record['user_agent'])
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
