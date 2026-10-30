@@ -45,8 +45,11 @@ select S3. Invalid backend values cause startup to fail.
 
 Precedence is shared defaults, environment variables, then the private file.
 Uppercase local settings override both defaults and environment. `SERVER_NAME` defaults to
-the overridden `HOST`; server/development ports default to `PORT`.
-Set `SERVER_PORT` to the public port (443 for standard HTTPS).
+the overridden `HOST`. `SERVER_PORT` defaults to 443 for public HTTPS and is
+independent of the internal listener `PORT` (8080). Setting `PORT` alone never
+changes discovery URLs. Direct HTTP deployments must explicitly set their
+public `SERVER_PORT` (for example 8080); nonstandard HTTPS ports can also be
+set explicitly. The development port defaults to `PORT`.
 Run `docker compose up -d --force-recreate` after changing configuration.
 The private file must be readable by container UID/GID 999; on Linux, one option
 is `sudo chgrp 999 settings_local.py` followed by `chmod 640 settings_local.py`.

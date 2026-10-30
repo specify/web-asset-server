@@ -30,3 +30,16 @@ class ReasonCodeTests(unittest.TestCase):
                 server.static_handler('../../etc/passwd')
             self.assertEqual(caught.exception.status_code, 404)
             self.assertEqual(request.environ['asset.error_reason'], 'invalid_static_path')
+
+    def test_https_discovery_never_advertises_internal_listener(self):
+        import xml.etree.ElementTree as ET
+        from urllib.parse import urlsplit
+        request.bind({'REQUEST_METHOD': 'GET', 'HTTP_X_FORWARDED_PROTO': 'https'})
+        with patch.object(server.settings, 'SERVER_NAME', 'assets.example.edu'), patch.object(server.settings, 'SERVER_PORT', 443), patch.object(server.settings, 'PORT', 8080):
+            root = ET.fromstring(server.web_asset_store())
+        self.assertEqual(len(root), 5)
+        for endpoint in root:
+            parsed = urlsplit(endpoint.text)
+            self.assertEqual(parsed.scheme, 'https')
+            self.assertEqual(parsed.hostname, 'assets.example.edu')
+            self.assertIsNone(parsed.port)

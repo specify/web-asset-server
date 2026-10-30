@@ -1,5 +1,6 @@
 # Copy to settings_local.py and customize for your institution.
 HOST = 'assets.example.edu'
+SERVER_PORT = 443  # Public HTTPS; the container still listens on PORT = 8080.
 KEY = 'replace-with-your-own-secret'  # Must match Specify attachment preferences.
 
 # Local storage is the default.
@@ -17,6 +18,5 @@ COLLECTION_DIRS = None  # Collections share originals/ and thumbnails/.
 
 # PORT = 8080
 # SERVER_NAME = HOST
-# SERVER_PORT = 443
 # DEBUG = False
 # LOG_LEVEL = 'INFO'

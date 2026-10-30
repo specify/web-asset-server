@@ -35,3 +35,23 @@ class ConfigurationTests(unittest.TestCase):
             update_config(filename, 's3', 'remove', ["O'Brien"])
             result = {}; exec(filename.read_text(), result)
             self.assertEqual(result['COLLECTION_S3_PATHS'], {})
+
+    def test_public_https_port_never_inherits_internal_listener(self):
+        for local_source in ['', "HOST = 'assets.example.edu'\nPORT = 9000\n"]:
+            with tempfile.TemporaryDirectory() as directory:
+                shutil.copy('settings.py', directory)
+                Path(directory, 'settings_local.py').write_text(local_source)
+                env = dict(os.environ)
+                env.pop('SERVER_PORT', None)
+                env['PORT'] = '8080'
+                subprocess.run([sys.executable, '-c',
+                    "import settings; assert settings.SERVER_PORT == 443; "
+                    "assert settings.PORT in (8080, 9000)"], cwd=directory, env=env, check=True)
+
+    def test_shared_example_explicitly_uses_public_https_port(self):
+        with tempfile.TemporaryDirectory() as directory:
+            shutil.copy('settings.py', directory)
+            shutil.copy('settings_local.example.py', Path(directory, 'settings_local.py'))
+            subprocess.run([sys.executable, '-c',
+                "import settings; assert settings.SERVER_PORT == 443; assert settings.PORT == 8080"],
+                cwd=directory, check=True)
