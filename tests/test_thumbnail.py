@@ -49,7 +49,7 @@ class ThumbnailTests(unittest.TestCase):
                 body = BytesIO(b'original')
                 client.get_object.return_value = {'Body':body}
                 inputs=[]
-                def convert(source, *args):
+                def convert(source, *args, **kwargs):
                     inputs.append(source)
                     self.assertTrue(source.endswith('[0]'))
                     Path(args[-1]).write_bytes(b'png')
@@ -60,3 +60,38 @@ class ThumbnailTests(unittest.TestCase):
                 self.assertTrue(body.closed)
                 self.assertFalse(Path(inputs[0][:-3]).parent.exists())
                 client.put_object.assert_called_once()
+
+    def test_busy_generation_rejects_without_downloading_and_cached_still_works(self):
+        from threading import BoundedSemaphore
+        from bottle import HTTPError, response
+        server = importlib.import_module('server')
+        slots = BoundedSemaphore(1)
+        slots.acquire()
+        client = Mock()
+        request.bind({'REQUEST_METHOD': 'GET', 'QUERY_STRING': 'coll=c&type=T&scale=24&filename=image.jpg'})
+        response.bind()
+        with patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
+            client.head_object.side_effect = ClientError({'Error': {'Code': '404'}}, 'HeadObject')
+            with self.assertRaises(HTTPError) as caught:
+                server.resolve_s3_key()
+            self.assertEqual(caught.exception.status_code, 503)
+            self.assertEqual(caught.exception.get_header('Retry-After'), '5')
+            self.assertEqual(request.environ['asset.error_reason'], 'thumbnail_busy')
+            client.get_object.assert_not_called()
+            client.head_object.side_effect = None
+            self.assertEqual(server.resolve_s3_key(), ('bucket', 'thumb'))
+        slots.release()
+
+    def test_failure_releases_generation_slot(self):
+        from threading import BoundedSemaphore
+        server = importlib.import_module('server')
+        slots = BoundedSemaphore(1)
+        client = Mock()
+        client.head_object.side_effect = ClientError({'Error': {'Code': '404'}}, 'HeadObject')
+        client.get_object.side_effect = RuntimeError('storage unavailable')
+        request.bind({'REQUEST_METHOD': 'GET', 'QUERY_STRING': 'coll=c&type=T&scale=24&filename=image.jpg'})
+        with patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
+            with self.assertRaises(RuntimeError):
+                server.resolve_s3_key()
+        self.assertTrue(slots.acquire(blocking=False))
+        slots.release()

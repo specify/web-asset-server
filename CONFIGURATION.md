@@ -64,3 +64,13 @@ See [Docker deployment](deploy/README.md) for the standard Compose setup, option
 Request records distinguish HTTP outcome (`success`, `redirect`, `not_found`, `client_error`, `server_error`) from `response_completed`, which only indicates whether the response body finished sending. Interrupted responses have outcome `transfer_incomplete`. For errors, `bytes_sent` counts the error response body, not asset bytes.
 
 Error summaries include a safe `reason` code: authentication (`missing_token`, `malformed_token`, `expired_token`, `invalid_token`), request validation (`unknown_collection`, `invalid_filename`, `invalid_thumbnail_scale`), storage (`asset_not_found`, `original_not_found`, `asset_changed`, `invalid_storage_configuration`), or metadata (`metadata_date_not_found`). Unclassified errors retain generic status-based reasons. Codes contain no tokens or exception messages.
+
+## Thumbnail load protection
+
+`THUMBNAIL_CONCURRENCY = 1` limits uncached generation per application process.
+Cached thumbnails and original downloads bypass it. Busy requests receive HTTP
+503 with `Retry-After: 5` and reason `thumbnail_busy`; clients should retry with
+backoff and jitter. Conversions time out after `THUMBNAIL_TIMEOUT_SECONDS = 60`
+with HTTP 504 and reason `thumbnail_timeout`. Increase concurrency only after
+measuring memory use. This is a bounded admission limit, not a background queue
+or an automatic client retry mechanism.

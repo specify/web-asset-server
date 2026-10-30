@@ -167,7 +167,9 @@ class RequestLogging:
                 request_id.reset(token)
 
 
-def abort_with_reason(status, reason, message):
-    from bottle import request, abort
+def abort_with_reason(status, reason, message, **headers):
+    from bottle import request, abort, HTTPError
     request.environ['asset.error_reason'] = reason
+    if headers:
+        raise HTTPError(status, message, **headers)
     abort(status, message)

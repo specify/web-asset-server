@@ -7,6 +7,9 @@ import os
 # information to console.
 DEBUG = False
 LOG_LEVEL = 'INFO'
+# Per server process; cached thumbnails and original reads bypass this limit.
+THUMBNAIL_CONCURRENCY = 1
+THUMBNAIL_TIMEOUT_SECONDS = 60
 # Exact proxy peer addresses allowed to supply nginx's overwritten X-Real-IP.
 TRUSTED_PROXY_IPS = []
 #DEBUG = True
