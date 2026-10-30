@@ -42,6 +42,10 @@ container after changing settings. Do not trust an entire public network.
 
 The Compose health probe identifies itself as `SpecifyAssetHealthcheck/1.0`.
 Successful completed loopback probes are omitted from application request logs;
-failed probes are retained with `healthcheck: true`. External requests remain
-logged even when they claim the same user agent. Docker still records health
-status and recent probe results in its health inspection data.
+HTTP failures and incomplete responses from identified probes are retained with
+`healthcheck: true`. A completed HTTP 200 response is suppressed before the
+probe validates its body, so malformed XML or an incorrect URL count can make
+Docker mark the probe failed without an application request record. Connection
+failures may never reach the application either. Inspect these failures with
+`docker inspect --format '{{json .State.Health}}' "$(docker compose ps -q asset-server)"`.
+External requests remain logged even when they claim the same user agent.
