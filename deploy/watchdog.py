@@ -9,15 +9,19 @@ import time
 
 def container_state():
     container = subprocess.check_output(
-        ['docker', 'compose', 'ps', '-q', 'asset-server'], text=True).strip()
+        ['docker', 'compose', 'ps', '-q', 'asset-server'], text=True, timeout=10).strip()
     if not container:
         return None
     return json.loads(subprocess.check_output(
-        ['docker', 'inspect', container], text=True))[0]['State']
+        ['docker', 'inspect', container], text=True, timeout=10))[0]['State']
 
 
 def check(state_dir, cooldown=600):
-    state = container_state()
+    try:
+        state = container_state()
+    except subprocess.TimeoutExpired:
+        print('Docker state query timed out; retrying on next timer run.', flush=True)
+        return
     if not state or state.get('Health', {}).get('Status') != 'unhealthy':
         return
     now = time.time()

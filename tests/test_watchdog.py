@@ -38,3 +38,16 @@ class WatchdogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, patch.object(watchdog, 'container_state', return_value=state), patch.object(watchdog.subprocess, 'run') as restart, patch.object(watchdog.time, 'time', return_value=10000):
             watchdog.check(Path(d))
             restart.assert_not_called()
+
+    def test_docker_query_timeout_does_not_restart(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(watchdog.subprocess, 'check_output', side_effect=watchdog.subprocess.TimeoutExpired('docker', 10)) as query, patch.object(watchdog.subprocess, 'run') as restart:
+            watchdog.check(Path(d))
+            self.assertEqual(query.call_args.kwargs['timeout'], 10)
+            restart.assert_not_called()
+            self.assertFalse((Path(d) / 'last-attempt').exists())
+
+    def test_inspect_query_is_also_bounded(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(watchdog.subprocess, 'check_output', side_effect=['container-id', watchdog.subprocess.TimeoutExpired('docker', 10)]) as query, patch.object(watchdog.subprocess, 'run') as restart:
+            watchdog.check(Path(d))
+            self.assertEqual(query.call_args.kwargs['timeout'], 10)
+            restart.assert_not_called()
