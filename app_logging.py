@@ -43,12 +43,29 @@ def configure_logging(level='INFO'):
     logging.getLogger('wsgi').disabled = True
 
 
+class RedactedErrorStream:
+    """Keep raw WSGI tracebacks out of stderr; structured errors retain context."""
+    def __init__(self):
+        self.reported = False
+
+    def write(self, text):
+        if text and not self.reported:
+            logger.error('wsgi_error')
+            self.reported = True
+        return len(text)
+
+    def flush(self):
+        pass
+
+
 class RequestLogging:
     def __init__(self, application, backend):
         self.application = application
         self.backend = backend
 
     def __call__(self, environ, start_response):
+        environ = dict(environ)
+        environ['wsgi.errors'] = RedactedErrorStream()
         identifier = uuid.uuid4().hex
         token = request_id.set(identifier)
         started = time.monotonic()

@@ -145,3 +145,34 @@ class LoggingTests(unittest.TestCase):
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)
+
+    def test_bottle_unhandled_error_does_not_leak_to_wsgi_errors(self):
+        from bottle import Bottle
+        from wsgiref.util import setup_testing_defaults
+        application = Bottle()
+        @application.route('/fail')
+        def fail():
+            raise PermissionError('/private/attachments/sensitive.jpg token=secret')
+        raw_errors = StringIO()
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        env = {}
+        setup_testing_defaults(env)
+        env.update(PATH_INFO='/fail', **{'wsgi.errors': raw_errors})
+        statuses = []
+        try:
+            list(RequestLogging(application, 'local')(env, lambda status, *args: statuses.append(status)))
+            self.assertTrue(statuses[0].startswith('500'))
+            self.assertEqual(raw_errors.getvalue(), '')
+            self.assertNotIn('sensitive.jpg', output.getvalue())
+            self.assertNotIn('token=secret', output.getvalue())
+            records = [json.loads(line) for line in output.getvalue().splitlines()]
+            self.assertTrue(any(r['event'] == 'wsgi_error' for r in records))
+            self.assertEqual(records[-1]['status'], 500)
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
