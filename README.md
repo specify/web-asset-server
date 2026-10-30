@@ -52,6 +52,11 @@ grant container GID 999 read access to the private file (for example,
 
 ## Tests
 
+CI uses Python 3.12 and ImageMagick. On Ubuntu, install ImageMagick with
+`sudo apt-get install imagemagick` before running the tests. The `convert`
+command is required when importing server routes; the multi-layer TIFF test
+also checks for it explicitly.
+
 ```sh
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
