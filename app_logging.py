@@ -81,7 +81,12 @@ class RequestLogging:
                               route=getattr(route, 'rule', 'unmatched'),
                               status=status, bytes_sent=count,
                               duration_ms=round((time.monotonic()-started)*1000, 2),
-                              completed=completed)
+                              response_completed=completed,
+                              outcome=('transfer_incomplete' if not completed else
+                                       'not_found' if status == 404 else
+                                       'server_error' if status >= 500 else
+                                       'client_error' if status >= 400 else
+                                       'redirect' if status >= 300 else 'success'))
                 if fields['route'] in ('/fileget', '/getmetadata', '/getfileref'):
                     try:
                         query = parse_qs(environ.get('QUERY_STRING', ''), max_num_fields=100)

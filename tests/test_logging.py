@@ -22,7 +22,7 @@ class LoggingTests(unittest.TestCase):
             self.assertEqual(b''.join(body),b'abcd')
             record=json.loads(output.getvalue())
             self.assertEqual(record['bytes_sent'],4)
-            self.assertTrue(record['completed'])
+            self.assertTrue(record['response_completed'])
             self.assertEqual(dict(headers)['X-Request-ID'],record['request_id'])
             self.assertNotIn('private',output.getvalue())
             self.assertNotIn('secret',output.getvalue())
@@ -65,6 +65,30 @@ class LoggingTests(unittest.TestCase):
                 self.assertEqual(record['asset_type'], expected)
                 self.assertNotIn('backend', record)
                 self.assertNotIn('PRIVATE', output.getvalue())
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
+
+    def test_http_errors_are_distinct_from_completed_transfers(self):
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            for status, outcome, level in [(200, 'success', 'INFO'), (404, 'not_found', 'WARNING'), (403, 'client_error', 'WARNING'), (500, 'server_error', 'ERROR')]:
+                output.seek(0); output.truncate()
+                def application(env, start):
+                    start(str(status) + ' Response', [])
+                    return [b'response body']
+                list(RequestLogging(application, 's3')({'REQUEST_METHOD': 'GET'}, lambda *args: None))
+                record = json.loads(output.getvalue())
+                self.assertEqual(record['status'], status)
+                self.assertEqual(record['outcome'], outcome)
+                self.assertEqual(record['level'], level)
+                self.assertTrue(record['response_completed'])
+                self.assertNotIn('completed', record)
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)

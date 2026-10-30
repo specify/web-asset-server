@@ -60,3 +60,5 @@ when using local mode. Do not bake secrets into shared images.
 ## Deploying with Docker
 
 See [Docker deployment](deploy/README.md) for the standard Compose setup, optional AWS credential mount, startup on reboot, and daily restart timer. Institution-specific paths and ownership go in ignored `.env`; application settings stay in ignored `settings_local.py`.
+
+Request records distinguish HTTP outcome (`success`, `redirect`, `not_found`, `client_error`, `server_error`) from `response_completed`, which only indicates whether the response body finished sending. Interrupted responses have outcome `transfer_incomplete`. For errors, `bytes_sent` counts the error response body, not asset bytes.
