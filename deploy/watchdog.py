@@ -2,6 +2,7 @@
 """Restart a Docker-unhealthy Compose service"""
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import time
@@ -34,7 +35,8 @@ def check(state_dir, cooldown=600):
     from datetime import datetime
     started = state.get('StartedAt')
     if started:
-        started_at = datetime.fromisoformat(started.replace('Z', '+00:00')).timestamp()
+        normalized = re.sub(r'(\.\d{6})\d+', r'\1', started.replace('Z', '+00:00'))
+        started_at = datetime.fromisoformat(normalized).timestamp()
         if now - started_at < cooldown:
             return
     state_dir.mkdir(parents=True, exist_ok=True)

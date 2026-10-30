@@ -51,3 +51,16 @@ class WatchdogTests(unittest.TestCase):
             watchdog.check(Path(d))
             self.assertEqual(query.call_args.kwargs['timeout'], 10)
             restart.assert_not_called()
+
+    def test_nanoseconds_are_normalized_for_older_host_python(self):
+        from datetime import datetime
+        real_parse = datetime.fromisoformat
+        def strict_parse(value):
+            self.assertIn('.123456+', value)
+            return real_parse(value)
+        state = {'Health': {'Status': 'unhealthy'}, 'StartedAt': '1970-01-01T02:45:00.123456789Z'}
+        with tempfile.TemporaryDirectory() as d, patch.object(watchdog, 'container_state', return_value=state), patch('datetime.datetime') as parser, patch.object(watchdog.subprocess, 'run') as restart, patch.object(watchdog.time, 'time', return_value=10000):
+            parser.fromisoformat.side_effect = strict_parse
+            watchdog.check(Path(d))
+            parser.fromisoformat.assert_called_once()
+            restart.assert_not_called()
