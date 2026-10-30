@@ -7,7 +7,7 @@ services:
     healthcheck:
       test:
         - CMD
-        - python3
+        - ve/bin/python
         - -c
         - "import urllib.request, xml.etree.ElementTree as ET; r = urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8080/web_asset_store.xml', headers={'User-Agent': 'SpecifyAssetHealthcheck/1.0'}), timeout=3); root = ET.fromstring(r.read()); assert root.tag == 'urls' and len(root.findall('url')) == 5"
       interval: 30s
