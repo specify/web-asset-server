@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily asset server container restart
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Set this to the directory containing docker-compose.yml and .env.
+WorkingDirectory=/opt/web-asset-server
+ExecStart=/usr/bin/docker compose restart asset-server

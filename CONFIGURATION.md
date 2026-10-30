@@ -56,3 +56,7 @@ to send `X-Forwarded-Proto`.
 For the included Dockerfile, mount local settings read-only at
 `/home/specify/settings_local.py` and mount persistent storage at `BASE_DIR`
 when using local mode. Do not bake secrets into shared images.
+
+## Deploying with Docker
+
+See [Docker deployment](deploy/README.md) for the standard Compose setup, optional AWS credential mount, startup on reboot, and daily restart timer. Institution-specific paths and ownership go in ignored `.env`; application settings stay in ignored `settings_local.py`.

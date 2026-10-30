@@ -1,29 +1,19 @@
-services: 
+services:
   asset-server:
+    image: ${ASSET_IMAGE:-specify-assets:local}
+    build: .
     restart: unless-stopped
-    build:
-      context: ./.
     init: true
+    user: '${ASSET_UID:-999}:${ASSET_GID:-999}'
     logging:
       driver: json-file
       options:
         max-size: '10m'
         max-file: '3'
     volumes:
-      - "attachments:/home/specify/attachments"
+      - '${ASSET_ATTACHMENTS:-attachments}:/home/specify/attachments'
       - './settings_local.py:/home/specify/settings_local.py:ro'
-    environment:
-      - SERVER_NAME=host.docker.internal
-      - SERVER_PORT=8080
-      - ATTACHMENT_KEY=test_attachment_key
-      - DEBUG_MODE=false
     ports:
-    # Instead of exposing the host machine's port, you can add this container
-    # to an existing Docker network (e.g., one that the Specify 7 instance is 
-    # on)
-    # See:
-    # https://docs.docker.com/compose/how-tos/networking/#use-an-existing-network
-      - "8080:8080"
-
+      - '${ASSET_BIND_ADDRESS:-127.0.0.1}:${ASSET_PORT:-8080}:8080'
 volumes:
   attachments:

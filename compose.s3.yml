@@ -1,0 +1,8 @@
+# Optional when using AWS credential files rather than an instance role.
+services:
+  asset-server:
+    environment:
+      AWS_SHARED_CREDENTIALS_FILE: /aws/credentials
+      AWS_CONFIG_FILE: /aws/config
+    volumes:
+      - '${AWS_CONFIG_DIR:-${HOME}/.aws}:/aws:ro'

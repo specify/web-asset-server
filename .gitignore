@@ -8,3 +8,6 @@ attachments/*
 # Private deployment settings and production snapshots
 settings_local.py
 .production-snapshot/
+
+# Private Compose deployment settings
+.env
