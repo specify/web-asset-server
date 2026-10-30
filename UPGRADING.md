@@ -12,8 +12,8 @@
 4. Use `docker compose build` and `docker compose up -d`. The included Compose
    file mounts private configuration read-only and persists local attachments.
    To reuse existing filesystem data, replace its named volume with a bind mount
-   such as `/srv/existing-attachments:/home/specify/attachments`. Ensure UID/GID
-   999 can read/write it. Never use `docker compose down -v` on retained data.
+   such as `/srv/existing-attachments:/home/specify/attachments`. Ensure the configured container UID/GID
+   can read/write it. Never use `docker compose down -v` on retained data.
 5. Set `SERVER_NAME` and `SERVER_PORT` to the public hostname and port, not the
    container's internal port. Configure HTTPS through your reverse proxy and
    forward `X-Forwarded-Proto`. Verify discovery, an existing original, a thumbnail,
@@ -45,9 +45,11 @@ are created on upload, and removing mappings preserves assets. It never restarts
 systemd or contacts S3. Recreating is required after atomic file replacement so
 Docker binds the new file rather than retaining the old inode.
 
-The container runs as UID/GID 999. Its private configuration must be readable by
-that user. For example, on Linux use `sudo chgrp 999 settings_local.py` and
-`chmod 640 settings_local.py`. Run the helper with sudo when preserving a group your user does not belong to.
+The container defaults to UID/GID 999, but that numeric host group may have
+unrelated members. Select a restricted host group, verify its membership, and
+set `ASSET_GID` in `.env` to its numeric GID before granting configuration access.
+For example, use a dedicated `specify-assets` group, then
+`sudo chgrp specify-assets settings_local.py` and `chmod 640 settings_local.py`. Run the helper with sudo when preserving a group your user does not belong to.
 The helper preserves existing ownership and mode and removes temporary files on failure.
 New files are created with mode 600; grant container access before deployment.
 

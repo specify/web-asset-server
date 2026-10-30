@@ -1,7 +1,7 @@
 # Docker deployment
 
 1. Install Docker Engine and its Compose plugin.
-2. Copy `settings_local.example.py` to `settings_local.py` and configure your institution (see `CONFIGURATION.md`). Keep the application port at 8080 inside the container.
+2. Follow the private-file ownership and restricted-group setup in `README.md`, then copy `settings_local.example.py` to `settings_local.py` only if it does not already exist and configure your institution (see `CONFIGURATION.md`). Keep the application port at 8080 inside the container.
 3. Optionally copy `.env.example` to `.env` to configure host paths, port, and file ownership. Private settings and `.env` stay outside Git.
 4. Run `docker compose up -d --build`. For AWS credential files, use `docker compose -f docker-compose.yml -f compose.s3.yml up -d --build` instead. Set `AWS_CONFIG_DIR` to their directory and ensure the configured container UID/GID can read them. Instance roles do not require this optional mount; their metadata endpoint must be reachable from containers.
 

@@ -7,7 +7,12 @@ the same attachment API. Docker Compose is the recommended deployment method.
 
 ```sh
 install -m 600 settings_local.example.py settings_local.py
-sudo chgrp 999 settings_local.py
+# Use a dedicated host group with no unrelated members (choose another name if it exists).
+sudo groupadd --system specify-assets
+ASSET_GID=$(getent group specify-assets | cut -d: -f3)
+# If .env already exists, update its ASSET_GID rather than adding another assignment.
+printf 'ASSET_GID=%s\n' "$ASSET_GID" >> .env
+sudo chgrp specify-assets settings_local.py
 chmod 640 settings_local.py
 # Edit settings_local.py for your institution before starting.
 docker compose up -d --build
@@ -18,8 +23,8 @@ Set a private authentication `KEY` matching Specify attachment preferences,
 the public `HOST`, and public `SERVER_PORT`. The included Compose file exposes
 port 8080 and mounts `settings_local.py` read-only. Local data persists in the
 `attachments` named volume at `/home/specify/attachments`. To reuse existing
-files, replace the named volume with a bind mount and grant container UID/GID
-999 read/write access. Keep the container's `PORT` at 8080 unless you also change
+files, replace the named volume with a bind mount and grant the configured
+container UID and restricted host group read/write access. Keep the container's `PORT` at 8080 unless you also change
 the container port mapping.
 
 Use `SERVER_PORT = 8080` for direct HTTP testing, or `SERVER_PORT = 443` behind
@@ -47,8 +52,11 @@ Back up configuration and assets before updating and retain the previous image
 for rollback. Never remove persistent volumes during an upgrade. Change private
 settings on the host, then run `docker compose up -d --force-recreate` to apply
 them reliably, including when an editor replaces the file atomically. On Linux,
-grant container GID 999 read access to the private file (for example,
-`sudo chgrp 999 settings_local.py` and `chmod 640 settings_local.py`).
+select a restricted host group, verify that it has no unrelated members, and
+set `ASSET_GID` in `.env` to its numeric GID before granting it read access
+(`sudo chgrp specify-assets settings_local.py` and `chmod 640 settings_local.py`).
+Do not assume host GID 999 is private; the container default may collide with
+an existing host group.
 
 ## Tests
 
