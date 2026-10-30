@@ -25,7 +25,9 @@ The watchdog checks every minute and restarts only a container Docker has marked
 
 For named AWS profiles, set `AWS_PROFILE=institution` in `.env` or export it
 in the host environment. The S3 Compose override passes that selection into
-the container; otherwise it uses the `default` profile.
+the container when supplied. Otherwise `AWS_PROFILE` stays unset, preserving
+boto3’s normal credential chain (including instance roles); no named profile
+is forced.
 
 ## Requester identification
 

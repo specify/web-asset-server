@@ -2,7 +2,7 @@
 services:
   asset-server:
     environment:
-      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_PROFILE:
       AWS_SHARED_CREDENTIALS_FILE: /aws/credentials
       AWS_CONFIG_FILE: /aws/config
     volumes:
