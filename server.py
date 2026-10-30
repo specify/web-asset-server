@@ -305,7 +305,11 @@ def resolve_s3_key():
             # rather than numbered -0/-1 files. This also covers PDFs and sequences.
             local_orig += '[0]'
             try:
-                convert(local_orig, *convert_args, local_thumb,
+                limits = ['-limit', 'thread', '1',
+                          '-limit', 'memory', getattr(settings, 'THUMBNAIL_MEMORY_LIMIT', '64MiB'),
+                          '-limit', 'map', getattr(settings, 'THUMBNAIL_MAP_LIMIT', '64MiB'),
+                          '-limit', 'disk', getattr(settings, 'THUMBNAIL_DISK_LIMIT', '512MiB')]
+                convert(*limits, local_orig, *convert_args, local_thumb,
                         _timeout=getattr(settings, 'THUMBNAIL_TIMEOUT_SECONDS', 60))
             except TimeoutException:
                 abort_with_reason(504, 'thumbnail_timeout', 'Thumbnail generation timed out')

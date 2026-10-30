@@ -49,7 +49,9 @@ class ThumbnailTests(unittest.TestCase):
                 body = BytesIO(b'original')
                 client.get_object.return_value = {'Body':body}
                 inputs=[]
-                def convert(source, *args, **kwargs):
+                def convert(*args, **kwargs):
+                    self.assertEqual(args[:3], ('-limit', 'thread', '1'))
+                    source = next(arg for arg in args if arg.endswith('[0]'))
                     inputs.append(source)
                     self.assertTrue(source.endswith('[0]'))
                     Path(args[-1]).write_bytes(b'png')
