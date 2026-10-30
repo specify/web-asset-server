@@ -92,3 +92,24 @@ class LoggingTests(unittest.TestCase):
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)
+
+    def test_wsgi_write_and_yield_both_count(self):
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        written = []
+        def application(env, start):
+            write = start('200 OK', [])
+            write(b'ab')
+            return [b'cd']
+        try:
+            body = RequestLogging(application, 's3')({}, lambda *args: written.append)
+            self.assertEqual(b''.join(body), b'cd')
+            self.assertEqual(written, [b'ab'])
+            self.assertEqual(json.loads(output.getvalue())['bytes_sent'], 4)
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)

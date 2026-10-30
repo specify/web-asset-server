@@ -61,7 +61,13 @@ class RequestLogging:
             status = int(value.split()[0])
             headers = [(k,v) for k,v in headers if k.lower() != 'x-request-id']
             headers.append(('X-Request-ID', identifier))
-            return start_response(value, headers, exc_info)
+            write = start_response(value, headers, exc_info)
+            def counted_write(data):
+                nonlocal count
+                result = write(data)
+                count += len(data)
+                return result
+            return counted_write
         try:
             result = self.application(environ, start)
             for chunk in result:
