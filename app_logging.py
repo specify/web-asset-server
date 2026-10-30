@@ -55,6 +55,7 @@ class RequestLogging:
         status = 500
         count = 0
         completed = False
+        streaming_error = False
         result = None
         def start(value, headers, exc_info=None):
             nonlocal status
@@ -75,6 +76,7 @@ class RequestLogging:
                 yield chunk
             completed = True
         except Exception:
+            streaming_error = True
             logger.exception('request_failed')
             raise
         finally:
@@ -114,7 +116,7 @@ class RequestLogging:
                     collection, separator, filename = path.partition('/')
                     if separator:
                         fields.update(collection=collection[:1024], filename=filename[:1024])
-                level = logging.ERROR if status >= 500 else logging.WARNING if status >= 400 or not completed else logging.INFO
+                level = logging.ERROR if streaming_error or status >= 500 else logging.WARNING if status >= 400 or not completed else logging.INFO
                 logger.log(level, 'request_finished', extra={'fields': fields})
                 request_id.reset(token)
 

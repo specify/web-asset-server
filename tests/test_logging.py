@@ -113,3 +113,35 @@ class LoggingTests(unittest.TestCase):
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)
+
+    def test_stream_failure_is_error_but_early_close_is_warning(self):
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        def application(env, start):
+            start('200 OK', [])
+            yield b'partial'
+            raise OSError('private-stream-error')
+        try:
+            body = RequestLogging(application, 's3')({}, lambda *args: None)
+            next(body)
+            with self.assertRaises(OSError):
+                next(body)
+            records = [json.loads(line) for line in output.getvalue().splitlines()]
+            self.assertEqual(records[-1]['status'], 200)
+            self.assertEqual(records[-1]['level'], 'ERROR')
+            self.assertEqual(records[-1]['outcome'], 'transfer_incomplete')
+            self.assertNotIn('private-stream-error', output.getvalue())
+            output.seek(0); output.truncate()
+            body = RequestLogging(application, 's3')({}, lambda *args: None)
+            next(body)
+            body.close()
+            record = json.loads(output.getvalue())
+            self.assertEqual(record['level'], 'WARNING')
+            self.assertFalse(record['response_completed'])
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
