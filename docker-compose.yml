@@ -4,6 +4,16 @@ services:
     build: .
     restart: unless-stopped
     init: true
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request, xml.etree.ElementTree as ET; r = urllib.request.urlopen('http://127.0.0.1:8080/web_asset_store.xml', timeout=3); root = ET.fromstring(r.read()); assert root.tag == 'urls' and len(root.findall('url')) == 5"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     user: '${ASSET_UID:-999}:${ASSET_GID:-999}'
     logging:
       driver: json-file

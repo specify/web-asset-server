@@ -1,0 +1,13 @@
+[Unit]
+Description=Recover persistently unhealthy asset server
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Change this to your checkout directory!
+WorkingDirectory=/opt/web-asset-server
+ExecStart=/usr/bin/python3 deploy/watchdog.py
+StateDirectory=asset-server-watchdog
+Environment=COOLDOWN_SECONDS=600
+TimeoutStartSec=120
