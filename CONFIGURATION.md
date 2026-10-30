@@ -78,7 +78,4 @@ measuring memory use. This bounded queue holds existing HTTP requests; it is not
 queue or an automatic client retry mechanism.
 
 ImageMagick uses one thread per conversion and bounded pixel caches:
-`THUMBNAIL_MEMORY_LIMIT = '64MiB'`, `THUMBNAIL_MAP_LIMIT = '64MiB'`, and
-`THUMBNAIL_DISK_LIMIT = '512MiB'`. These are ImageMagick cache limits, not a hard
-cap on total process memory. Set `THUMBNAIL_CONCURRENCY = 2` in private settings
-to enable a second conversion after measuring available memory.
+`THUMBNAIL_MEMORY_LIMIT = '64MiB'`, `THUMBNAIL_MAP_LIMIT = '64MiB'`, and `THUMBNAIL_DISK_LIMIT = '512MiB'`.
