@@ -8,7 +8,7 @@ settings or `LOG_LEVEL=DEBUG` in the environment (private settings take preceden
 Requests include a generated `X-Request-ID`, route pattern, status, backend,
 duration, bytes sent, and completion state. Stream failures and server errors
 include exception types and stack locations, without exception messages or locals.
-Query strings, headers, credentials and object names are not logged. The included
+Full query strings, headers and credentials are not logged. Asset requests log allowlisted collection, filename and original/thumbnail type fields; static requests log collection and relative filename. The included
 Compose configuration rotates logs at 10 MB and retains three files per container.
 
 S3 downloads stream in 64 KiB chunks and support HEAD and single byte ranges

@@ -40,3 +40,31 @@ class LoggingTests(unittest.TestCase):
         self.assertIn('ValueError',result)
         self.assertNotIn('credential',result)
         self.assertNotIn('private',result)
+
+    def test_asset_fields_are_allowlisted(self):
+        from types import SimpleNamespace
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        def application(env, start):
+            env['bottle.route'] = SimpleNamespace(rule='/fileget')
+            start('200 OK', [])
+            return [b'asset']
+        try:
+            for kind, expected in [('T', 'thumbnail'), ('O', 'original')]:
+                output.seek(0); output.truncate()
+                env = {'REQUEST_METHOD': 'GET', 'QUERY_STRING':
+                       'coll=Example+Collection&filename=image.jpg&type=' + kind + '&token=PRIVATE_TOKEN&other=PRIVATE_VALUE'}
+                list(RequestLogging(application, 's3')(env, lambda *args: None))
+                record = json.loads(output.getvalue())
+                self.assertEqual(record['collection'], 'Example Collection')
+                self.assertEqual(record['filename'], 'image.jpg')
+                self.assertEqual(record['asset_type'], expected)
+                self.assertNotIn('backend', record)
+                self.assertNotIn('PRIVATE', output.getvalue())
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)

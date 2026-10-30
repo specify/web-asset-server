@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import uuid
+from urllib.parse import parse_qs
 
 request_id = ContextVar('request_id', default=None)
 logger = logging.getLogger('asset_server')
@@ -78,9 +79,25 @@ class RequestLogging:
                 route = environ.get('bottle.route')
                 fields = dict(method=environ.get('REQUEST_METHOD'),
                               route=getattr(route, 'rule', 'unmatched'),
-                              status=status, backend=self.backend, bytes_sent=count,
+                              status=status, bytes_sent=count,
                               duration_ms=round((time.monotonic()-started)*1000, 2),
                               completed=completed)
+                if fields['route'] in ('/fileget', '/getmetadata', '/getfileref'):
+                    try:
+                        query = parse_qs(environ.get('QUERY_STRING', ''), max_num_fields=100)
+                    except ValueError:
+                        query = {}
+                    # Explicit allowlist: never log the raw URL, tokens or headers.
+                    for source, field in (('coll', 'collection'), ('filename', 'filename')):
+                        if query.get(source):
+                            fields[field] = query[source][0][:1024]
+                    if fields['route'] != '/getmetadata':
+                        fields['asset_type'] = 'thumbnail' if query.get('type', [''])[0] == 'T' else 'original'
+                elif fields['route'] == '/static/<path:path>':
+                    path = environ.get('PATH_INFO', '').removeprefix('/static/')
+                    collection, separator, filename = path.partition('/')
+                    if separator:
+                        fields.update(collection=collection[:1024], filename=filename[:1024])
                 level = logging.ERROR if status >= 500 else logging.WARNING if status >= 400 or not completed else logging.INFO
                 logger.log(level, 'request_finished', extra={'fields': fields})
                 request_id.reset(token)
