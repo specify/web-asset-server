@@ -33,9 +33,9 @@ migrate or delete existing attachment data.
 Run the helper on the host so it can atomically replace the private file:
 
 ```sh
-python3 manage_collection_dirs.py --backend local add collection_name
-python3 manage_collection_dirs.py --backend s3 add collection_name s3://bucket/prefix
-python3 manage_collection_dirs.py --backend s3 remove collection_name
+sudo python3 manage_collection_dirs.py --backend local add collection_name
+sudo python3 manage_collection_dirs.py --backend s3 add collection_name s3://bucket/prefix
+sudo python3 manage_collection_dirs.py --backend s3 remove collection_name
 docker compose up -d --force-recreate asset-server
 ```
 
@@ -47,5 +47,6 @@ Docker binds the new file rather than retaining the old inode.
 
 The container runs as UID/GID 999. Its private configuration must be readable by
 that user. For example, on Linux use `sudo chgrp 999 settings_local.py` and
-`chmod 640 settings_local.py`. The helper preserves existing ownership and mode.
+`chmod 640 settings_local.py`. Run the helper with sudo when preserving a group your user does not belong to.
+The helper preserves existing ownership and mode and removes temporary files on failure.
 New files are created with mode 600; grant container access before deployment.

@@ -48,17 +48,25 @@ def update_config(filename, backend, action, entries):
     else:
         result = source.rstrip() + '\n\n' + replacement
     ast.parse(result)
-    with NamedTemporaryFile(mode='w', dir=target.parent, delete=False) as output:
-        temporary = output.name
-        output.write(result)
-    if target.exists():
-        import stat
-        metadata = target.stat()
-        os.chmod(temporary, stat.S_IMODE(metadata.st_mode))
-        os.chown(temporary, metadata.st_uid, metadata.st_gid)
-    else:
-        os.chmod(temporary, 0o600)
-    os.replace(temporary, target)
+    temporary = None
+    try:
+        with NamedTemporaryFile(mode='w', dir=target.parent, delete=False) as output:
+            temporary = output.name
+            output.write(result)
+        if target.exists():
+            import stat
+            metadata = target.stat()
+            try:
+                os.chown(temporary, metadata.st_uid, metadata.st_gid)
+            except PermissionError as exc:
+                raise ValueError('Cannot preserve configuration ownership; run the helper with sudo') from exc
+            os.chmod(temporary, stat.S_IMODE(metadata.st_mode))
+        else:
+            os.chmod(temporary, 0o600)
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
 
 
 def main():
@@ -70,7 +78,7 @@ def main():
     args = parser.parse_args()
     try:
         update_config(args.config, args.backend, args.action, args.entries)
-    except (ValueError, SyntaxError) as exc:
+    except (ValueError, SyntaxError, OSError) as exc:
         parser.error(str(exc))
     print('Configuration updated. Recreate the container to apply it. Assets were not changed.')
 
