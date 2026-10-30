@@ -1,45 +1,50 @@
 from collections import defaultdict, OrderedDict
 from functools import wraps
-from glob import glob
 from mimetypes import guess_type
-from os import path, mkdir, remove
-from urllib.parse import quote
-from urllib.request import pathname2url
+from os import path
+from urllib.parse import quote, urlparse
+from io import BytesIO
 
 import exifread
 import hmac
 import json
 import time
-from sh import convert
+from sh import convert, TimeoutException
+from thumbnail_gate import ThumbnailGate
+from threading import BoundedSemaphore
+from metadata_reader import read_metadata, MetadataError
+from botocore.exceptions import ClientError
 
 import settings
 from bottle import (
     Response, request, response, static_file, template, abort,
-    HTTPResponse, route)
+    HTTPResponse, route, redirect
+)
 
 
-def log(msg):
-    if settings.DEBUG:
-        print(msg)
+from bottle import error
+from app_logging import configure_logging, logger, RequestLogging, abort_with_reason
+configure_logging(settings.LOG_LEVEL)
+
+@error(500)
+def show_500(exc):
+    exception = getattr(exc, 'exception', None)
+    logger.error('request_error', exc_info=(type(exception), exception, exception.__traceback__)
+                 if exception else None)
+    return 'Internal Server Error'
 
 
-def get_rel_path(coll, thumb_p):
-    """Return originals or thumbnails subdirectory of the main
-    attachments directory for the given collection.
-    """
-    type_dir = settings.THUMB_DIR if thumb_p else settings.ORIG_DIR
+# S3 client (shared)
+from storage import create_storage
+s3, storage_backend = create_storage(settings)
+thumbnail_slots = ThumbnailGate(getattr(settings, 'THUMBNAIL_CONCURRENCY', 1),
+                                getattr(settings, 'THUMBNAIL_QUEUE_SIZE', 5))
 
-    if settings.COLLECTION_DIRS is None:
-        return type_dir
+metadata_slots = BoundedSemaphore(getattr(settings, 'METADATA_CONCURRENCY', 1))
 
-    try:
-        coll_dir = settings.COLLECTION_DIRS[coll]
-    except KeyError:
-        abort(404, "Unknown collection: %r" % coll)
+logger.info('storage_initialized', extra={'fields': {'backend': storage_backend}})
 
-    return path.join(coll_dir, type_dir)
-
-
+### Token/Auth helpers (unchanged semantics) ###
 def generate_token(timestamp, filename):
     """Generate the auth token for the given filename and timestamp.
     This is for comparing to the client submited token.
@@ -51,7 +56,9 @@ def generate_token(timestamp, filename):
 
 class TokenException(Exception):
     """Raised when an auth token is invalid for some reason."""
-    pass
+    def __init__(self, message, reason='invalid_token'):
+        super().__init__(message)
+        self.reason = reason
 
 
 def get_timestamp():
@@ -68,22 +75,20 @@ def validate_token(token_in, filename):
     """
     if settings.KEY is None:
         return
-    if token_in == '':
-        raise TokenException("Auth token is missing.")
-    if ':' not in token_in:
-        raise TokenException("Auth token is malformed.")
-
-    mac_in, timestr = token_in.split(':')
+    if not token_in or ':' not in token_in:
+        raise TokenException("Auth token is missing or malformed.",
+                             "missing_token" if not token_in else "malformed_token")
+    mac_in, timestr = token_in.split(':', 1)
     try:
         timestamp = int(timestr)
     except ValueError:
-        raise TokenException("Auth token is malformed.")
-
+        raise TokenException("Auth token is malformed.", "malformed_token")
     if settings.TIME_TOLERANCE is not None:
         current_time = get_timestamp()
         if not abs(current_time - timestamp) < settings.TIME_TOLERANCE:
-            raise TokenException("Auth token timestamp out of range: %s vs %s" % (timestamp, current_time))
-
+            raise TokenException(
+                "Auth token timestamp out of range: %s vs %s" % (timestamp, current_time), "expired_token"
+            )
     if token_in != generate_token(timestamp, filename):
         raise TokenException("Auth token is invalid.")
 
@@ -110,13 +115,12 @@ def require_token(filename_param, always=False):
                 try:
                     validate_token(params.token, params.get(filename_param))
                 except TokenException as e:
+                    request.environ['asset.error_reason'] = e.reason
                     response.content_type = 'text/plain; charset=utf-8'
                     response.status = 403
-                    return response
+                    return str(e)
             return func(*args, **kwargs)
-
         return wrapper
-
     return decorator
 
 
@@ -127,11 +131,14 @@ def include_timestamp(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
-        (result if isinstance(result, Response) else response) \
-            .set_header('X-Timestamp', str(get_timestamp()))
+        try:
+            result = func(*args, **kwargs)
+        except HTTPResponse as result:
+            result.set_header('X-Timestamp', str(get_timestamp()))
+            raise
+        target = result if isinstance(result, Response) else response
+        target.set_header('X-Timestamp', str(get_timestamp()))
         return result
-
     return wrapper
 
 
@@ -145,99 +152,254 @@ def allow_cross_origin(func):
         except HTTPResponse as r:
             r.set_header('Access-Control-Allow-Origin', '*')
             raise
-
-        (result if isinstance(result, Response) else response) \
-            .set_header('Access-Control-Allow-Origin', '*')
+        target = result if isinstance(result, Response) else response
+        target.set_header('Access-Control-Allow-Origin', '*')
         return result
-
     return wrapper
 
 
-def resolve_file():
-    """Inspect the request object to determine the file being requested.
-    If the request is for a thumbnail and it has not been generated, do
-    so before returning.
-
-    Returns the relative path to the requested file in the base
-    attachments directory.
+### S3 URI / key helpers ###
+def parse_s3_uri(s3_uri):
     """
-    thumb_p = (request.query['type'] == "T")
-    storename = request.query.filename
-    relpath = get_rel_path(request.query.coll, thumb_p)
+    Parse s3://bucket/prefix and return (bucket, prefix_without_trailing_slash)
+    """
+    parsed = urlparse(s3_uri)
+    if parsed.scheme != 's3' or not parsed.netloc:
+        raise ValueError(f"Invalid S3 URI: {s3_uri!r}")
+    return parsed.netloc, parsed.path.lstrip('/').rstrip('/')
+
+def get_collection_base(coll):
+    """
+    Return (bucket, base_prefix) for the collection, or 404 if unknown.
+    """
+    if storage_backend == 'local':
+        directories = getattr(settings, 'COLLECTION_DIRS', None)
+        if directories is None:
+            return settings.BASE_DIR, ''
+        if coll not in directories:
+            abort_with_reason(404, 'unknown_collection', 'Unknown collection')
+        return path.join(settings.BASE_DIR, directories[coll]), ''
+    try:
+        s3_uri = settings.COLLECTION_S3_PATHS[coll]
+    except KeyError:
+        abort_with_reason(404, 'unknown_collection', 'Unknown collection')
+    try:
+        return parse_s3_uri(s3_uri)
+    except ValueError as e:
+        abort_with_reason(500, 'invalid_storage_configuration', 'Invalid storage configuration')
+
+
+def make_s3_key(coll, thumb, filename=''):
+    """
+    Build bucket and key for given collection, thumb/orig, and filename.
+    """
+    if filename and (filename in ('.', '..') or '/' in filename or '\\' in filename or '\x00' in filename):
+        abort_with_reason(400, 'invalid_filename', 'Attachment filename must be a single filename')
+    bucket, base_prefix = get_collection_base(coll)
+    subdir = settings.THUMB_DIR if thumb else settings.ORIG_DIR
+    parts = []
+    if base_prefix:
+        parts.append(base_prefix)
+    parts.append(subdir)
+    if filename:
+        parts.append(filename)
+    key = '/'.join(p.strip('/') for p in parts)
+    return bucket, key
+
+
+def stream_s3_object(bucket, key):
+    """Retrieve object from S3, abort 404 if missing."""
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
+            abort_with_reason(404, 'asset_not_found', 'Attachment not found')
+        raise
+    try:
+        return obj['Body'].read(), obj.get('ContentType', 'application/octet-stream')
+    finally:
+        obj['Body'].close()
+
+
+def public_origin():
+    protocol = request.headers.get('X-Forwarded-Proto', request.urlparts.scheme)
+    host = settings.SERVER_NAME
+    # Explicit ports in SERVER_NAME remain supported, including IPv6 literals.
+    parsed = urlparse('//' + host)
+    if parsed.port is None and settings.SERVER_PORT != (443 if protocol == 'https' else 80):
+        host += ':' + str(settings.SERVER_PORT)
+    return f'{protocol}://{host}'
+
+
+def serve_object(bucket, key):
+    if storage_backend == 'local':
+        target = s3._path(bucket, key)
+        return static_file(target.name, root=str(target.parent))
+    from s3_http import serve_s3
+    return serve_s3(s3, bucket, key)
+
+
+def resolve_s3_key():
+    """
+    Determine bucket+key for requested file or thumbnail. Generate thumbnail if needed.
+    Returns (bucket, key).
+    """
+    thumb_p = (request.query.get('type') == "T")
+    coll = request.query.coll
+    name = request.query.filename
 
     if not thumb_p:
-        return path.join(relpath, storename)
+        return make_s3_key(coll, False, name)
 
-    basepath = path.join(settings.BASE_DIR, relpath)
-
-    scale = int(request.query.scale)
-    mimetype, encoding = guess_type(storename)
-
-    assert mimetype in settings.CAN_THUMBNAIL
-
-    root, ext = path.splitext(storename)
-
-    if mimetype in ('application/pdf', 'image/tiff', 'image/heic', 'image/heif'):
-        # use PNG for PDF and HEIC thumbnails (ImageMagick can only read HEIC, not write)
+    # Thumbnail logic
+    try:
+        scale = int(request.query.scale)
+    except (TypeError, ValueError):
+        abort_with_reason(400, 'invalid_thumbnail_scale', 'Thumbnail scale must be an integer')
+    if not 1 <= scale <= 4096:
+        abort_with_reason(400, 'invalid_thumbnail_scale', 'Thumbnail scale must be between 1 and 4096')
+    root, ext = path.splitext(name)
+    # ImageMagick reads HEIC/HEIF; generate PNG thumbnails for these formats.
+    if ext.lower() in ('.pdf', '.tiff', '.tif', '.heic', '.heif'):
         ext = '.png'
+    thumb_name = f"{root}_{scale}{ext}"
+    bucket, thumb_key = make_s3_key(coll, True, thumb_name)
 
-    scaled_name = "%s_%d%s" % (root, scale, ext)
-    scaled_pathname = path.join(basepath, scaled_name)
+    # If thumbnail exists, return it
+    try:
+        s3.head_object(Bucket=bucket, Key=thumb_key)
+        logger.debug('thumbnail_cache_hit')
+        return bucket, thumb_key
+    except ClientError as e:
+        if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
+            raise
 
-    if path.exists(scaled_pathname):
-        log("Serving previously scaled thumbnail")
-        return path.join(relpath, scaled_name)
+    if not thumbnail_slots.acquire(timeout=getattr(settings, 'THUMBNAIL_QUEUE_WAIT_SECONDS', 20)):
+        abort_with_reason(503, 'thumbnail_busy', 'Thumbnail generation busy; retry later',
+                          **{'Retry-After': '5'})
+    try:
+        # Another request may have generated this thumbnail while we waited.
+        try:
+            s3.head_object(Bucket=bucket, Key=thumb_key)
+            return bucket, thumb_key
+        except ClientError as e:
+            if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
+                raise
+        # Need to generate thumbnail: fetch original
+        orig_bucket, orig_key = make_s3_key(coll, False, name)
+        try:
+            obj = s3.get_object(Bucket=orig_bucket, Key=orig_key)
+        except ClientError as e:
+            if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
+                abort_with_reason(404, 'original_not_found', 'Original attachment not found')
+            raise
+        # Write temp files for ImageMagick processing
+        from tempfile import TemporaryDirectory
+        from contextlib import closing
+        import shutil
+        with closing(obj['Body']) as body, TemporaryDirectory(prefix='asset-thumbnail-') as tmp:
+            local_orig = path.join(tmp, 'original' + path.splitext(name)[1])
+            local_thumb = path.join(tmp, 'thumbnail' + ext)
+            with open(local_orig, 'wb') as f:
+                shutil.copyfileobj(body, f, length=64 * 1024)
+            convert_args = ['-resize', f"{scale}x{scale}>"]
+            if path.splitext(name)[1].lower() == '.pdf':
+                convert_args += ['-background', 'white', '-flatten']
+            # PR #35: select the first TIFF layer so ImageMagick writes one output
+            # rather than numbered -0/-1 files. This also covers PDFs and sequences.
+            local_orig += '[0]'
+            try:
+                limits = ['-limit', 'thread', '1',
+                          '-limit', 'memory', getattr(settings, 'THUMBNAIL_MEMORY_LIMIT', '64MiB'),
+                          '-limit', 'map', getattr(settings, 'THUMBNAIL_MAP_LIMIT', '64MiB'),
+                          '-limit', 'disk', getattr(settings, 'THUMBNAIL_DISK_LIMIT', '512MiB')]
+                convert(*limits, local_orig, *convert_args, local_thumb,
+                        _timeout=getattr(settings, 'THUMBNAIL_TIMEOUT_SECONDS', 60))
+            except TimeoutException:
+                abort_with_reason(504, 'thumbnail_timeout', 'Thumbnail generation timed out')
+            ctype, _ = guess_type(local_thumb)
+            with open(local_thumb, 'rb') as f:
+                s3.put_object(Bucket=bucket, Key=thumb_key, Body=f,
+                              ContentType=ctype or 'application/octet-stream')
 
-    if not path.exists(basepath):
-        mkdir(basepath)
+    finally:
+        thumbnail_slots.release()
 
-    orig_dir = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
-    orig_path = path.join(orig_dir, storename)
+    logger.info('thumbnail_generated', extra={'fields': {'backend': storage_backend, 'scale': scale}})
 
-    if not path.exists(orig_path):
-        abort(404, "Missing original: %s" % orig_path)
-
-    input_spec = orig_path
-    convert_args = ('-resize', "%dx%d>" % (scale, scale))
-    if mimetype == 'application/pdf':
-        input_spec += '[0]'  # only thumbnail first page of PDF
-        convert_args += ('-background', 'white', '-flatten')  # add white background to PDFs
-
-    log("Scaling thumbnail to %d" % scale)
-    convert(input_spec, *(convert_args + (scaled_pathname,)))
-
-    return path.join(relpath, scaled_name)
+    return bucket, thumb_key
 
 
+### Routes ###
 @route('/static/<path:path>')
-def static(path):
-    """Serve static files to the client. Primarily for Web Portal."""
+def static_handler(path):
+    """Serve local static files (unchanged)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
-    return static_file(path, root=settings.BASE_DIR)
+    if storage_backend == 'local':
+        # Preserve master URLs relative to BASE_DIR.
+        try:
+            target = s3._path(settings.BASE_DIR, path)
+        except ValueError:
+            abort_with_reason(404, 'invalid_static_path', 'Attachment not found')
+        return static_file(target.name, root=str(target.parent))
+
+    parts = path.split('/', 1)
+    if len(parts) != 2:
+        abort(404, f"Bad static path: {path!r}")
+
+    coll, rest = parts
+    try:
+        bucket, base_prefix = get_collection_base(coll)
+    except KeyError:
+        abort_with_reason(404, 'unknown_collection', 'Unknown collection')
+
+    key = '/'.join(p for p in (base_prefix, rest) if p)
+    return serve_object(bucket, key)
 
 
 @route('/getfileref')
 @allow_cross_origin
 def getfileref():
-    """Returns a URL to the static file indicated by the query parameters."""
+    """Return the fileget URL for the requested attachment (client will append token etc)."""
     if not settings.ALLOW_STATIC_FILE_ACCESS:
         abort(404)
+
+    coll = request.query.coll
+    filename = request.query.filename
+
+    # URL-encode the “collection/filename” into a single static path
+    bucket, key = resolve_s3_key()
+    _, prefix = get_collection_base(coll)
+    relative = key[len(prefix.strip('/') + '/'):] if prefix else key
+    if storage_backend == 'local':
+        import os
+        relative = os.path.relpath(s3._path(bucket, key), path.realpath(settings.BASE_DIR))
+        static_path = quote(relative)
+    else:
+        static_path = f"{quote(coll, safe='')}/{quote(relative)}"
+    url = f"{public_origin()}/static/{static_path}"
+
     response.content_type = 'text/plain; charset=utf-8'
-    return "http://%s:%d/static/%s" % (settings.HOST, settings.PORT,
-                                       pathname2url(resolve_file()))
+    return url
 
 
 @route('/fileget')
 @require_token('filename')
 def fileget():
-    """Returns the file data of the file indicated by the query parameters."""
-    r = static_file(resolve_file(), root=settings.BASE_DIR)
-    download_name = request.query.downloadname
+    bucket, key = resolve_s3_key()
+    result = serve_object(bucket, key)
+
+    download_name = request.query.get('downloadname')
     if download_name:
-        download_name = quote(path.basename(download_name).encode('ascii', 'replace'))
-        r.set_header('Content-Disposition', "inline; filename*=utf-8''%s" % download_name)
-    return r
+        dl = quote(path.basename(download_name).encode('ascii', 'replace'))
+        target = result if isinstance(result, HTTPResponse) else response
+        target.set_header(
+            'Content-Disposition',
+            f"inline; filename*=utf-8''{dl}"
+        )
+
+    return result
 
 
 @route('/fileupload', method='OPTIONS')
@@ -251,22 +413,19 @@ def fileupload_options():
 @allow_cross_origin
 @require_token('store')
 def fileupload():
-    """Accept original file uploads and store them in the proper
-    attchment subdirectory.
-    """
-    thumb_p = (request.forms['type'] == "T")
-    storename = request.forms.store
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p))
-    pathname = path.join(basepath, storename)
+    """Upload a new original (thumbnails are derived later)."""
+    thumb_p = (request.forms.get('type') == "T")
+    coll = request.forms.coll
+    name = request.forms.store
 
     if thumb_p:
         return 'Ignoring thumbnail upload!'
 
-    if not path.exists(basepath):
-        mkdir(basepath)
-
+    bucket, key = make_s3_key(coll, False, name)
     upload = list(request.files.values())[0]
-    upload.save(pathname, overwrite=True)
+    content_type = upload.content_type or 'application/octet-stream'
+
+    s3.put_object(Bucket=bucket, Key=key, Body=upload.file, ContentType=content_type)
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
@@ -275,26 +434,21 @@ def fileupload():
 @route('/filedelete', method='POST')
 @require_token('filename')
 def filedelete():
-    """Delete the file indicated by the query parameters. Returns 404
-    if the original file does not exist. Any associated thumbnails will
-    also be deleted.
-    """
-    storename = request.forms.filename
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=False))
-    thumbpath = path.join(settings.BASE_DIR, get_rel_path(request.forms.coll, thumb_p=True))
+    """Delete original + derived thumbnails for a collection."""
+    coll = request.forms.coll
+    name = request.forms.filename
 
-    pathname = path.join(basepath, storename)
-    if not path.exists(pathname):
-        abort(404)
+    # Delete original
+    bucket, orig_key = make_s3_key(coll, False, name)
+    s3.delete_object(Bucket=bucket, Key=orig_key)
 
-    log("Deleting %s" % pathname)
-    remove(pathname)
-
-    prefix = storename.split('.att')[0]
-    pattern = path.join(thumbpath, prefix + '*')
-    log("Deleting thumbnails matching %s" % pattern)
-    for name in glob(pattern):
-        remove(name)
+    # Delete matching thumbnails (prefix: basename_)
+    thumb_bucket, thumb_prefix_base = make_s3_key(coll, True, '')
+    base = path.splitext(name)[0] + '_'
+    paginator = s3.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=thumb_bucket, Prefix=f"{thumb_prefix_base}/{base}"):
+        for obj in page.get('Contents', []):
+            s3.delete_object(Bucket=thumb_bucket, Key=obj['Key'])
 
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
@@ -303,52 +457,50 @@ def filedelete():
 @route('/getmetadata')
 @require_token('filename')
 def getmetadata():
-    """Provides access to EXIF metadata."""
-    storename = request.query.filename
-    basepath = path.join(settings.BASE_DIR, get_rel_path(request.query.coll, thumb_p=False))
-    pathname = path.join(basepath, storename)
-    datatype = request.query.dt
-
-    if not path.exists(pathname):
-        abort(404)
-
-    with open(pathname, 'rb') as f:
+    """Fetch original from S3 and return EXIF metadata."""
+    coll = request.query.coll
+    name = request.query.filename
+    bucket, key = make_s3_key(coll, False, name)
+    if not metadata_slots.acquire(blocking=False):
+        abort_with_reason(503, 'metadata_busy', 'Metadata processing busy; retry later',
+                          **{'Retry-After': '5'})
+    try:
         try:
-            tags = exifread.process_file(f)
-        except:
-            log("Error reading exif data.")
-            tags = {}
+            tags = read_metadata(s3, bucket, key,
+                                 max_bytes=getattr(settings, 'METADATA_MAX_BYTES', 32*1024*1024),
+                                 timeout=getattr(settings, 'METADATA_TIMEOUT_SECONDS', 10),
+                                 memory_bytes=getattr(settings, 'METADATA_MEMORY_BYTES', 192*1024*1024))
+        except MetadataError as exc:
+            abort_with_reason(exc.status, exc.reason, 'Metadata request could not be processed')
+        except ClientError as exc:
+            if exc.response['Error']['Code'] in ('404', 'NoSuchKey', 'NotFound'):
+                abort_with_reason(404, 'asset_not_found', 'Attachment not found')
+            raise
+    finally:
+        metadata_slots.release()
 
-    if datatype == 'date':
+    if request.query.get('dt') == 'date':
         try:
+            response.content_type = 'text/plain; charset=utf-8'
             return str(tags['EXIF DateTimeOriginal'])
         except KeyError:
-            abort(404, 'DateTime not found in EXIF')
+            abort_with_reason(404, 'metadata_date_not_found', 'DateTime not found in EXIF')
 
-    data = defaultdict(dict)
-    for key, value in list(tags.items()):
-        parts = key.split()
-        if len(parts) < 2: continue
-        try:
-            v = str(value).decode('ascii', 'replace').encode('utf-8')
-        except TypeError:
-            v = repr(value)
+    out = defaultdict(dict)
+    for k, v in tags.items():
+        parts = k.split()
+        if len(parts) < 2:
+            continue
+        out.setdefault(parts[0], {})[parts[1]] = str(v)
 
-        data[parts[0]][parts[1]] = str(v)
-
-    response.content_type = 'application/json'
-    data = [OrderedDict((('Name', key), ('Fields', value)))
-            for key, value in list(data.items())]
-
-    return json.dumps(data, indent=4)
+    result = [OrderedDict((('Name', k), ('Fields', f))) for k, f in out.items()]
+    response.content_type = 'application/json; charset=utf-8'
+    return json.dumps(result, indent=4)
 
 
 @route('/testkey')
 @require_token('random', always=True)
 def testkey():
-    """If access to this resource succeeds, clients can conclude
-    that they have a valid access key.
-    """
     response.content_type = 'text/plain; charset=utf-8'
     return 'Ok.'
 
@@ -356,9 +508,8 @@ def testkey():
 @route('/web_asset_store.xml')
 @include_timestamp
 def web_asset_store():
-    """Serve an XML description of the URLs available here."""
     response.content_type = 'text/xml; charset=utf-8'
-    return template('web_asset_store.xml', host="%s:%d" % (settings.SERVER_NAME, settings.SERVER_PORT))
+    return template('web_asset_store.xml', host=public_origin())
 
 
 @route('/')
@@ -366,8 +517,18 @@ def main_page():
     return 'It works!'
 
 
+from bottle import default_app
+app = RequestLogging(default_app(), storage_backend,
+                     getattr(settings, 'TRUSTED_PROXY_IPS', ()))
+
 if __name__ == '__main__':
     from bottle import run
-
-    run(host='0.0.0.0', port=settings.PORT, server=settings.SERVER,
-        debug=settings.DEBUG, reloader=settings.DEBUG)
+    run(
+        app=app,
+        host='0.0.0.0',
+        port=settings.PORT,
+        server=settings.SERVER,
+        debug=settings.DEBUG,
+        reloader=settings.DEBUG,
+        quiet=True
+    )

@@ -20,19 +20,13 @@ WORKDIR /home/specify
 
 COPY --chown=specify:specify requirements.txt .
 
-RUN python3.14 -m venv ve && ve/bin/pip install --no-cache-dir -r requirements.txt
+RUN python3.14 -m venv ve && \
+    ve/bin/python -m pip install --no-cache-dir --upgrade pip==26.2.2 && \
+    ve/bin/python -m pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=specify:specify *.py views ./
+COPY --chown=specify:specify *.py ./
+COPY --chown=specify:specify views ./views
 
 RUN mkdir -p /home/specify/attachments/
-
-RUN echo \
-        "import os" \
-        "\nSERVER = 'paste'" \
-        "\nSERVER_NAME = os.environ['SERVER_NAME']" \
-        "\nSERVER_PORT = int(os.getenv('SERVER_PORT', 8080))" \
-        "\nKEY = os.environ['ATTACHMENT_KEY']" \
-        "\nDEBUG = os.getenv('DEBUG_MODE', 'false').lower() == 'true'" \
-        >> settings.py
 
 CMD ["ve/bin/python", "server.py"]

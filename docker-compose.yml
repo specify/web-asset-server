@@ -1,28 +1,29 @@
-services: 
+services:
   asset-server:
+    image: ${ASSET_IMAGE:-specify-assets:local}
+    build: .
     restart: unless-stopped
-    build:
-      context: ./.
     init: true
+    healthcheck:
+      test:
+        - CMD
+        - ve/bin/python
+        - -c
+        - "import urllib.request, xml.etree.ElementTree as ET; r = urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8080/web_asset_store.xml', headers={'User-Agent': 'SpecifyAssetHealthcheck/1.0'}), timeout=3); root = ET.fromstring(r.read()); assert root.tag == 'urls' and len(root.findall('url')) == 5"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    user: '${ASSET_UID:-999}:${ASSET_GID:-999}'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     volumes:
-      - "attachments:/home/specify/attachments"
-      # If you need to use the settings.py file, uncomment the following line.
-      # On container start-up, this bind mount will overwrite the changes made
-      # to the settings file during the Build process (e.g., parsing and 
-      # "applying" the environment variables)
-      # - './settings.py:/home/specify/settings.py'
-    environment:
-      - SERVER_NAME=host.docker.internal
-      - SERVER_PORT=8080
-      - ATTACHMENT_KEY=test_attachment_key
-      - DEBUG_MODE=true
+      - '${ASSET_ATTACHMENTS:-attachments}:/home/specify/attachments'
+      - './settings_local.py:/home/specify/settings_local.py:ro'
     ports:
-    # Instead of exposing the host machine's port, you can add this container
-    # to an existing Docker network (e.g., one that the Specify 7 instance is 
-    # on)
-    # See:
-    # https://docs.docker.com/compose/how-tos/networking/#use-an-existing-network
-      - "8080:8080"
-
+      - '${ASSET_BIND_ADDRESS:-127.0.0.1}:${ASSET_PORT:-8080}:8080'
 volumes:
   attachments:

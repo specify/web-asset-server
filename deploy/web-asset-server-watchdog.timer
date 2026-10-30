@@ -1,0 +1,11 @@
+[Unit]
+Description=Check asset server health every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+Unit=web-asset-server-watchdog.service
+
+[Install]
+WantedBy=timers.target

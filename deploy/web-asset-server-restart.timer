@@ -1,0 +1,9 @@
+[Unit]
+Description=Restart asset server daily at 03:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Unit=web-asset-server-restart.service
+
+[Install]
+WantedBy=timers.target
