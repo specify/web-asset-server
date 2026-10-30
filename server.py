@@ -10,7 +10,7 @@ import hmac
 import json
 import time
 from sh import convert, TimeoutException
-from threading import BoundedSemaphore
+from thumbnail_gate import ThumbnailGate
 from botocore.exceptions import ClientError
 
 import settings
@@ -35,7 +35,8 @@ def show_500(exc):
 # S3 client (shared)
 from storage import create_storage
 s3, storage_backend = create_storage(settings)
-thumbnail_slots = BoundedSemaphore(getattr(settings, 'THUMBNAIL_CONCURRENCY', 1))
+thumbnail_slots = ThumbnailGate(getattr(settings, 'THUMBNAIL_CONCURRENCY', 1),
+                                getattr(settings, 'THUMBNAIL_QUEUE_SIZE', 5))
 
 logger.info('storage_initialized', extra={'fields': {'backend': storage_backend}})
 
@@ -269,10 +270,17 @@ def resolve_s3_key():
         if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
             raise
 
-    if not thumbnail_slots.acquire(blocking=False):
+    if not thumbnail_slots.acquire(timeout=getattr(settings, 'THUMBNAIL_QUEUE_WAIT_SECONDS', 20)):
         abort_with_reason(503, 'thumbnail_busy', 'Thumbnail generation busy; retry later',
                           **{'Retry-After': '5'})
     try:
+        # Another request may have generated this thumbnail while we waited.
+        try:
+            s3.head_object(Bucket=bucket, Key=thumb_key)
+            return bucket, thumb_key
+        except ClientError as e:
+            if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
+                raise
         # Need to generate thumbnail: fetch original
         orig_bucket, orig_key = make_s3_key(coll, False, name)
         try:

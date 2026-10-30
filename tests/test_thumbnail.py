@@ -70,7 +70,7 @@ class ThumbnailTests(unittest.TestCase):
         client = Mock()
         request.bind({'REQUEST_METHOD': 'GET', 'QUERY_STRING': 'coll=c&type=T&scale=24&filename=image.jpg'})
         response.bind()
-        with patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
+        with patch.object(settings, 'THUMBNAIL_QUEUE_WAIT_SECONDS', 0), patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
             client.head_object.side_effect = ClientError({'Error': {'Code': '404'}}, 'HeadObject')
             with self.assertRaises(HTTPError) as caught:
                 server.resolve_s3_key()
@@ -90,7 +90,7 @@ class ThumbnailTests(unittest.TestCase):
         client.head_object.side_effect = ClientError({'Error': {'Code': '404'}}, 'HeadObject')
         client.get_object.side_effect = RuntimeError('storage unavailable')
         request.bind({'REQUEST_METHOD': 'GET', 'QUERY_STRING': 'coll=c&type=T&scale=24&filename=image.jpg'})
-        with patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
+        with patch.object(settings, 'THUMBNAIL_QUEUE_WAIT_SECONDS', 0), patch.object(server, 'thumbnail_slots', slots), patch.object(server, 's3', client), patch.object(server, 'make_s3_key', return_value=('bucket', 'thumb')):
             with self.assertRaises(RuntimeError):
                 server.resolve_s3_key()
         self.assertTrue(slots.acquire(blocking=False))

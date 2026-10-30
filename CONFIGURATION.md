@@ -68,9 +68,11 @@ Error summaries include a safe `reason` code: authentication (`missing_token`, `
 ## Thumbnail load protection
 
 `THUMBNAIL_CONCURRENCY = 1` limits uncached generation per application process.
-Cached thumbnails and original downloads bypass it. Busy requests receive HTTP
-503 with `Retry-After: 5` and reason `thumbnail_busy`; clients should retry with
-backoff and jitter. Conversions time out after `THUMBNAIL_TIMEOUT_SECONDS = 60`
+Cached thumbnails and original downloads bypass it. Up to `THUMBNAIL_QUEUE_SIZE = 5` additional requests wait for a slot for
+`THUMBNAIL_QUEUE_WAIT_SECONDS = 20` seconds, allowing normal browser page loads
+to complete sequentially. A full queue or expired wait receives HTTP 503 with
+`Retry-After: 5` and reason `thumbnail_busy`; bulk clients should retry with
+backoff and jitter. The cache is rechecked after waiting to avoid duplicate work. Conversions time out after `THUMBNAIL_TIMEOUT_SECONDS = 60`
 with HTTP 504 and reason `thumbnail_timeout`. Increase concurrency only after
-measuring memory use. This is a bounded admission limit, not a background queue
-or an automatic client retry mechanism.
+measuring memory use. This bounded queue holds existing HTTP requests; it is not a durable background
+queue or an automatic client retry mechanism.
