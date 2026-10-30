@@ -1,3 +1,4 @@
+from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -42,6 +43,9 @@ class StorageTests(unittest.TestCase):
         self.assertIsInstance(store, LocalStorage)
         self.assertEqual(backend, 'local')
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_local_upload_is_readable_by_backup_tools(self):
+        import stat
+        from storage import LocalStorage
+        with tempfile.TemporaryDirectory() as root:
+            LocalStorage().put_object(Bucket=root, Key='originals/test.jpg', Body=b'asset')
+            self.assertEqual(stat.S_IMODE((Path(root) / 'originals/test.jpg').stat().st_mode), 0o644)

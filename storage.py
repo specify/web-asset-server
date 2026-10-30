@@ -41,6 +41,8 @@ class LocalStorage:
                     shutil.copyfileobj(Body, output)
                 else:
                     output.write(Body)
+            # Match normal attachment readability for shared-volume tools.
+            os.chmod(temporary, 0o644)
             os.replace(temporary, target)
         finally:
             if temporary:
