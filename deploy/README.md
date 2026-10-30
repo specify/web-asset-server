@@ -22,3 +22,7 @@ You can see the health with `docker compose ps`. At Specify, we rely on external
 Install `deploy/watchdog.py` with the checkout, copy `deploy/web-asset-server-watchdog.service` and `.timer` to `/etc/systemd/system/`, and set the service's `WorkingDirectory` to the checkout. Run `sudo systemctl daemon-reload && sudo systemctl enable --now web-asset-server-watchdog.timer`.
 
 The watchdog checks every minute and restarts only a container Docker has marked `unhealthy`. It leaves healthy, starting and deliberately stopped containers alone. Restarts are limited to once per ten minutes, including failed attempts and recent container starts. Set `COOLDOWN_SECONDS` in the service to change this. Attempt timestamps persist under `/var/lib/asset-server-watchdog`. Check activity with `journalctl -u web-asset-server-watchdog.service`. Docker itself does not restart unhealthy containers; this optional watchdog supplies that recovery policy without adding another container.
+
+For named AWS profiles, set `AWS_PROFILE=institution` in `.env` or export it
+in the host environment. The S3 Compose override passes that selection into
+the container; otherwise it uses the `default` profile.
