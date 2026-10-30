@@ -20,3 +20,13 @@ class ReasonCodeTests(unittest.TestCase):
             abort_with_reason(404, 'asset_not_found', 'Attachment not found')
         self.assertEqual(caught.exception.status_code, 404)
         self.assertEqual(request.environ['asset.error_reason'], 'asset_not_found')
+
+    def test_local_static_escape_is_not_an_internal_error(self):
+        import tempfile
+        from storage import LocalStorage
+        with tempfile.TemporaryDirectory() as root, patch.object(server, 'storage_backend', 'local'), patch.object(server, 's3', LocalStorage()), patch.object(server.settings, 'BASE_DIR', root), patch.object(server.settings, 'ALLOW_STATIC_FILE_ACCESS', True):
+            request.bind({})
+            with self.assertRaises(HTTPError) as caught:
+                server.static_handler('../../etc/passwd')
+            self.assertEqual(caught.exception.status_code, 404)
+            self.assertEqual(request.environ['asset.error_reason'], 'invalid_static_path')

@@ -308,7 +308,10 @@ def static_handler(path):
         abort(404)
     if storage_backend == 'local':
         # Preserve master URLs relative to BASE_DIR.
-        target = s3._path(settings.BASE_DIR, path)
+        try:
+            target = s3._path(settings.BASE_DIR, path)
+        except ValueError:
+            abort_with_reason(404, 'invalid_static_path', 'Attachment not found')
         return static_file(target.name, root=str(target.parent))
 
     parts = path.split('/', 1)
