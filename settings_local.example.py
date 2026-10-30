@@ -19,3 +19,4 @@ COLLECTION_DIRS = None  # Collections share originals/ and thumbnails/.
 # SERVER_NAME = HOST
 # SERVER_PORT = 443
 # DEBUG = False
+# LOG_LEVEL = 'INFO'

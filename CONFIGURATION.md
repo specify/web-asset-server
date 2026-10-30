@@ -1,5 +1,16 @@
 # Institution configuration
 
+## Logging
+
+Application logs are JSON lines on stdout, collected by Docker. View them with
+`docker compose logs -f asset-server`. Set `LOG_LEVEL = 'INFO'` in private
+settings or `LOG_LEVEL=DEBUG` in the environment (private settings take precedence).
+Requests include a generated `X-Request-ID`, route pattern, status, backend,
+duration, bytes sent, and completion state. Stream failures and server errors
+include exception types and stack locations, without exception messages or locals.
+Query strings, headers, credentials and object names are not logged. The included
+Compose configuration rotates logs at 10 MB and retains three files per container.
+
 S3 downloads stream in 64 KiB chunks and support HEAD and single byte ranges
 (including open-ended and suffix ranges). Unsatisfiable ranges return 416;
 multipart ranges fall back to a full response. If-Range honors an exact ETag or

@@ -4,6 +4,11 @@ services:
     build:
       context: ./.
     init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     volumes:
       - "attachments:/home/specify/attachments"
       - './settings_local.py:/home/specify/settings_local.py:ro'

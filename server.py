@@ -20,24 +20,21 @@ from bottle import (
 
 
 from bottle import error
+from app_logging import configure_logging, logger, RequestLogging
+configure_logging(settings.LOG_LEVEL)
 
 @error(500)
 def show_500(exc):
-    import traceback
-    tb = traceback.format_exc()
-    print(tb)                 # prints in your console
+    exception = getattr(exc, 'exception', None)
+    logger.error('request_error', exc_info=(type(exception), exception, exception.__traceback__)
+                 if exception else None)
     return 'Internal Server Error'
 
 
 # S3 client (shared)
 from storage import create_storage
 s3, storage_backend = create_storage(settings)
-
-
-def log(msg):
-    print(msg)
-    # if getattr(settings, "DEBUG", False):
-    #     print(msg)
+logger.info('storage_initialized', extra={'fields': {'backend': storage_backend}})
 
 ### Token/Auth helpers (unchanged semantics) ###
 def generate_token(timestamp, filename):
@@ -259,7 +256,7 @@ def resolve_s3_key():
     # If thumbnail exists, return it
     try:
         s3.head_object(Bucket=bucket, Key=thumb_key)
-        log(f"Serving cached thumbnail {thumb_key}")
+        logger.debug('thumbnail_cache_hit')
         return bucket, thumb_key
     except ClientError as e:
         if e.response['Error']['Code'] not in ('404', 'NoSuchKey'):
@@ -293,6 +290,8 @@ def resolve_s3_key():
         with open(local_thumb, 'rb') as f:
             s3.put_object(Bucket=bucket, Key=thumb_key, Body=f,
                           ContentType=ctype or 'application/octet-stream')
+
+    logger.info('thumbnail_generated', extra={'fields': {'backend': storage_backend, 'scale': scale}})
 
     return bucket, thumb_key
 
@@ -430,7 +429,7 @@ def getmetadata():
     try:
         tags = exifread.process_file(f)
     except Exception as e:
-        log(f"Error reading EXIF data: {e}")
+        logger.warning('metadata_parse_failed', extra={'fields': {'error_type':type(e).__name__}})
         tags = {}
 
     if request.query.get('dt') == 'date':
@@ -471,12 +470,17 @@ def main_page():
     return 'It works!'
 
 
+from bottle import default_app
+app = RequestLogging(default_app(), storage_backend)
+
 if __name__ == '__main__':
     from bottle import run
     run(
+        app=app,
         host='0.0.0.0',
         port=settings.PORT,
         server=settings.SERVER,
         debug=settings.DEBUG,
-        reloader=settings.DEBUG
+        reloader=settings.DEBUG,
+        quiet=True
     )

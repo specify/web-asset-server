@@ -6,6 +6,7 @@ import os
 # Turns on bottle.py debugging, module reloading and printing some
 # information to console.
 DEBUG = False
+LOG_LEVEL = 'INFO'
 #DEBUG = True
 
 # This secret key is used to generate authentication tokens for requests.
@@ -57,7 +58,7 @@ ALT_DIR_COLLECTIONS = {}
 
 # 1. Environment overrides shared defaults. 
 # 2. Private file overrides environment.
-for _name in ('HOST', 'SERVER_NAME', 'STORAGE_BACKEND', 'BASE_DIR'):
+for _name in ('HOST', 'SERVER_NAME', 'STORAGE_BACKEND', 'BASE_DIR', 'LOG_LEVEL'):
     if _name in os.environ:
         globals()[_name] = os.environ[_name]
 for _name in ('PORT', 'SERVER_PORT'):
