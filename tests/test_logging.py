@@ -199,3 +199,32 @@ class LoggingTests(unittest.TestCase):
         finally:
             logger.removeHandler(handler)
             logger.setLevel(previous)
+
+    def test_only_successful_internal_healthchecks_are_suppressed(self):
+        from types import SimpleNamespace
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        handler.setFormatter(JsonFormatter())
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            for peer, agent, status, suppressed in [
+                ('127.0.0.1', 'SpecifyAssetHealthcheck/1.0', 200, True),
+                ('127.0.0.1', 'SpecifyAssetHealthcheck/1.0', 500, False),
+                ('172.18.0.1', 'SpecifyAssetHealthcheck/1.0', 200, False),
+                ('127.0.0.1', 'Python-urllib/3.12', 200, False),
+            ]:
+                output.seek(0); output.truncate()
+                def application(env, start):
+                    env['bottle.route'] = SimpleNamespace(rule='/web_asset_store.xml')
+                    start(str(status) + ' Response', [])
+                    return [b'response']
+                env = dict(REMOTE_ADDR=peer, HTTP_USER_AGENT=agent, REQUEST_METHOD='GET')
+                list(RequestLogging(application, 's3')(env, lambda *args: None))
+                self.assertEqual(output.getvalue() == '', suppressed)
+                if status == 500:
+                    self.assertTrue(json.loads(output.getvalue())['healthcheck'])
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)

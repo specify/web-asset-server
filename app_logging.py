@@ -153,7 +153,17 @@ class RequestLogging:
                     if separator:
                         fields.update(collection=collection[:1024], filename=filename[:1024])
                 level = logging.ERROR if streaming_error or status >= 500 else logging.WARNING if status >= 400 or not completed else logging.INFO
-                logger.log(level, 'request_finished', extra={'fields': fields})
+                is_healthcheck = (
+                    environ.get('REMOTE_ADDR') in ('127.0.0.1', '::1')
+                    and environ.get('HTTP_USER_AGENT') == 'SpecifyAssetHealthcheck/1.0'
+                    and environ.get('REQUEST_METHOD') == 'GET'
+                    and fields['route'] == '/web_asset_store.xml'
+                    and not environ.get('QUERY_STRING')
+                )
+                if is_healthcheck:
+                    fields['healthcheck'] = True
+                if not (is_healthcheck and status == 200 and completed and not streaming_error):
+                    logger.log(level, 'request_finished', extra={'fields': fields})
                 request_id.reset(token)
 
 

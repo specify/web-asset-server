@@ -37,3 +37,9 @@ must overwrite the header), then list only nginx's exact connection peer IPs in
 `TRUSTED_PROXY_IPS = ['172.18.0.1']` in private settings. The example IP is a
 Docker gateway; inspect your network for its actual address. Recreate the
 container after changing settings. Do not trust an entire public network.
+
+The Compose health probe identifies itself as `SpecifyAssetHealthcheck/1.0`.
+Successful completed loopback probes are omitted from application request logs;
+failed probes are retained with `healthcheck: true`. External requests remain
+logged even when they claim the same user agent. Docker still records health
+status and recent probe results in its health inspection data.
