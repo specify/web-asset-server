@@ -7,6 +7,10 @@ import os
 # information to console.
 DEBUG = False
 LOG_LEVEL = 'INFO'
+METADATA_CONCURRENCY = 1
+METADATA_MAX_BYTES = 32 * 1024 * 1024
+METADATA_MEMORY_BYTES = 192 * 1024 * 1024
+METADATA_TIMEOUT_SECONDS = 10
 # Per server process; cached thumbnails and original reads bypass this limit.
 THUMBNAIL_CONCURRENCY = 1
 THUMBNAIL_QUEUE_SIZE = 5

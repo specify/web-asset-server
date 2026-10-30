@@ -79,3 +79,23 @@ queue or an automatic client retry mechanism.
 
 ImageMagick uses one thread per conversion and bounded pixel caches:
 `THUMBNAIL_MEMORY_LIMIT = '64MiB'`, `THUMBNAIL_MAP_LIMIT = '64MiB'`, and `THUMBNAIL_DISK_LIMIT = '512MiB'`.
+
+## Metadata resource limits
+
+Metadata parsing is isolated in a subprocess. Defaults are one concurrent job,
+a 32 MiB input limit (`METADATA_MAX_BYTES`), a 192 MiB parser address-space limit
+(`METADATA_MEMORY_BYTES`), five CPU seconds and a ten-second wall timeout
+(`METADATA_TIMEOUT_SECONDS`). Input is copied to a bounded temporary file in
+64 KiB chunks, not loaded into the web process. Parser output is limited to
+1 MiB. Linux resource limits are required for the parser sandbox.
+
+Oversized inputs return 413 (`metadata_input_too_large`); a busy parser returns
+503 with Retry-After (`metadata_busy`); timeout returns 504 (`metadata_timeout`);
+parser failures return 422 (`metadata_parse_failed`). Temporary files and
+concurrency slots are released on failures. These limits can reject requests
+for very large originals that previously worked; tune after testing actual
+collections. Normal asset downloads are unaffected.
+
+See `deploy/nginx/README.md` for HTTPS compatibility checks, finite upload
+limits and nginx rate/concurrency controls. These examples must be adapted and
+validated before installation.

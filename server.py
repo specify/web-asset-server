@@ -11,6 +11,8 @@ import json
 import time
 from sh import convert, TimeoutException
 from thumbnail_gate import ThumbnailGate
+from threading import BoundedSemaphore
+from metadata_reader import read_metadata, MetadataError
 from botocore.exceptions import ClientError
 
 import settings
@@ -37,6 +39,8 @@ from storage import create_storage
 s3, storage_backend = create_storage(settings)
 thumbnail_slots = ThumbnailGate(getattr(settings, 'THUMBNAIL_CONCURRENCY', 1),
                                 getattr(settings, 'THUMBNAIL_QUEUE_SIZE', 5))
+
+metadata_slots = BoundedSemaphore(getattr(settings, 'METADATA_CONCURRENCY', 1))
 
 logger.info('storage_initialized', extra={'fields': {'backend': storage_backend}})
 
@@ -457,13 +461,23 @@ def getmetadata():
     coll = request.query.coll
     name = request.query.filename
     bucket, key = make_s3_key(coll, False, name)
-    data, _ = stream_s3_object(bucket, key)
-    f = BytesIO(data)
+    if not metadata_slots.acquire(blocking=False):
+        abort_with_reason(503, 'metadata_busy', 'Metadata processing busy; retry later',
+                          **{'Retry-After': '5'})
     try:
-        tags = exifread.process_file(f)
-    except Exception as e:
-        logger.warning('metadata_parse_failed', extra={'fields': {'error_type':type(e).__name__}})
-        tags = {}
+        try:
+            tags = read_metadata(s3, bucket, key,
+                                 max_bytes=getattr(settings, 'METADATA_MAX_BYTES', 32*1024*1024),
+                                 timeout=getattr(settings, 'METADATA_TIMEOUT_SECONDS', 10),
+                                 memory_bytes=getattr(settings, 'METADATA_MEMORY_BYTES', 192*1024*1024))
+        except MetadataError as exc:
+            abort_with_reason(exc.status, exc.reason, 'Metadata request could not be processed')
+        except ClientError as exc:
+            if exc.response['Error']['Code'] in ('404', 'NoSuchKey', 'NotFound'):
+                abort_with_reason(404, 'asset_not_found', 'Attachment not found')
+            raise
+    finally:
+        metadata_slots.release()
 
     if request.query.get('dt') == 'date':
         try:
