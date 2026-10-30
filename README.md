@@ -6,7 +6,9 @@ the same attachment API. Docker Compose is the recommended deployment method.
 ## Deploy with Docker
 
 ```sh
-cp settings_local.example.py settings_local.py
+install -m 600 settings_local.example.py settings_local.py
+sudo chgrp 999 settings_local.py
+chmod 640 settings_local.py
 # Edit settings_local.py for your institution before starting.
 docker compose up -d --build
 docker compose logs -f asset-server
