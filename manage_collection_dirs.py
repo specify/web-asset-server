@@ -19,6 +19,8 @@ def update_config(filename, backend, action, entries):
     node = assignments[0] if assignments else None
     if node and any(other is not node and other.lineno == node.lineno for other in tree.body):
         raise ValueError('Put collection mappings on their own statement line first')
+    if node is None and backend == 'local':
+        raise ValueError('Shared local storage is the default; define COLLECTION_DIRS = {} first')
     mapping = ast.literal_eval(node.value) if node else {}
     if mapping is None:
         raise ValueError('Shared local storage is enabled; define COLLECTION_DIRS = {} first')

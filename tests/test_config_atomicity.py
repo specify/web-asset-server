@@ -16,3 +16,14 @@ class ConfigAtomicityTests(unittest.TestCase):
                     update_config(target, 'local', 'add', ['example'])
             self.assertEqual(target.read_text(), source)
             self.assertEqual(list(Path(directory).iterdir()), [target])
+
+    def test_missing_local_mapping_does_not_switch_shared_storage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'settings_local.py'
+            source = "KEY = 'private'\n"
+            target.write_text(source)
+            with self.assertRaisesRegex(ValueError, 'Shared local storage'):
+                update_config(target, 'local', 'add', ['example'])
+            self.assertEqual(target.read_text(), source)
+            update_config(target, 's3', 'add', ['example', 's3://bucket/example'])
+            self.assertIn('COLLECTION_S3_PATHS', target.read_text())
