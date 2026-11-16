@@ -8,6 +8,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
         libheif-plugin-libde265 \
         python3.14 \
         python3.14-venv \
+        && apt-get -y upgrade \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 999 specify && \

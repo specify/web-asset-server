@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   weekly:
-    if: github.event_name == 'schedule' && github.repository == 'specify/web-asset-server'
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'specify/web-asset-server'
     permissions:
       contents: read
     runs-on: ubuntu-latest
